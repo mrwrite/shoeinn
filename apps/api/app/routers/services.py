@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends
+from uuid import UUID
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.core.db import get_session
 from app.models.service import Service
@@ -20,6 +21,14 @@ def get_services(session: Session = Depends(get_session)):
         .order_by(Service.name)
         .all()
     )
+
+
+@router.get("/services/{service_id}", response_model=ServiceOut)
+def get_service(service_id: UUID, session: Session = Depends(get_session)):
+    service = session.get(Service, service_id)
+    if not service or not service.active:
+        raise HTTPException(status_code=404, detail="service not found")
+    return service
 
 @router.post("/services/seed")
 def seed_services(session: Session = Depends(get_session)):
