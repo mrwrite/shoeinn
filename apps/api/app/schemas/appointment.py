@@ -1,30 +1,30 @@
-from uuid import UUID
 from pydantic import BaseModel
-from typing import Literal
 
-class AddressIn(BaseModel):
+
+class Address(BaseModel):
     line1: str
     line2: str | None = None
     city: str
     state: str
     postal_code: str
 
-class CustomerIn(BaseModel):
-    name: str
-    email: str
-    phone: str
 
 class AppointmentCreate(BaseModel):
-    service_id: UUID
-    type: Literal["pickup", "dropoff"]
-    address: AddressIn
+    company_id: str | None = None
+    service_id: str | None = None
+    type: str
+    address: Address
     start_time_iso: str
     notes: str | None = None
-    customer: CustomerIn
+
 
 class AppointmentOut(BaseModel):
-    id: UUID
-    service_name: str
+    id: str
+    company_name: str | None = None
+    service_name: str | None = None
     type: str
     start_time_iso: str
     status: str
+
+    class Config:
+        from_attributes = True

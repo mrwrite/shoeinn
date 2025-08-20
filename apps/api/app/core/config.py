@@ -1,15 +1,15 @@
-import os
-from dotenv import load_dotenv
-from pydantic import BaseModel
+from pydantic_settings import BaseSettings
 
-load_dotenv()
 
-class Settings(BaseModel):
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./dev.db")
-    API_HOST: str = os.getenv("API_HOST", "0.0.0.0")
-    API_PORT: int = int(os.getenv("API_PORT", "8000"))
-    ALLOWED_ORIGINS: list[str] = (
-        os.getenv("ALLOWED_ORIGINS", "").split(",") if os.getenv("ALLOWED_ORIGINS") else ["*"]
-    )
+class Settings(BaseSettings):
+    database_url: str = "sqlite:///./dev.db"
+    api_host: str = "0.0.0.0"
+    api_port: int = 8000
+    jwt_secret: str = "changeme"
+    allowed_origins: str = "*"
+
+    class Config:
+        env_file = ".env"
+
 
 settings = Settings()

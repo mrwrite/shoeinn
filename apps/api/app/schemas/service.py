@@ -1,12 +1,12 @@
-from uuid import UUID
 from pydantic import BaseModel
 
+
 class ServiceOut(BaseModel):
-    id: UUID
-    name: str
+    id: str
+    name: str | None = None
     description: str | None = None
-    price_cents: int
-    duration_min: int
+    price_cents: int | None = None
+    duration_min: int | None = None
 
     class Config:
         from_attributes = True

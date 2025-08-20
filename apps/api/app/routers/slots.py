@@ -1,18 +1,17 @@
+from datetime import date, datetime, time, timedelta
+
 from fastapi import APIRouter, Query
-from datetime import datetime, date, time, timedelta
 
-router = APIRouter()
+router = APIRouter(prefix="/slots", tags=["slots"])
 
-@router.get("/slots")
-def get_slots(date: str, type: str = Query(..., regex="^(pickup|dropoff)$")):
-    d = datetime.fromisoformat(date).date()
-    tz = datetime.now().astimezone().tzinfo
-    start = datetime.combine(d, time(9, 0), tzinfo=tz)
-    end = datetime.combine(d, time(17, 30), tzinfo=tz)
-    delta = timedelta(minutes=30)
+
+@router.get("")
+def get_slots(company_id: str | None = None, date: date = Query(...), type: str = Query(...)):
+    start = datetime.combine(date, time(hour=9))
     slots = []
-    cur = start
-    while cur <= end:
-        slots.append({"start_time_iso": cur.isoformat()})
-        cur += delta
-    return slots
+    for i in range(0, 18):
+        dt = start + timedelta(minutes=30 * i)
+        if dt.time() > time(hour=17, minute=30):
+            break
+        slots.append(dt.isoformat())
+    return {"slots": slots}
