@@ -1,10 +1,12 @@
+from uuid import UUID
+
 from pydantic import BaseModel
 
 
 class NotificationOut(BaseModel):
-    id: str
+    id: UUID
     company_id: str
-    appointment_id: str
+    appointment_id: UUID
     kind: str
     delivered: bool
 

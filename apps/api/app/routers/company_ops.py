@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -39,17 +41,18 @@ def open_appointments(current=Depends(get_current_company_user), db: Session = D
 @router.post("/appointments/{appointment_id}/claim")
 def claim_appointment(appointment_id: str, current=Depends(get_current_company_user), db: Session = Depends(get_db)):
     user, company_id = current
-    appt = db.get(Appointment, appointment_id)
+    appt_uuid = UUID(appointment_id)
+    appt = db.get(Appointment, appt_uuid)
     if not appt:
         raise HTTPException(status_code=404, detail="Not found")
     if appt.company_id and appt.company_id != company_id:
         raise HTTPException(status_code=400, detail="Already claimed")
     appt.company_id = company_id
     appt.status = "claimed"
-    notif = db.query(Notification).filter_by(company_id=company_id, appointment_id=appointment_id, delivered=False).first()
+    notif = db.query(Notification).filter_by(company_id=company_id, appointment_id=appt_uuid, delivered=False).first()
     if notif:
         notif.delivered = True
-    db.add(Notification(company_id=company_id, appointment_id=appointment_id, kind="status_change"))
+    db.add(Notification(company_id=company_id, appointment_id=appt_uuid, kind="status_change"))
     db.commit()
     return {"id": appt.id, "status": appt.status}
 
