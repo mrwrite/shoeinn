@@ -1,5 +1,12 @@
 # shoeinn
 
+## Project overview
+
+Shoeinn is a full-stack demo composed of a FastAPI backend and an Expo React Native mobile client. The source code lives under `apps`:
+
+- `apps/api` – backend service implemented with FastAPI, SQLAlchemy and Alembic.
+- `apps/mobile` – Expo application built with React Native.
+
 ## Run the API locally
 
 ```bash
@@ -23,4 +30,27 @@ curl -X POST http://localhost:8000/appointments \
   -H "Content-Type: application/json" \
   -d '{"service_id":"<uuid>","type":"pickup","address":{"line1":"123","line2":"","city":"Town","state":"TX","postal_code":"75001"},"start_time_iso":"2025-08-18T15:30:00-05:00","customer":{"name":"Joe","email":"joe@example.com","phone":"123"}}'
 curl "http://localhost:8000/appointments/me?email=joe@example.com&phone=123"
+```
+
+## Run the mobile app locally
+
+```bash
+cd apps/mobile
+npm start
+```
+
+## Running tests
+
+Backend tests:
+
+```bash
+cd apps/api
+pytest
+```
+
+Mobile tests:
+
+```bash
+cd apps/mobile
+npm test
 ```
