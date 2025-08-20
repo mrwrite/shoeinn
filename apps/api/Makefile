@@ -1,19 +1,19 @@
 .PHONY: up down migrate revision dev seed
 
 up:
-	docker compose up -d
+	docker-compose up -d
 
 down:
-	docker compose down -v
+	docker-compose down
 
 migrate:
 	alembic upgrade head
 
 revision:
-	alembic revision -m "auto" --autogenerate
+	alembic revision --autogenerate -m "update"
 
 dev:
-	uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+	uvicorn app.main:app --reload --host $${API_HOST:-0.0.0.0} --port $${API_PORT:-8000}
 
 seed:
-	curl -X POST http://localhost:8000/services/seed
+	curl -X POST http://localhost:$${API_PORT:-8000}/dev/seed
