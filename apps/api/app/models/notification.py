@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import uuid4
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String, Text, Index
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String, Text, Index, Uuid
 
 from app.core.db import Base
 
@@ -9,9 +9,9 @@ from app.core.db import Base
 class Notification(Base):
     __tablename__ = "notifications"
 
-    id = Column(String, primary_key=True, default=lambda: str(uuid4()))
+    id = Column(Uuid, primary_key=True, default=uuid4)
     company_id = Column(String, ForeignKey("companies.id"), nullable=False)
-    appointment_id = Column(String, ForeignKey("appointments.id"), nullable=False)
+    appointment_id = Column(Uuid, ForeignKey("appointments.id"), nullable=False)
     kind = Column(String, nullable=False)
     delivered = Column(Boolean, default=False)
     channel = Column(String, default="in_app")

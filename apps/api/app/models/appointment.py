@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import uuid4
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, Index
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, Index, Uuid
 
 from app.core.db import Base
 
@@ -9,7 +9,7 @@ from app.core.db import Base
 class Appointment(Base):
     __tablename__ = "appointments"
 
-    id = Column(String, primary_key=True, default=lambda: str(uuid4()))
+    id = Column(Uuid, primary_key=True, default=uuid4)
     customer_id = Column(String, ForeignKey("users.id"), nullable=False)
     company_id = Column(String, ForeignKey("companies.id"))
     service_id = Column(String, ForeignKey("services.id"))
