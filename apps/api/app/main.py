@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 from app.core.config import settings
+from app.core.db import Base, engine
 from app.routers import health, services, slots, appointments
 
 app = FastAPI()
@@ -17,3 +19,9 @@ app.include_router(health.router)
 app.include_router(services.router)
 app.include_router(slots.router)
 app.include_router(appointments.router)
+
+
+@app.on_event("startup")
+def on_startup() -> None:
+    """Create database tables if they do not exist."""
+    Base.metadata.create_all(bind=engine)
