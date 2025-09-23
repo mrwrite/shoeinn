@@ -27,6 +27,38 @@ Browse companies:
 ```
 curl http://localhost:8000/companies
 ```
+
+Discover services across companies:
+```
+curl "http://localhost:8000/services?city=Austin&query=clean"
+```
+The endpoint aggregates active services and returns normalized pricing data:
+
+```json
+[
+  {
+    "id": "SERVICE_ID",
+    "name": "Basic Clean",
+    "description": "Quick refresh",
+    "duration_min": 30,
+    "price_cents": 1000,
+    "price": 10.0,
+    "company": {
+      "id": "COMPANY_ID",
+      "name": "Clean Kicks",
+      "city": "Austin",
+      "state": "TX",
+      "postal_code": "73301"
+    }
+  }
+]
+```
+Optional query parameters:
+
+* `query` – fuzzy match against service or company name
+* `city`/`state` – filter by company location
+* `company_id` – scope to a specific provider
+
 Book appointment:
 ```
 curl -X POST http://localhost:8000/appointments -H 'Authorization: Bearer TOKEN' \
