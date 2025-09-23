@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import uuid4
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, Index, Uuid
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, Index, Uuid, UniqueConstraint
 
 from app.core.db import Base
 
@@ -27,4 +27,5 @@ class Appointment(Base):
 
     __table_args__ = (
         Index("ix_appointments_start_time", "start_time_utc"),
+        UniqueConstraint("company_id", "start_time_utc", name="uq_appointments_company_start_time"),
     )

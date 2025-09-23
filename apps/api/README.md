@@ -14,6 +14,10 @@ Seed demo data:
 curl -X POST http://localhost:8000/dev/seed
 ```
 
+### Availability projection
+
+Confirmed bookings update the `available_slots` read model so clients can query `/slots` without hitting transactional tables. See [docs/cqrs.md](docs/cqrs.md) for an overview of the hold lifecycle, optimistic concurrency checks, and background cleanup that keeps inventory fresh.
+
 ## Curl examples
 Register & login:
 ```

@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.core.db import Base, engine
+from app.utils.holds import hold_cleanup_worker
 from app.routers import (
     appointments,
     auth,
@@ -28,6 +29,12 @@ app.add_middleware(
 @app.on_event("startup")
 def startup():
     Base.metadata.create_all(bind=engine)
+    hold_cleanup_worker.start()
+
+
+@app.on_event("shutdown")
+def shutdown():
+    hold_cleanup_worker.stop()
 
 
 app.include_router(health.router)

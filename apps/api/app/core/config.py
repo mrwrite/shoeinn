@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     allowed_origins: str = "*"
     access_token_ttl_minutes: int = 15
     refresh_token_ttl_days: int = 30
+    appointment_hold_minutes: int = 15
+    hold_cleanup_interval_seconds: int = 60
 
     class Config:
         env_file = ".env"

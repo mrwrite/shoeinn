@@ -18,6 +18,8 @@ from app.core.db import Base, SessionLocal, engine
 from app.main import app
 from app.models.company import Company
 from app.models.service import Service
+from app.models.appointment_hold import AppointmentHold  # noqa: F401 - ensure table registration
+from app.models.available_slot import AvailableSlot  # noqa: F401 - ensure table registration
 
 Base.metadata.create_all(bind=engine)
 client = TestClient(app)
