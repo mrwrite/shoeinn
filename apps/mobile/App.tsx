@@ -12,7 +12,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('http://localhost:8000/services')
+    fetch('http://192.168.128.1:8000/services')
       .then((res) => {
         if (!res.ok) {
           throw new Error('network error');
