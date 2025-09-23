@@ -1,10 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.core.security import create_access_token, hash_password, verify_password
+from app.core.security import (
+    create_access_token,
+    create_refresh_token,
+    hash_password,
+    rotate_refresh_token,
+    revoke_refresh_token,
+    verify_password,
+)
 from app.models.user import User
-from app.schemas.auth import LoginRequest, RegisterRequest, Token
+from app.schemas.auth import LoginRequest, RefreshRequest, RegisterRequest, TokenPair
 from app.schemas.user import UserOut
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -26,10 +33,39 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     return user
 
 
-@router.post("/login", response_model=Token)
-def login(payload: LoginRequest, db: Session = Depends(get_db)):
+@router.post("/login", response_model=TokenPair)
+def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)):
     user = db.query(User).filter_by(email=payload.email).first()
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=400, detail="Invalid credentials")
-    token = create_access_token({"sub": user.id, "role": user.role})
-    return {"access_token": token, "token_type": "bearer"}
+    access_token = create_access_token({"sub": user.id, "role": user.role})
+    refresh_token, _ = create_refresh_token(
+        db,
+        user_id=user.id,
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
+    return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer"}
+
+
+@router.post("/refresh", response_model=TokenPair)
+def refresh(payload: RefreshRequest, request: Request, db: Session = Depends(get_db)):
+    new_refresh_token, db_token = rotate_refresh_token(
+        db,
+        payload.refresh_token,
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
+    user = db_token.user
+    access_token = create_access_token({"sub": user.id, "role": user.role})
+    return {
+        "access_token": access_token,
+        "refresh_token": new_refresh_token,
+        "token_type": "bearer",
+    }
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout(payload: RefreshRequest, db: Session = Depends(get_db)):
+    revoke_refresh_token(db, payload.refresh_token)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

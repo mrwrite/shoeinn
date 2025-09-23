@@ -7,6 +7,8 @@ class Settings(BaseSettings):
     api_port: int = 8000
     jwt_secret: str = "changeme"
     allowed_origins: str = "*"
+    access_token_ttl_minutes: int = 15
+    refresh_token_ttl_days: int = 30
 
     class Config:
         env_file = ".env"

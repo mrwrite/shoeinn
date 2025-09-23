@@ -32,6 +32,14 @@ curl -X POST http://localhost:8000/appointments \
 curl "http://localhost:8000/appointments/me?email=joe@example.com&phone=123"
 ```
 
+### Authentication and token refresh
+
+- Access tokens now expire after approximately 15 minutes by default. You can change the window by setting `ACCESS_TOKEN_TTL_MINUTES` in the API environment.
+- `POST /auth/login` returns both an `access_token` and a long-lived `refresh_token`. Persist the refresh token securely on the client.
+- When the API responds with `401` due to an expired access token, call `POST /auth/refresh` with the stored refresh token to receive a rotated token pair. Each refresh invalidates the previous refresh token, so always replace the stored value with the latest one.
+- Call `POST /auth/logout` with the current refresh token when the user signs out or you detect compromise so the server revokes the session immediately.
+- The mobile app should follow the same pattern—refresh quietly when the access token expires and fall back to login if refresh fails (e.g., after logout or suspected compromise).
+
 ## Run the mobile app locally
 
 ```bash
