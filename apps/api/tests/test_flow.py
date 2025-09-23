@@ -1,4 +1,8 @@
 import os
+import time
+from datetime import timedelta
+
+import pytest
 
 os.environ["DATABASE_URL"] = "sqlite:///./test.db"
 os.environ["JWT_SECRET"] = "testsecret"
@@ -6,10 +10,12 @@ os.environ["JWT_SECRET"] = "testsecret"
 if os.path.exists("test.db"):
     os.remove("test.db")
 
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-from app.main import app
+from app.core.security import create_access_token, decode_token
 from app.core.db import Base, SessionLocal, engine
+from app.main import app
 from app.models.company import Company
 from app.models.service import Service
 
@@ -82,7 +88,8 @@ def test_flow():
 
     # login customer
     r = client.post("/auth/login", json={"email": "new@user.com", "password": "Password1!"})
-    token = r.json()["access_token"]
+    pair = r.json()
+    token = pair["access_token"]
 
     # browse companies
     r = client.get("/companies")
@@ -164,5 +171,48 @@ def test_services_filters():
         filtered = r.json()
         assert len(filtered) == 1
         assert filtered[0]["company"]["id"] == ids["clean_kicks"]
+    finally:
+        reset_db()
+
+
+def test_access_token_expiry():
+    token = create_access_token({"sub": "user-123", "role": "customer"}, expires_delta=timedelta(seconds=1))
+    assert decode_token(token)["sub"] == "user-123"
+    time.sleep(1.5)
+    with pytest.raises(HTTPException):
+        decode_token(token)
+
+
+def test_refresh_flow_and_revocation():
+    reset_db()
+    try:
+        client.post("/dev/seed")
+        client.post(
+            "/auth/register",
+            json={
+                "email": "refresh@test.com",
+                "password": "Password1!",
+                "full_name": "Refresh User",
+                "role": "customer",
+            },
+        )
+
+        login = client.post("/auth/login", json={"email": "refresh@test.com", "password": "Password1!"})
+        assert login.status_code == 200
+        tokens = login.json()
+        refresh_token = tokens["refresh_token"]
+
+        refreshed = client.post("/auth/refresh", json={"refresh_token": refresh_token})
+        assert refreshed.status_code == 200
+        rotated = refreshed.json()
+        assert rotated["refresh_token"] != refresh_token
+
+        reuse_attempt = client.post("/auth/refresh", json={"refresh_token": refresh_token})
+        assert reuse_attempt.status_code == 401
+
+        logout = client.post("/auth/logout", json={"refresh_token": rotated["refresh_token"]})
+        assert logout.status_code == 204
+        revoked_attempt = client.post("/auth/refresh", json={"refresh_token": rotated["refresh_token"]})
+        assert revoked_attempt.status_code == 401
     finally:
         reset_db()
