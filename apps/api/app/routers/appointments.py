@@ -11,10 +11,10 @@ from app.models.appointment import Appointment
 from app.models.appointment_hold import AppointmentHold
 from app.models.available_slot import AvailableSlot
 from app.models.company import Company
-from app.models.notification import Notification
 from app.models.service import Service
 from app.schemas.appointment import AppointmentCreate
 from app.utils.time import local_iso_from_utc, parse_client_iso, to_utc, tz_offset_minutes
+from app.utils.notifications import enqueue_notification_intent
 
 router = APIRouter(tags=["appointments"])
 
@@ -114,7 +114,18 @@ def create_appointment(payload: AppointmentCreate, current_user=Depends(get_curr
                 Company.state == payload.address.state,
             ).order_by(Company.name).limit(5)]
         for cid in company_ids:
-            db.add(Notification(company_id=cid, appointment_id=appt.id, kind="new_request"))
+            enqueue_notification_intent(
+                db,
+                company_id=cid,
+                appointment_id=appt.id,
+                kind="new_request",
+                channel="email",
+                payload={
+                    "appointment_id": str(appt.id),
+                    "company_id": cid,
+                    "kind": "new_request",
+                },
+            )
 
         db.commit()
     except HTTPException:
