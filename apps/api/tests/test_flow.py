@@ -6,6 +6,7 @@ import pytest
 
 os.environ["DATABASE_URL"] = "sqlite:///./test.db"
 os.environ["JWT_SECRET"] = "testsecret"
+os.environ["ENABLE_NOTIFICATION_DISPATCHER"] = "false"
 
 if os.path.exists("test.db"):
     os.remove("test.db")

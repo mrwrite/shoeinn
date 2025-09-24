@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.db import Base, engine
 from app.utils.holds import hold_cleanup_worker
+from app.utils.notification_dispatcher import notification_dispatcher
 from app.routers import (
     appointments,
     auth,
@@ -11,6 +12,7 @@ from app.routers import (
     company_ops,
     dev_seed,
     health,
+    webhooks,
     services,
     slots,
 )
@@ -30,11 +32,13 @@ app.add_middleware(
 def startup():
     Base.metadata.create_all(bind=engine)
     hold_cleanup_worker.start()
+    notification_dispatcher.start()
 
 
 @app.on_event("shutdown")
 def shutdown():
     hold_cleanup_worker.stop()
+    notification_dispatcher.stop()
 
 
 app.include_router(health.router)
@@ -45,3 +49,4 @@ app.include_router(slots.router)
 app.include_router(appointments.router)
 app.include_router(company_ops.router)
 app.include_router(dev_seed.router)
+app.include_router(webhooks.router)

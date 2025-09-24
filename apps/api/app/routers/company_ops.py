@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -8,6 +9,7 @@ from app.core.security import get_current_company_user
 from app.models.appointment import Appointment
 from app.models.notification import Notification
 from app.models.service import Service
+from app.utils.notifications import enqueue_notification_intent, record_notification_event
 from app.utils.time import local_iso_from_utc
 
 router = APIRouter(prefix="/company", tags=["company"])
@@ -19,7 +21,12 @@ def open_appointments(current=Depends(get_current_company_user), db: Session = D
     q = (
         db.query(Appointment)
         .join(Notification, Notification.appointment_id == Appointment.id)
-        .filter(Notification.company_id == company_id, Appointment.status == "requested", Notification.delivered.is_(False))
+        .filter(
+            Notification.company_id == company_id,
+            Notification.kind == "new_request",
+            Notification.status.in_(["pending", "retrying"]),
+            Appointment.status == "requested",
+        )
         .order_by(Appointment.start_time_utc.asc())
     )
     items = []
@@ -49,10 +56,34 @@ def claim_appointment(appointment_id: str, current=Depends(get_current_company_u
         raise HTTPException(status_code=400, detail="Already claimed")
     appt.company_id = company_id
     appt.status = "claimed"
-    notif = db.query(Notification).filter_by(company_id=company_id, appointment_id=appt_uuid, delivered=False).first()
+    notif = (
+        db.query(Notification)
+        .filter_by(company_id=company_id, appointment_id=appt_uuid, kind="new_request")
+        .first()
+    )
     if notif:
+        ack_time = datetime.now(timezone.utc)
+        notif.status = "acknowledged"
         notif.delivered = True
-    db.add(Notification(company_id=company_id, appointment_id=appt_uuid, kind="status_change"))
+        notif.delivered_at = ack_time
+        if notif.outbox_entry:
+            notif.outbox_entry.status = "cancelled"
+            notif.outbox_entry.locked_at = None
+            notif.outbox_entry.processed_at = ack_time
+        record_notification_event(
+            db,
+            notif,
+            "notification_acknowledged",
+            {"appointment_id": str(appt_uuid)},
+        )
+    enqueue_notification_intent(
+        db,
+        company_id=company_id,
+        appointment_id=appt_uuid,
+        kind="status_change",
+        channel="email",
+        payload={"appointment_id": str(appt_uuid), "status": appt.status},
+    )
     db.commit()
     return {"id": appt.id, "status": appt.status}
 
