@@ -62,3 +62,13 @@ Mobile tests:
 cd apps/mobile
 npm test
 ```
+
+## Mobile offline behavior
+
+The Expo client now layers TanStack Query over the REST API to provide caching and offline resilience:
+
+- Service lists are hydrated from AsyncStorage on launch so previously viewed data is available immediately.
+- Network reads and writes use a retry strategy with exponential backoff, and mutations optimistically update the UI.
+- When offline, service status changes are queued on disk and replayed once connectivity returns; a banner surfaces the offline state and pending work.
+- During synchronization the app disables destructive actions until all queued writes have been flushed.
+- Run `npm test` from `apps/mobile` to execute Jest suites that cover cache hydration and offline queue processing.
