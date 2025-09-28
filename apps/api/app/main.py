@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from sqlalchemy.engine import make_url
+
 from app.core.config import settings
 from app.core.db import Base, engine
 from app.utils.holds import hold_cleanup_worker
@@ -28,9 +30,23 @@ app.add_middleware(
 )
 
 
+def _should_auto_create() -> bool:
+    """Determine whether the ORM should auto-create tables on startup."""
+
+    if settings.db_auto_create:
+        return True
+
+    try:
+        url = make_url(settings.database_url)
+    except Exception:  # pragma: no cover - defensive fallback
+        return False
+
+    return url.get_backend_name() == "sqlite"
+
+
 @app.on_event("startup")
 def startup():
-    if settings.db_auto_create:
+    if _should_auto_create():
         Base.metadata.create_all(bind=engine)
     hold_cleanup_worker.start()
     notification_dispatcher.start()
