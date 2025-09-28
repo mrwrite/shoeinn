@@ -9,6 +9,14 @@ pip install -e .
 alembic upgrade head
 make dev
 ```
+
+> **Postgres credentials**
+>
+> The local database created by `make up` uses the default Postgres credentials `postgres` / `postgres`. Update your `.env`
+> file only if you have customised the database user or password, and make sure the value matches the connection string in
+> `docker-compose.yml`. A mismatch (for example `DATABASE_URL=postgresql+psycopg://shoeinn:shoeinn@localhost:5432/shoeinn`
+> while docker-compose still provisions `postgres` / `postgres`) will result in `password authentication failed for user` errors
+> when running Alembic migrations.
 Seed demo data:
 ```
 curl -X POST http://localhost:8000/dev/seed
