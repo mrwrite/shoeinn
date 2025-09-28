@@ -1,5 +1,6 @@
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 
 revision = "0002"
@@ -11,10 +12,10 @@ depends_on = None
 def upgrade():
     op.create_table(
         "appointment_holds",
-        sa.Column("id", sa.Uuid(), primary_key=True),
-        sa.Column("customer_id", sa.String(), nullable=False),
-        sa.Column("company_id", sa.String(), nullable=False),
-        sa.Column("service_id", sa.String(), nullable=True),
+        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
+        sa.Column("customer_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("company_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("service_id", postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column("start_time_utc", sa.DateTime(timezone=True), nullable=False),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("version", sa.Integer(), nullable=False, server_default="0"),
@@ -28,9 +29,9 @@ def upgrade():
 
     op.create_table(
         "available_slots",
-        sa.Column("id", sa.Uuid(), primary_key=True),
-        sa.Column("company_id", sa.String(), nullable=False),
-        sa.Column("service_id", sa.String(), nullable=True),
+        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
+        sa.Column("company_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("service_id", postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column("start_time_utc", sa.DateTime(timezone=True), nullable=False),
         sa.Column("is_available", sa.Boolean(), nullable=False, server_default=sa.text("1")),
         sa.Column("last_booked_at", sa.DateTime(timezone=True), nullable=True),
