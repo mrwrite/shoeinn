@@ -60,6 +60,16 @@ def _drop_unique(
             op.drop_constraint(name, table, type_="unique")
 
 
+def _drop_index(table: str, name: str) -> None:
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    indexes = inspector.get_indexes(table)
+    existing_names = {index.get("name") for index in indexes}
+
+    if name in existing_names:
+        op.drop_index(name, table_name=table)
+
+
 def upgrade() -> None:
     # appointment_holds adjustments
     op.add_column(
@@ -130,7 +140,7 @@ def upgrade() -> None:
         "available_slots",
         type_="unique",
     )
-    op.drop_index("ix_available_slots_company_time", table_name="available_slots")
+    _drop_index("available_slots", "ix_available_slots_company_time")
     _drop_fk("available_slots", ["company_id"])
     op.drop_column("available_slots", "company_id")
     op.alter_column("available_slots", "company_id_uuid", new_column_name="company_id")
@@ -162,7 +172,7 @@ def upgrade() -> None:
         )
     )
     op.alter_column("services", "company_id_uuid", nullable=False)
-    op.drop_index("ix_services_company_active", table_name="services")
+    _drop_index("services", "ix_services_company_active")
     _drop_fk("services", ["company_id"])
     op.drop_column("services", "company_id")
     op.alter_column("services", "company_id_uuid", new_column_name="company_id")
@@ -310,7 +320,7 @@ def upgrade() -> None:
         )
     )
     op.alter_column("notifications", "company_id_uuid", nullable=False)
-    op.drop_index("ix_notifications_company_status", table_name="notifications")
+    _drop_index("notifications", "ix_notifications_company_status")
     _drop_fk("notifications", ["company_id"])
     op.drop_column("notifications", "company_id")
     op.alter_column("notifications", "company_id_uuid", new_column_name="company_id")
