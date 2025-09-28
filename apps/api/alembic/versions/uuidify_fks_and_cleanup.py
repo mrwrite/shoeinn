@@ -5,7 +5,7 @@ Revises: 1f6f3b9139a1
 Create Date: 2024-06-15 00:05:00
 """
 
-from typing import List, Sequence, Union
+from typing import List, Optional, Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
@@ -26,6 +26,24 @@ def _drop_fk(table: str, columns: List[str]) -> None:
         if fk.get("constrained_columns") == columns:
             op.drop_constraint(fk["name"], table, type_="foreignkey")
             break
+
+
+def _drop_unique(
+    table: str, columns: List[str], *, name: Optional[str] = None
+) -> None:
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+
+    for constraint in inspector.get_unique_constraints(table):
+        if constraint.get("column_names") == columns or (
+            name and constraint.get("name") == name
+        ):
+            op.drop_constraint(constraint["name"], table, type_="unique")
+            return
+
+    if name:
+        # Fallback to dropping by the provided name if the inspector didn't return it.
+        op.drop_constraint(name, table, type_="unique")
 
 
 def upgrade() -> None:
@@ -221,10 +239,10 @@ def upgrade() -> None:
     _drop_fk("company_users", ["user_id"])
     _drop_fk("company_users", ["company_id"])
     op.drop_constraint("company_users_pkey", "company_users", type_="primary")
-    op.drop_constraint(
-        "company_users_user_id_company_id_key",
+    _drop_unique(
         "company_users",
-        type_="unique",
+        ["user_id", "company_id"],
+        name="company_users_user_id_company_id_key",
     )
     op.drop_index("ix_company_users_company_id", table_name="company_users")
     op.drop_column("company_users", "user_id")
