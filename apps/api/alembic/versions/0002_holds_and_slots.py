@@ -33,7 +33,7 @@ def upgrade():
         sa.Column("company_id", sa.String(), nullable=False),
         sa.Column("service_id", sa.String(), nullable=True),
         sa.Column("start_time_utc", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("is_available", sa.Boolean(), nullable=False, server_default=sa.text("1")),
+        sa.Column("is_available", sa.Boolean(), nullable=False, server_default=sa.text("true")),
         sa.Column("last_booked_at", sa.DateTime(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(["company_id"], ["companies.id"]),
         sa.ForeignKeyConstraint(["service_id"], ["services.id"]),
