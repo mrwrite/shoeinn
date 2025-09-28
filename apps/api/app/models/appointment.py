@@ -1,7 +1,8 @@
 from datetime import datetime
-from uuid import uuid4
+import uuid
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, Index, Uuid, UniqueConstraint
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, Index, UniqueConstraint
+from sqlalchemy.dialects.postgresql import UUID
 
 from app.core.db import Base
 
@@ -9,10 +10,10 @@ from app.core.db import Base
 class Appointment(Base):
     __tablename__ = "appointments"
 
-    id = Column(Uuid, primary_key=True, default=uuid4)
-    customer_id = Column(String, ForeignKey("users.id"), nullable=False)
-    company_id = Column(String, ForeignKey("companies.id"))
-    service_id = Column(String, ForeignKey("services.id"))
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    customer_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    company_id = Column(UUID(as_uuid=True), ForeignKey("companies.id"))
+    service_id = Column(UUID(as_uuid=True), ForeignKey("services.id"))
     type = Column(String, nullable=False)
     address_line1 = Column(String)
     address_line2 = Column(String)

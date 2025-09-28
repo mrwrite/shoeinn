@@ -1,4 +1,5 @@
 from datetime import date, datetime, time, timedelta
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
@@ -12,7 +13,7 @@ router = APIRouter(prefix="/slots", tags=["slots"])
 
 @router.get("")
 def get_slots(
-    company_id: str | None = None,
+    company_id: UUID | None = None,
     date: date = Query(...),
     slot_type: str = Query(...),
     db: Session = Depends(get_db),

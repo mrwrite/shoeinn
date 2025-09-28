@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from pydantic import BaseModel
 
 
@@ -10,8 +12,8 @@ class Address(BaseModel):
 
 
 class AppointmentCreate(BaseModel):
-    company_id: str | None = None
-    service_id: str | None = None
+    company_id: UUID | None = None
+    service_id: UUID | None = None
     type: str
     address: Address
     start_time_iso: str
@@ -19,7 +21,7 @@ class AppointmentCreate(BaseModel):
 
 
 class AppointmentOut(BaseModel):
-    id: str
+    id: UUID
     company_name: str | None = None
     service_name: str | None = None
     type: str

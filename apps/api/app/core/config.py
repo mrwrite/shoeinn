@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     notification_max_attempts: int = 5
     notification_backoff_seconds: int = 30
     enable_notification_dispatcher: bool = True
+    db_auto_create: bool = False
 
     class Config:
         env_file = ".env"

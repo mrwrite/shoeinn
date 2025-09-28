@@ -14,7 +14,7 @@ from app.utils.notifications import enqueue_notification_intent
 from tests.test_flow import auth_headers, client, reset_db
 
 
-def _create_company_and_appointment() -> tuple[str, str]:
+def _create_company_and_appointment() -> tuple[UUID, UUID]:
     with SessionLocal() as db:
         company = Company(name="Notif Co", city="Austin", state="TX")
         customer = User(email="notif@test.com", password_hash="hash", role="customer")
@@ -42,7 +42,7 @@ def _create_company_and_appointment() -> tuple[str, str]:
         return company.id, appt.id
 
 
-def _book_api_appointment() -> tuple[str, str]:
+def _book_api_appointment() -> tuple[UUID, UUID]:
     client.post("/dev/seed")
     client.post(
         "/auth/register",
@@ -56,11 +56,11 @@ def _book_api_appointment() -> tuple[str, str]:
     token = client.post("/auth/login", json={"email": "notifyuser@test.com", "password": "Password1!"}).json()[
         "access_token"
     ]
-    company_id = client.get("/companies").json()[0]["id"]
-    service_id = client.get(f"/companies/{company_id}/services").json()[0]["id"]
+    company_id = UUID(client.get("/companies").json()[0]["id"])
+    service_id = UUID(client.get(f"/companies/{company_id}/services").json()[0]["id"])
     payload = {
-        "company_id": company_id,
-        "service_id": service_id,
+        "company_id": str(company_id),
+        "service_id": str(service_id),
         "type": "pickup",
         "address": {
             "line1": "1 Main",
@@ -73,7 +73,7 @@ def _book_api_appointment() -> tuple[str, str]:
     }
     resp = client.post("/appointments", json=payload, headers=auth_headers(token))
     resp.raise_for_status()
-    appointment_id = resp.json()["id"]
+    appointment_id = UUID(resp.json()["id"])
     return company_id, appointment_id
 
 
@@ -92,7 +92,7 @@ def test_appointment_creation_enqueues_notification():
             db.query(Notification)
             .filter_by(
                 company_id=company_id,
-                appointment_id=UUID(appointment_id),
+                appointment_id=appointment_id,
                 kind="new_request",
             )
             .one()

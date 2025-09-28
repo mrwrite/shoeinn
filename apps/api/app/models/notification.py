@@ -1,5 +1,5 @@
 from datetime import datetime
-from uuid import uuid4
+import uuid
 
 from sqlalchemy import (
     Boolean,
@@ -10,9 +10,9 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    Uuid,
 )
 from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import UUID
 
 from app.core.db import Base
 
@@ -20,9 +20,9 @@ from app.core.db import Base
 class Notification(Base):
     __tablename__ = "notifications"
 
-    id = Column(Uuid, primary_key=True, default=uuid4)
-    company_id = Column(String, ForeignKey("companies.id"), nullable=False)
-    appointment_id = Column(Uuid, ForeignKey("appointments.id"), nullable=False)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    company_id = Column(UUID(as_uuid=True), ForeignKey("companies.id"), nullable=False)
+    appointment_id = Column(UUID(as_uuid=True), ForeignKey("appointments.id"), nullable=False)
     kind = Column(String, nullable=False)
     channel = Column(String, default="email", nullable=False)
     target = Column(String)

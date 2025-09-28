@@ -1,8 +1,10 @@
+from uuid import UUID
+
 from pydantic import BaseModel, computed_field
 
 
 class ServiceCompanyOut(BaseModel):
-    id: str
+    id: UUID
     name: str
     city: str | None = None
     state: str | None = None
@@ -10,7 +12,7 @@ class ServiceCompanyOut(BaseModel):
 
 
 class ServiceOut(BaseModel):
-    id: str
+    id: UUID
     name: str | None = None
     description: str | None = None
     price_cents: int | None = None

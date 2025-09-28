@@ -1,7 +1,8 @@
 from datetime import datetime
-from uuid import uuid4
+import uuid
 
-from sqlalchemy import Column, DateTime, ForeignKey, String, Text, Uuid
+from sqlalchemy import Column, DateTime, ForeignKey, String, Text
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from app.core.db import Base
@@ -10,8 +11,8 @@ from app.core.db import Base
 class NotificationEvent(Base):
     __tablename__ = "notification_events"
 
-    id = Column(Uuid, primary_key=True, default=uuid4)
-    notification_id = Column(Uuid, ForeignKey("notifications.id"), nullable=False, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    notification_id = Column(UUID(as_uuid=True), ForeignKey("notifications.id"), nullable=False, index=True)
     event_type = Column(String, nullable=False)
     payload_json = Column(Text)
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)

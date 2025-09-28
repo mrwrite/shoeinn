@@ -1,7 +1,8 @@
 from datetime import datetime
-from uuid import uuid4
+import uuid
 
 from sqlalchemy import Column, DateTime, String, UniqueConstraint
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from app.core.db import Base
@@ -10,7 +11,7 @@ from app.core.db import Base
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(String, primary_key=True, default=lambda: str(uuid4()))
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email = Column(String, unique=True, nullable=False)
     password_hash = Column(String, nullable=False)
     full_name = Column(String)

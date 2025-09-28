@@ -8,7 +8,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from app.core.config import settings
 from app.core.db import Base
-from app.models import appointment, company, company_user, notification, service, user
+from app import models  # noqa: F401 - ensure models are imported for metadata
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)

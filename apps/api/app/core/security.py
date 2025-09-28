@@ -6,23 +6,29 @@ from typing import Optional, Tuple
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from passlib.context import CryptContext
+import bcrypt
 from sqlalchemy.orm import Session
 
 from .config import settings
+import os
+from uuid import UUID
+
+os.environ.setdefault("BCRYPT_NO_LIMIT", "1")
 from .db import get_db
 from app.models.refresh_token import RefreshToken
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    password_bytes = password.encode("utf-8")
+    return bcrypt.hashpw(password_bytes, bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(password: str, hashed: str) -> bool:
-    return pwd_context.verify(password, hashed)
+    try:
+        return bcrypt.checkpw(password.encode("utf-8"), hashed.encode("utf-8"))
+    except ValueError:
+        return False
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
@@ -42,9 +48,13 @@ def decode_token(token: str) -> dict:
 
 def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
     payload = decode_token(token)
-    user_id = payload.get("sub")
-    if not user_id:
+    user_id_value = payload.get("sub")
+    if not user_id_value:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    try:
+        user_id = UUID(str(user_id_value))
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid user")
     from app.models.user import User
 
     user = db.get(User, user_id)
@@ -87,7 +97,7 @@ def _ensure_utc(dt: datetime) -> datetime:
 def create_refresh_token(
     db: Session,
     *,
-    user_id: str,
+    user_id: UUID,
     user_agent: Optional[str] = None,
     ip_address: Optional[str] = None,
 ) -> Tuple[str, RefreshToken]:

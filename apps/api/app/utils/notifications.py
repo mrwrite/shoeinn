@@ -4,6 +4,7 @@ import json
 import logging
 from datetime import datetime, timezone
 from typing import Any
+from uuid import UUID
 
 from sqlalchemy.orm import Session
 
@@ -31,8 +32,8 @@ def _serialize_payload(payload: dict[str, Any] | None) -> str:
 def enqueue_notification_intent(
     db: Session,
     *,
-    company_id: str,
-    appointment_id: str,
+    company_id: UUID,
+    appointment_id: UUID,
     kind: str,
     channel: str = "email",
     target: str | None = None,
@@ -72,7 +73,7 @@ def enqueue_notification_intent(
         extra={
             "notification_id": str(notification.id),
             "appointment_id": str(appointment_id),
-            "company_id": company_id,
+            "company_id": str(company_id),
             "channel": channel,
             "target": target,
         },

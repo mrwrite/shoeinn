@@ -1,7 +1,8 @@
 from datetime import datetime, timezone
-from uuid import uuid4
+import uuid
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, UniqueConstraint, Uuid, Index
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, UniqueConstraint, Index
+from sqlalchemy.dialects.postgresql import UUID
 
 from app.core.db import Base
 
@@ -9,10 +10,10 @@ from app.core.db import Base
 class AppointmentHold(Base):
     __tablename__ = "appointment_holds"
 
-    id = Column(Uuid, primary_key=True, default=uuid4)
-    customer_id = Column(String, ForeignKey("users.id"), nullable=False)   # verify type of users.id
-    company_id  = Column(String, ForeignKey("companies.id"), nullable=False)  # verify type of companies.id
-    service_id  = Column(Uuid,  ForeignKey("services.id"), nullable=True)  # <— change here
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    customer_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    company_id = Column(UUID(as_uuid=True), ForeignKey("companies.id"), nullable=False)
+    service_id = Column(UUID(as_uuid=True), ForeignKey("services.id"), nullable=True)
     start_time_utc = Column(DateTime(timezone=True), nullable=False)
     expires_at     = Column(DateTime(timezone=True), nullable=False)
     version = Column(Integer, nullable=False, default=0)
