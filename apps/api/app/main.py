@@ -30,7 +30,8 @@ app.add_middleware(
 
 @app.on_event("startup")
 def startup():
-    Base.metadata.create_all(bind=engine)
+    if settings.db_auto_create:
+        Base.metadata.create_all(bind=engine)
     hold_cleanup_worker.start()
     notification_dispatcher.start()
 

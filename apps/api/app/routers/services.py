@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -15,7 +17,7 @@ def list_services(
     query: str = "",
     city: str | None = None,
     state: str | None = None,
-    company_id: str | None = None,
+    company_id: UUID | None = None,
     db: Session = Depends(get_db),
 ):
     q = (

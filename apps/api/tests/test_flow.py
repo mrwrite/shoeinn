@@ -75,7 +75,7 @@ def seed_services():
         )
         db.add_all([s1, s2, s3, s4])
         db.commit()
-        return {"clean_kicks": c1.id, "fresh_soles": c2.id}
+        return {"clean_kicks": str(c1.id), "fresh_soles": str(c2.id)}
 
 
 def test_flow():

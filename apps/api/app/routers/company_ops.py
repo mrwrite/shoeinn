@@ -46,10 +46,9 @@ def open_appointments(current=Depends(get_current_company_user), db: Session = D
 
 
 @router.post("/appointments/{appointment_id}/claim")
-def claim_appointment(appointment_id: str, current=Depends(get_current_company_user), db: Session = Depends(get_db)):
+def claim_appointment(appointment_id: UUID, current=Depends(get_current_company_user), db: Session = Depends(get_db)):
     user, company_id = current
-    appt_uuid = UUID(appointment_id)
-    appt = db.get(Appointment, appt_uuid)
+    appt = db.get(Appointment, appointment_id)
     if not appt:
         raise HTTPException(status_code=404, detail="Not found")
     if appt.company_id and appt.company_id != company_id:
@@ -58,7 +57,7 @@ def claim_appointment(appointment_id: str, current=Depends(get_current_company_u
     appt.status = "claimed"
     notif = (
         db.query(Notification)
-        .filter_by(company_id=company_id, appointment_id=appt_uuid, kind="new_request")
+        .filter_by(company_id=company_id, appointment_id=appointment_id, kind="new_request")
         .first()
     )
     if notif:
@@ -74,15 +73,15 @@ def claim_appointment(appointment_id: str, current=Depends(get_current_company_u
             db,
             notif,
             "notification_acknowledged",
-            {"appointment_id": str(appt_uuid)},
+            {"appointment_id": str(appointment_id)},
         )
     enqueue_notification_intent(
         db,
         company_id=company_id,
-        appointment_id=appt_uuid,
+        appointment_id=appointment_id,
         kind="status_change",
         channel="email",
-        payload={"appointment_id": str(appt_uuid), "status": appt.status},
+        payload={"appointment_id": str(appointment_id), "status": appt.status},
     )
     db.commit()
     return {"id": appt.id, "status": appt.status}

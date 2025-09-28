@@ -58,8 +58,8 @@ def test_competing_bookings_fail_fast():
         token_two = _register_customer("two@test.com")
 
         payload = {
-            "company_id": company_id,
-            "service_id": service_id,
+            "company_id": str(company_id),
+            "service_id": str(service_id),
             "type": "pickup",
             "address": {
                 "line1": "1 Main",
@@ -112,8 +112,8 @@ def test_hold_expiration_releases_slot():
             db.commit()
 
         payload = {
-            "company_id": company_id,
-            "service_id": service_id,
+            "company_id": str(company_id),
+            "service_id": str(service_id),
             "type": "pickup",
             "address": {
                 "line1": "1 Main",

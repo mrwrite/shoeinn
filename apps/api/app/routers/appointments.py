@@ -122,7 +122,7 @@ def create_appointment(payload: AppointmentCreate, current_user=Depends(get_curr
                 channel="email",
                 payload={
                     "appointment_id": str(appt.id),
-                    "company_id": cid,
+                    "company_id": str(cid),
                     "kind": "new_request",
                 },
             )

@@ -1,7 +1,8 @@
 from datetime import datetime
-from uuid import uuid4
+import uuid
 
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text, Index
+from sqlalchemy.dialects.postgresql import UUID
 
 from app.core.db import Base
 
@@ -9,8 +10,8 @@ from app.core.db import Base
 class Service(Base):
     __tablename__ = "services"
 
-    id = Column(String, primary_key=True, default=lambda: str(uuid4()))
-    company_id = Column(String, ForeignKey("companies.id"), nullable=False)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    company_id = Column(UUID(as_uuid=True), ForeignKey("companies.id"), nullable=False)
     name = Column(String)
     description = Column(Text)
     price_cents = Column(Integer)

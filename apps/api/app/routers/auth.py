@@ -38,7 +38,7 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
     user = db.query(User).filter_by(email=payload.email).first()
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=400, detail="Invalid credentials")
-    access_token = create_access_token({"sub": user.id, "role": user.role})
+    access_token = create_access_token({"sub": str(user.id), "role": user.role})
     refresh_token, _ = create_refresh_token(
         db,
         user_id=user.id,
@@ -57,7 +57,7 @@ def refresh(payload: RefreshRequest, request: Request, db: Session = Depends(get
         ip_address=request.client.host if request.client else None,
     )
     user = db_token.user
-    access_token = create_access_token({"sub": user.id, "role": user.role})
+    access_token = create_access_token({"sub": str(user.id), "role": user.role})
     return {
         "access_token": access_token,
         "refresh_token": new_refresh_token,
