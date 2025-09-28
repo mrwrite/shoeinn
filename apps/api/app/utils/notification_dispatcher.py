@@ -18,7 +18,6 @@ from app.utils.notifications import record_notification_event
 
 logger = logging.getLogger(__name__)
 
-_OUTBOX_TABLE_CHECKED = False
 _OUTBOX_TABLE_PRESENT = False
 _OUTBOX_WARNING_LOGGED = False
 
@@ -182,9 +181,9 @@ def _ensure_outbox_table(session: Session) -> bool:
     ready.
     """
 
-    global _OUTBOX_TABLE_CHECKED, _OUTBOX_TABLE_PRESENT, _OUTBOX_WARNING_LOGGED
+    global _OUTBOX_TABLE_PRESENT, _OUTBOX_WARNING_LOGGED
 
-    if _OUTBOX_TABLE_CHECKED and _OUTBOX_TABLE_PRESENT:
+    if _OUTBOX_TABLE_PRESENT:
         return True
 
     try:
@@ -194,7 +193,6 @@ def _ensure_outbox_table(session: Session) -> bool:
         inspector = inspect(bind)
         table_name = NotificationOutbox.__table__.name
         _OUTBOX_TABLE_PRESENT = table_name in inspector.get_table_names()
-        _OUTBOX_TABLE_CHECKED = True
     except Exception:  # pragma: no cover - defensive
         logger.exception("Failed to inspect database for notification outbox table")
         return False
