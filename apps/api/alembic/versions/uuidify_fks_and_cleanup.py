@@ -25,6 +25,13 @@ def _table_exists(table: str) -> bool:
     return table in inspector.get_table_names()
 
 
+def _column_exists(table: str, column: str) -> bool:
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    columns = inspector.get_columns(table)
+    return any(col.get("name") == column for col in columns)
+
+
 def _drop_fk(table: str, columns: List[str]) -> None:
     bind = op.get_bind()
     inspector = sa.inspect(bind)
@@ -324,6 +331,20 @@ def upgrade() -> None:
     _drop_fk("notifications", ["company_id"])
     op.drop_column("notifications", "company_id")
     op.alter_column("notifications", "company_id_uuid", new_column_name="company_id")
+    if not _column_exists("notifications", "status"):
+        op.add_column(
+            "notifications",
+            sa.Column("status", sa.String(), nullable=True, server_default=sa.text("'pending'")),
+        )
+        op.execute("UPDATE notifications SET status = 'pending' WHERE status IS NULL")
+        op.alter_column("notifications", "status", nullable=False)
+        op.alter_column(
+            "notifications",
+            "status",
+            server_default=None,
+            existing_type=sa.String(),
+            existing_nullable=False,
+        )
     op.create_index(
         "ix_notifications_company_status",
         "notifications",
