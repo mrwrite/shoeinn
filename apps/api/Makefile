@@ -13,7 +13,7 @@ revision:
 	alembic revision --autogenerate -m "update"
 
 dev:
-	uvicorn app.main:app --reload --host $${API_HOST:-0.0.0.0} --port $${API_PORT:-8000}
+	uvicorn app.main:app --reload --host $(API_HOST) --port $(API_PORT)
 
 seed:
-	curl -X POST http://localhost:$${API_PORT:-8000}/dev/seed
+	curl -X POST http://localhost:$(API_PORT)/dev/seed

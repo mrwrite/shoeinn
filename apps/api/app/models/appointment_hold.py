@@ -10,13 +10,13 @@ class AppointmentHold(Base):
     __tablename__ = "appointment_holds"
 
     id = Column(Uuid, primary_key=True, default=uuid4)
-    customer_id = Column(String, ForeignKey("users.id"), nullable=False)
-    company_id = Column(String, ForeignKey("companies.id"), nullable=False)
-    service_id = Column(String, ForeignKey("services.id"), nullable=True)
+    customer_id = Column(String, ForeignKey("users.id"), nullable=False)   # verify type of users.id
+    company_id  = Column(String, ForeignKey("companies.id"), nullable=False)  # verify type of companies.id
+    service_id  = Column(Uuid,  ForeignKey("services.id"), nullable=True)  # <— change here
     start_time_utc = Column(DateTime(timezone=True), nullable=False)
-    expires_at = Column(DateTime(timezone=True), nullable=False)
+    expires_at     = Column(DateTime(timezone=True), nullable=False)
     version = Column(Integer, nullable=False, default=0)
-    active = Column(Boolean, nullable=False, default=True)
+    active  = Column(Boolean, nullable=False, default=True)
 
     __table_args__ = (
         UniqueConstraint(

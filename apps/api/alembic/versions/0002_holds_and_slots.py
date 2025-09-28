@@ -18,7 +18,7 @@ def upgrade():
         sa.Column("start_time_utc", sa.DateTime(timezone=True), nullable=False),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("version", sa.Integer(), nullable=False, server_default="0"),
-        sa.Column("active", sa.Boolean(), nullable=False, server_default=sa.text("1")),
+        sa.Column("active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
         sa.ForeignKeyConstraint(["customer_id"], ["users.id"]),
         sa.ForeignKeyConstraint(["company_id"], ["companies.id"]),
         sa.ForeignKeyConstraint(["service_id"], ["services.id"]),
