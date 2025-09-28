@@ -19,6 +19,12 @@ branch_labels = None
 depends_on = None
 
 
+def _table_exists(table: str) -> bool:
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    return table in inspector.get_table_names()
+
+
 def _drop_fk(table: str, columns: List[str]) -> None:
     bind = op.get_bind()
     inspector = sa.inspect(bind)
@@ -265,25 +271,28 @@ def upgrade() -> None:
     )
     op.create_index("ix_company_users_company_id", "company_users", ["company_id"])
 
-    # user_refresh_tokens adjustments
-    op.add_column(
-        "user_refresh_tokens",
-        sa.Column("user_id_uuid", postgresql.UUID(as_uuid=True), nullable=True),
-    )
-    op.execute(
-        sa.text(
-            """
-            UPDATE user_refresh_tokens AS t
-            SET user_id_uuid = u.id_uuid
-            FROM users AS u
-            WHERE t.user_id = u.id
-            """
+    if _table_exists("user_refresh_tokens"):
+        # user_refresh_tokens adjustments
+        op.add_column(
+            "user_refresh_tokens",
+            sa.Column("user_id_uuid", postgresql.UUID(as_uuid=True), nullable=True),
         )
-    )
-    op.alter_column("user_refresh_tokens", "user_id_uuid", nullable=False)
-    _drop_fk("user_refresh_tokens", ["user_id"])
-    op.drop_column("user_refresh_tokens", "user_id")
-    op.alter_column("user_refresh_tokens", "user_id_uuid", new_column_name="user_id")
+        op.execute(
+            sa.text(
+                """
+                UPDATE user_refresh_tokens AS t
+                SET user_id_uuid = u.id_uuid
+                FROM users AS u
+                WHERE t.user_id = u.id
+                """
+            )
+        )
+        op.alter_column("user_refresh_tokens", "user_id_uuid", nullable=False)
+        _drop_fk("user_refresh_tokens", ["user_id"])
+        op.drop_column("user_refresh_tokens", "user_id")
+        op.alter_column(
+            "user_refresh_tokens", "user_id_uuid", new_column_name="user_id"
+        )
 
     # notifications.company_id adjustments
     op.add_column(
@@ -329,7 +338,15 @@ def upgrade() -> None:
     op.create_foreign_key(None, "appointments", "companies", ["company_id"], ["id"])
     op.create_foreign_key(None, "company_users", "users", ["user_id"], ["id"])
     op.create_foreign_key(None, "company_users", "companies", ["company_id"], ["id"])
-    op.create_foreign_key(None, "user_refresh_tokens", "users", ["user_id"], ["id"], ondelete="CASCADE")
+    if _table_exists("user_refresh_tokens"):
+        op.create_foreign_key(
+            None,
+            "user_refresh_tokens",
+            "users",
+            ["user_id"],
+            ["id"],
+            ondelete="CASCADE",
+        )
     op.create_foreign_key(None, "notifications", "companies", ["company_id"], ["id"])
 
 
