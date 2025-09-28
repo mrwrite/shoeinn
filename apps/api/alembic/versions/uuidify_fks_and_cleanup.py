@@ -34,16 +34,24 @@ def _drop_unique(
     bind = op.get_bind()
     inspector = sa.inspect(bind)
 
-    for constraint in inspector.get_unique_constraints(table):
-        if constraint.get("column_names") == columns or (
+    constraints = inspector.get_unique_constraints(table)
+
+    for constraint in constraints:
+        column_names = constraint.get("column_names") or []
+        if sorted(column_names) == sorted(columns) or (
             name and constraint.get("name") == name
         ):
             op.drop_constraint(constraint["name"], table, type_="unique")
             return
 
     if name:
-        # Fallback to dropping by the provided name if the inspector didn't return it.
-        op.drop_constraint(name, table, type_="unique")
+        # If the constraint name was provided but not returned by the inspector,
+        # double-check that it still exists before attempting to drop it. This
+        # keeps the migration idempotent when the constraint has already been
+        # removed (for example, in manual or partially-applied environments).
+        existing_names = {c.get("name") for c in constraints}
+        if name in existing_names:
+            op.drop_constraint(name, table, type_="unique")
 
 
 def upgrade() -> None:
