@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 from threading import Event, Thread
 from typing import Dict, Protocol
 
+from sqlalchemy import inspect
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -16,6 +17,10 @@ from app.models.notification_outbox import NotificationOutbox
 from app.utils.notifications import record_notification_event
 
 logger = logging.getLogger(__name__)
+
+_OUTBOX_TABLE_CHECKED = False
+_OUTBOX_TABLE_PRESENT = False
+_OUTBOX_WARNING_LOGGED = False
 
 
 @dataclass
@@ -113,6 +118,9 @@ def dispatch_outbox_batch(
     Returns a tuple of (processed, succeeded, failed).
     """
 
+    if not _ensure_outbox_table(session):
+        return 0, 0, 0
+
     providers = providers or default_provider_registry()
     now = now or datetime.now(timezone.utc)
     processed = succeeded = failed = 0
@@ -164,6 +172,40 @@ def dispatch_outbox_batch(
             _handle_failure(session, notification, entry, result, now)
 
     return processed, succeeded, failed
+
+
+def _ensure_outbox_table(session: Session) -> bool:
+    """Verify the notification_outbox table exists before querying it.
+
+    In early local setups the migration that creates this table may not have run
+    yet. Instead of raising repeated errors, skip processing until the schema is
+    ready.
+    """
+
+    global _OUTBOX_TABLE_CHECKED, _OUTBOX_TABLE_PRESENT, _OUTBOX_WARNING_LOGGED
+
+    if _OUTBOX_TABLE_CHECKED and _OUTBOX_TABLE_PRESENT:
+        return True
+
+    try:
+        bind = session.get_bind()
+        if bind is None:
+            return False
+        inspector = inspect(bind)
+        table_name = NotificationOutbox.__table__.name
+        _OUTBOX_TABLE_PRESENT = table_name in inspector.get_table_names()
+        _OUTBOX_TABLE_CHECKED = True
+    except Exception:  # pragma: no cover - defensive
+        logger.exception("Failed to inspect database for notification outbox table")
+        return False
+
+    if not _OUTBOX_TABLE_PRESENT and not _OUTBOX_WARNING_LOGGED:
+        logger.warning(
+            "Notification outbox table missing; skipping dispatcher run until migrations are applied."
+        )
+        _OUTBOX_WARNING_LOGGED = True
+
+    return _OUTBOX_TABLE_PRESENT
 
 
 def _handle_success(
