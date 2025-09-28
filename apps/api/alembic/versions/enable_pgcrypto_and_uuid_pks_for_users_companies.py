@@ -19,6 +19,17 @@ branch_labels = None
 depends_on = None
 
 
+def _drop_inbound_foreign_keys(bind, target_table: str) -> None:
+    """Drop all foreign keys that reference the given table."""
+
+    inspector = sa.inspect(bind)
+
+    for table_name in inspector.get_table_names():
+        for fk in inspector.get_foreign_keys(table_name):
+            if fk.get("referred_table") == target_table:
+                op.drop_constraint(fk["name"], table_name, type_="foreignkey")
+
+
 def upgrade() -> None:
     op.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto;")
 
@@ -28,12 +39,13 @@ def upgrade() -> None:
         op.add_column(table, sa.Column("id_uuid", postgresql.UUID(as_uuid=True), nullable=True))
         op.execute(sa.text(f"UPDATE {table} SET id_uuid = gen_random_uuid() WHERE id_uuid IS NULL;"))
 
-        inspector = sa.inspect(bind)
-        pk = inspector.get_pk_constraint(table)
+        pk = sa.inspect(bind).get_pk_constraint(table)
         pk_name = pk.get("name") if pk else None
 
         legacy_unique_name = f"uq_{table}_id_legacy"
         op.create_unique_constraint(legacy_unique_name, table, ["id"])
+
+        _drop_inbound_foreign_keys(bind, table)
 
         if pk_name:
             op.drop_constraint(pk_name, table, type_="primary")
