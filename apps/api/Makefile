@@ -1,13 +1,16 @@
 API_HOST ?= 127.0.0.1
 API_PORT ?= 8000
 
-.PHONY: up down migrate revision dev seed
+.PHONY: up down reset-db migrate revision dev seed
 
 up:
 	docker-compose up -d
 
 down:
 	docker-compose down
+
+reset-db:
+	docker-compose down -v
 
 migrate:
 	alembic upgrade head

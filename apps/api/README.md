@@ -17,6 +17,14 @@ make dev
 > `docker-compose.yml`. A mismatch (for example `DATABASE_URL=postgresql+psycopg://shoeinn:shoeinn@localhost:5432/shoeinn`
 > while docker-compose still provisions `postgres` / `postgres`) will result in `password authentication failed for user` errors
 > when running Alembic migrations.
+
+If you've previously started the database with a different password, Postgres will keep that credential inside the persisted
+volume. You can reset the local database (and remove all data) with:
+
+```
+make reset-db
+make up
+```
 Seed demo data:
 ```
 curl -X POST http://localhost:8000/dev/seed
