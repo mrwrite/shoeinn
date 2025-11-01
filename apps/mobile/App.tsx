@@ -179,12 +179,25 @@ const AppContent: React.FC = () => {
   const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
+
     const hydrate = async () => {
-      await hydrateServicesCache(queryClient);
-      setIsHydrated(true);
+      try {
+        await hydrateServicesCache(queryClient);
+      } catch (error) {
+        console.warn('Failed to hydrate cached services', error);
+      } finally {
+        if (isMounted) {
+          setIsHydrated(true);
+        }
+      }
     };
 
     hydrate();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   if (!isHydrated) {
