@@ -22,6 +22,17 @@ export interface Service {
 }
 
 const DEFAULT_API_PORT = 8000;
+const ANDROID_LOOPBACK_HOST = '10.0.2.2';
+const ANDROID_LOCALHOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::1', '[::1]']);
+
+export const normalizeHostForPlatform = (host: string, platform: Platform['OS']): string => {
+  if (platform !== 'android') {
+    return host.trim();
+  }
+
+  const normalizedHost = host.trim();
+  return ANDROID_LOCALHOSTS.has(normalizedHost) ? ANDROID_LOOPBACK_HOST : normalizedHost;
+};
 
 const getExpoHost = (): string | undefined => {
   const debuggerHost = Constants.expoGoConfig?.debuggerHost;
@@ -45,11 +56,12 @@ const resolveApiBaseUrl = (): string => {
 
   const expoHost = getExpoHost();
   if (expoHost) {
-    return `http://${expoHost}:${DEFAULT_API_PORT}`;
+    const normalizedHost = normalizeHostForPlatform(expoHost, Platform.OS);
+    return `http://${normalizedHost}:${DEFAULT_API_PORT}`;
   }
 
   if (Platform.OS === 'android') {
-    return `http://10.0.2.2:${DEFAULT_API_PORT}`;
+    return `http://${ANDROID_LOOPBACK_HOST}:${DEFAULT_API_PORT}`;
   }
 
   return `http://localhost:${DEFAULT_API_PORT}`;

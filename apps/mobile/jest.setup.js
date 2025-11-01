@@ -14,4 +14,9 @@ jest.mock('@react-native-community/netinfo', () => {
   };
 });
 
-jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
+try {
+  require.resolve('react-native/Libraries/Animated/NativeAnimatedHelper');
+  jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
+} catch (error) {
+  jest.mock('react-native/Libraries/Animated/NativeAnimatedModule');
+}
