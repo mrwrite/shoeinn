@@ -1,3 +1,6 @@
+import { Platform } from 'react-native';
+import Constants from 'expo-constants';
+
 import { fetchWithRetry } from './fetchWithRetry';
 
 export type ServiceStatus = 'active' | 'inactive';
@@ -18,7 +21,41 @@ export interface Service {
   status: ServiceStatus;
 }
 
-const API_BASE_URL = 'http://192.168.128.1:8000';
+const DEFAULT_API_PORT = 8000;
+
+const getExpoHost = (): string | undefined => {
+  const debuggerHost = Constants.expoGoConfig?.debuggerHost;
+  if (debuggerHost) {
+    return debuggerHost.split(':')[0];
+  }
+
+  const hostUri = Constants.expoConfig?.hostUri;
+  if (hostUri) {
+    return hostUri.split(':')[0];
+  }
+
+  return undefined;
+};
+
+const resolveApiBaseUrl = (): string => {
+  const envUrl = process.env.EXPO_PUBLIC_API_URL;
+  if (envUrl) {
+    return envUrl;
+  }
+
+  const expoHost = getExpoHost();
+  if (expoHost) {
+    return `http://${expoHost}:${DEFAULT_API_PORT}`;
+  }
+
+  if (Platform.OS === 'android') {
+    return `http://10.0.2.2:${DEFAULT_API_PORT}`;
+  }
+
+  return `http://localhost:${DEFAULT_API_PORT}`;
+};
+
+const API_BASE_URL = resolveApiBaseUrl();
 
 const mapService = (service: any): Service => ({
   ...service,
