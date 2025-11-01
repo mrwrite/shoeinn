@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   AppState,
@@ -9,20 +9,24 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
-import NetInfo from '@react-native-community/netinfo';
+} from "react-native";
+import NetInfo from "@react-native-community/netinfo";
 import {
   QueryClient,
   QueryClientProvider,
   focusManager,
   onlineManager,
-} from '@tanstack/react-query';
+} from "@tanstack/react-query";
 
-import { hydrateServicesCache } from './src/cache/servicesCache';
-import { OfflineProvider, useOfflineManager } from './src/offline/OfflineProvider';
-import { useServiceStatusMutation } from './src/hooks/useServiceMutations';
-import { useServices } from './src/hooks/useServices';
-import type { Service } from './src/api/services';
+import { hydrateServicesCache } from "./src/cache/servicesCache";
+import {
+  OfflineProvider,
+  useOfflineManager,
+} from "./src/offline/OfflineProvider";
+import { useServiceStatusMutation } from "./src/hooks/useServiceMutations";
+import { useServices } from "./src/hooks/useServices";
+import type { Service } from "./src/api/services";
+import type { UseQueryResult } from "@tanstack/react-query";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -37,12 +41,12 @@ const queryClient = new QueryClient({
 
 focusManager.setEventListener((handleFocus) => {
   const onAppStateChange = (status: AppStateStatus) => {
-    if (status === 'active') {
+    if (status === "active") {
       handleFocus(true);
     }
   };
 
-  const subscription = AppState.addEventListener('change', onAppStateChange);
+  const subscription = AppState.addEventListener("change", onAppStateChange);
   return () => {
     subscription.remove();
   };
@@ -50,12 +54,16 @@ focusManager.setEventListener((handleFocus) => {
 
 onlineManager.setEventListener((setOnline) => {
   const unsubscribe = NetInfo.addEventListener((state) => {
-    const online = Boolean(state.isConnected && state.isInternetReachable !== false);
+    const online = Boolean(
+      state.isConnected && state.isInternetReachable !== false
+    );
     setOnline(online);
   });
 
   NetInfo.fetch().then((state) => {
-    const online = Boolean(state.isConnected && state.isInternetReachable !== false);
+    const online = Boolean(
+      state.isConnected && state.isInternetReachable !== false
+    );
     setOnline(online);
   });
 
@@ -65,18 +73,23 @@ onlineManager.setEventListener((setOnline) => {
 const formatPrice = (price: number) => `$${price.toFixed(2)}`;
 
 const ServicesScreen: React.FC = () => {
-  const { data: services, error, isError, isLoading } = useServices();
+  const query = useServices() as UseQueryResult<Service[], Error>;
+  const services: Service[] = query.data ?? [];
+  const { error, isError, isLoading } = query;
+
   const { isOnline, isSyncing, pendingCount } = useOfflineManager();
   const mutation = useServiceStatusMutation();
 
   const actionDisabled = mutation.isPending || isSyncing;
 
-  const sortedServices = useMemo(() => {
-    return (services ?? []).slice().sort((a, b) => a.name.localeCompare(b.name));
+  const sortedServices = useMemo<Service[]>(() => {
+    return services
+      .slice()
+      .sort((a: Service, b: Service) => a.name.localeCompare(b.name));
   }, [services]);
 
   const renderItem = ({ item }: { item: Service }) => {
-    const nextStatus = item.status === 'active' ? 'inactive' : 'active';
+    const nextStatus = item.status === "active" ? "inactive" : "active";
 
     return (
       <View style={styles.item}>
@@ -85,7 +98,9 @@ const ServicesScreen: React.FC = () => {
           <View
             style={[
               styles.statusBadge,
-              item.status === 'active' ? styles.statusActive : styles.statusInactive,
+              item.status === "active"
+                ? styles.statusActive
+                : styles.statusInactive,
             ]}
           >
             <Text style={styles.statusText}>{item.status.toUpperCase()}</Text>
@@ -95,10 +110,10 @@ const ServicesScreen: React.FC = () => {
         <Text style={styles.meta}>
           {item.company.city && item.company.state
             ? `${item.company.city}, ${item.company.state}`
-            : 'Available'}
+            : "Available"}
         </Text>
         <Text style={styles.meta}>
-          Duration: {item.duration_min ? `${item.duration_min} min` : 'N/A'}
+          Duration: {item.duration_min ? `${item.duration_min} min` : "N/A"}
         </Text>
         <Text style={styles.price}>{formatPrice(item.price)}</Text>
         <TouchableOpacity
@@ -113,7 +128,7 @@ const ServicesScreen: React.FC = () => {
           style={[styles.button, actionDisabled && styles.buttonDisabled]}
         >
           <Text style={styles.buttonLabel}>
-            {item.status === 'active' ? 'Mark Inactive' : 'Mark Active'}
+            {item.status === "active" ? "Mark Inactive" : "Mark Active"}
           </Text>
         </TouchableOpacity>
       </View>
@@ -127,13 +142,13 @@ const ServicesScreen: React.FC = () => {
           <Text style={styles.bannerText}>Unable to load services.</Text>
         </View>
         <Text style={styles.error}>
-          Error: {error instanceof Error ? error.message : 'Unknown error'}
+          Error: {error instanceof Error ? error.message : "Unknown error"}
         </Text>
       </SafeAreaView>
     );
   }
 
-  if (isLoading && !services?.length) {
+  if (isLoading && services.length === 0) {
     return (
       <SafeAreaView style={styles.container}>
         <ActivityIndicator size="large" />
@@ -146,7 +161,10 @@ const ServicesScreen: React.FC = () => {
       {!isOnline && (
         <View style={styles.bannerOffline}>
           <Text style={styles.bannerText}>
-            Offline. {pendingCount ? `${pendingCount} change(s) queued.` : 'Changes will sync when you reconnect.'}
+            Offline.{" "}
+            {pendingCount
+              ? `${pendingCount} change(s) queued.`
+              : "Changes will sync when you reconnect."}
           </Text>
         </View>
       )}
@@ -179,13 +197,28 @@ const AppContent: React.FC = () => {
   const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
+    (async () => {
+      const { API_URL } = await import("./src/api/http");
+      console.log("🔎 Using API_URL:", API_URL);
+
+      try {
+        const res = await fetch(`${API_URL}/health`, { method: "GET" });
+        console.log("🔎 /health status:", res.status);
+        console.log("🔎 /health body:", (await res.text()).slice(0, 200));
+      } catch (e: any) {
+        console.log("🔎 /health ERROR:", e?.message ?? e);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
     let isMounted = true;
 
     const hydrate = async () => {
       try {
         await hydrateServicesCache(queryClient);
       } catch (error) {
-        console.warn('Failed to hydrate cached services', error);
+        console.warn("Failed to hydrate cached services", error);
       } finally {
         if (isMounted) {
           setIsHydrated(true);
@@ -232,92 +265,92 @@ const styles = StyleSheet.create({
   item: {
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#ccc',
+    borderBottomColor: "#ccc",
     gap: 6,
   },
   title: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     flexShrink: 1,
   },
   company: {
     fontSize: 16,
-    color: '#444',
+    color: "#444",
   },
   meta: {
     fontSize: 14,
-    color: '#555',
+    color: "#555",
   },
   price: {
     marginTop: 4,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   error: {
-    color: 'red',
+    color: "red",
     marginTop: 16,
   },
   empty: {
     fontSize: 16,
-    color: '#666',
+    color: "#666",
   },
   emptyContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingVertical: 40,
   },
   emptyList: {
     flexGrow: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   button: {
     marginTop: 8,
     paddingVertical: 10,
-    backgroundColor: '#1f2937',
+    backgroundColor: "#1f2937",
     borderRadius: 6,
   },
   buttonDisabled: {
     opacity: 0.5,
   },
   buttonLabel: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
+    fontWeight: "600",
+    textAlign: "center",
   },
   bannerOffline: {
-    backgroundColor: '#f59e0b',
+    backgroundColor: "#f59e0b",
     padding: 12,
     borderRadius: 6,
     marginBottom: 12,
   },
   bannerSyncing: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
-    backgroundColor: '#2563eb',
+    backgroundColor: "#2563eb",
     padding: 10,
     borderRadius: 6,
     marginBottom: 12,
   },
   bannerText: {
-    color: '#111827',
-    fontWeight: '600',
+    color: "#111827",
+    fontWeight: "600",
   },
   bannerSyncingText: {
-    color: '#f9fafb',
+    color: "#f9fafb",
   },
   bannerError: {
-    backgroundColor: '#f87171',
+    backgroundColor: "#f87171",
     padding: 12,
     borderRadius: 6,
     marginBottom: 12,
   },
   headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     gap: 8,
   },
   statusBadge: {
@@ -326,14 +359,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   statusActive: {
-    backgroundColor: '#bbf7d0',
+    backgroundColor: "#bbf7d0",
   },
   statusInactive: {
-    backgroundColor: '#fecaca',
+    backgroundColor: "#fecaca",
   },
   statusText: {
     fontSize: 12,
-    fontWeight: '700',
-    color: '#111827',
+    fontWeight: "700",
+    color: "#111827",
   },
 });
