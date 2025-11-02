@@ -23,7 +23,7 @@ dev:
 python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
 seed:
-python -m scripts.seed_services
+	$(PYTHON) -m scripts.seed_services
 
 expire_holds:
-curl -X POST http://localhost:$(API_PORT)/appointments/holds/expire
+	curl -X POST http://localhost:$(API_PORT)/appointments/holds/expire

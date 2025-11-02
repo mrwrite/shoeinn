@@ -79,7 +79,9 @@ def upgrade() -> None:
         if _table_exists(table):
             op.drop_table(table)
 
-    hold_status = sa.Enum("PENDING", "EXPIRED", "CONFIRMED", name="holdstatus")
+    hold_status = postgresql.ENUM(
+        "PENDING", "EXPIRED", "CONFIRMED", name="holdstatus", create_type=False
+    )
     hold_status.create(op.get_bind(), checkfirst=True)
 
     timestamp_default = sa.text("timezone('utc', now())")
@@ -173,5 +175,5 @@ def downgrade() -> None:
     op.drop_index("ix_services_active_name", table_name="services")
     op.drop_table("services")
 
-    hold_status = sa.Enum(name="holdstatus")
+    hold_status = postgresql.ENUM(name="holdstatus")
     hold_status.drop(op.get_bind(), checkfirst=True)
