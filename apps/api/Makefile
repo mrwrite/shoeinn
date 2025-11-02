@@ -2,7 +2,7 @@ PYTHON ?= python
 API_HOST ?= 127.0.0.1
 API_PORT ?= 8000
 
-.PHONY: up down reset-db migrate revision dev seed
+.PHONY: up down reset-db migrate revision dev seed expire_holds
 
 up:
 	docker-compose up -d
@@ -23,4 +23,7 @@ dev:
 	$(PYTHON) -m uvicorn app.main:app --reload --host $(API_HOST) --port $(API_PORT)
 
 seed:
-	curl -X POST http://localhost:$(API_PORT)/dev/seed
+	$(PYTHON) -m scripts.seed_services
+
+expire_holds:
+	curl -X POST http://localhost:$(API_PORT)/appointments/holds/expire
