@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
+import { getJson } from './http';
 
 import { fetchWithRetry } from './fetchWithRetry';
 
@@ -18,7 +19,7 @@ export interface Service {
     city?: string | null;
     state?: string | null;
   };
-  status: ServiceStatus;
+  status?: ServiceStatus;
 }
 
 const DEFAULT_API_PORT = 8000;
@@ -75,9 +76,10 @@ const mapService = (service: any): Service => ({
 });
 
 export async function fetchServices(): Promise<Service[]> {
-  const response = await fetchWithRetry(`${API_BASE_URL}/services`);
-  const data = await response.json();
-  return Array.isArray(data) ? data.map(mapService) : [];
+  console.log("[Services] fetching /services …");
+  const data = await getJson<Service[]>("/services");
+  console.log("[Services] got", Array.isArray(data) ? data.length : "?", "items");
+  return data;
 }
 
 export async function updateServiceStatus({

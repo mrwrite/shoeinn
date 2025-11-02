@@ -4,12 +4,12 @@ import {
   AppState,
   AppStateStatus,
   FlatList,
-  SafeAreaView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import NetInfo from "@react-native-community/netinfo";
 import {
   QueryClient,
@@ -89,7 +89,8 @@ const ServicesScreen: React.FC = () => {
   }, [services]);
 
   const renderItem = ({ item }: { item: Service }) => {
-    const nextStatus = item.status === "active" ? "inactive" : "active";
+    const status = (item.status ?? "active") as "active" | "inactive";
+    const nextStatus = status === "active" ? "inactive" : "active";
 
     return (
       <View style={styles.item}>
@@ -98,12 +99,12 @@ const ServicesScreen: React.FC = () => {
           <View
             style={[
               styles.statusBadge,
-              item.status === "active"
+              status === "active"
                 ? styles.statusActive
                 : styles.statusInactive,
             ]}
           >
-            <Text style={styles.statusText}>{item.status.toUpperCase()}</Text>
+            <Text style={styles.statusText}>{status.toUpperCase()}</Text>
           </View>
         </View>
         <Text style={styles.company}>{item.company.name}</Text>
@@ -135,6 +136,7 @@ const ServicesScreen: React.FC = () => {
     );
   };
 
+  console.log("[UI] isLoading:", isLoading, "len:", services.length);
   if (isError) {
     return (
       <SafeAreaView style={styles.container}>
@@ -212,24 +214,22 @@ const AppContent: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    let isMounted = true;
+    let cancelled = false;
+    setIsHydrated(true); // optimistically set to true
 
-    const hydrate = async () => {
+    (async () => {
       try {
         await hydrateServicesCache(queryClient);
-      } catch (error) {
-        console.warn("Failed to hydrate cached services", error);
-      } finally {
-        if (isMounted) {
-          setIsHydrated(true);
+        if (!cancelled) {
+          console.log("[Hydrate] done");
         }
+      } catch (e) {
+        console.warn("[Hydrate] failed:", e);
       }
-    };
-
-    hydrate();
+    })();
 
     return () => {
-      isMounted = false;
+      cancelled = true;
     };
   }, []);
 
