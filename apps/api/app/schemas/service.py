@@ -1,30 +1,24 @@
+"""Pydantic schemas for services."""
+
+from __future__ import annotations
+
+from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, computed_field
+from pydantic import BaseModel, ConfigDict
 
 
-class ServiceCompanyOut(BaseModel):
+class ServiceRead(BaseModel):
+    """Service representation for API responses."""
+
     id: UUID
     name: str
-    city: str | None = None
-    state: str | None = None
-    postal_code: str | None = None
-
-
-class ServiceOut(BaseModel):
-    id: UUID
-    name: str | None = None
+    slug: str
     description: str | None = None
-    price_cents: int | None = None
-    duration_min: int | None = None
-    company: ServiceCompanyOut | None = None
+    duration_minutes: int
+    price_cents: int
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
 
-    @computed_field  # type: ignore[misc]
-    @property
-    def price(self) -> float | None:
-        if self.price_cents is None:
-            return None
-        return self.price_cents / 100
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
