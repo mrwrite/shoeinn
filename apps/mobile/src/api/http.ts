@@ -55,6 +55,10 @@ export function listServices(): Promise<Service[]> {
   return request<Service[]>("GET", "/services");
 }
 
+export function getJson<T>(path: string): Promise<T> {
+  return request<T>("GET", path);
+}
+
 export function getAvailability(serviceId: string, date: string): Promise<string[]> {
   const params = new URLSearchParams({ service_id: serviceId, date });
   return request<string[]>("GET", `/availability?${params.toString()}`);
