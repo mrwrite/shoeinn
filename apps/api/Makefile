@@ -20,7 +20,7 @@ revision:
 	alembic revision --autogenerate -m "update"
 
 dev:
-	$(PYTHON) -m uvicorn app.main:app --reload --host $(API_HOST) --port $(API_PORT)
+python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
 seed:
 	$(PYTHON) -m scripts.seed_services
