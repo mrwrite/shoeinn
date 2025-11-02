@@ -1,59 +1,50 @@
+"""Service catalogue and availability endpoints."""
+
+from __future__ import annotations
+
+from datetime import date, datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
-from sqlalchemy import func
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.models.company import Company
-from app.models.service import Service
-from app.schemas.service import ServiceCompanyOut, ServiceOut
+from app.models import Service
+from app.schemas.service import ServiceRead
+from app.services.availability import get_daily_availability
 
-router = APIRouter(prefix="/services", tags=["services"])
+router = APIRouter(tags=["services"])
 
 
-@router.get("", response_model=list[ServiceOut])
-def list_services(
-    query: str = "",
-    city: str | None = None,
-    state: str | None = None,
-    company_id: UUID | None = None,
-    db: Session = Depends(get_db),
-):
-    q = (
-        db.query(Service, Company)
-        .join(Company, Service.company_id == Company.id)
-        .filter(Service.active.is_(True), Company.is_active.is_(True))
+@router.get("/services", response_model=list[ServiceRead])
+def list_services(db: Session = Depends(get_db)) -> list[ServiceRead]:
+    """Return all active services ordered by name."""
+
+    services = (
+        db.query(Service)
+        .filter(Service.is_active.is_(True))
+        .order_by(Service.name.asc())
+        .all()
     )
-
-    if query:
-        like = f"%{query.lower()}%"
-        q = q.filter(
-            func.lower(Service.name).like(like) | func.lower(Company.name).like(like)
-        )
-    if city:
-        q = q.filter(Company.city == city)
-    if state:
-        q = q.filter(Company.state == state)
-    if company_id:
-        q = q.filter(Service.company_id == company_id)
-
-    services: list[ServiceOut] = []
-    for service, company in q.order_by(Company.name, Service.name).all():
-        services.append(
-            ServiceOut(
-                id=service.id,
-                name=service.name,
-                description=service.description,
-                price_cents=service.price_cents,
-                duration_min=service.duration_min,
-                company=ServiceCompanyOut(
-                    id=company.id,
-                    name=company.name,
-                    city=company.city,
-                    state=company.state,
-                    postal_code=company.postal_code,
-                ),
-            )
-        )
     return services
+
+
+@router.get("/availability")
+def get_availability(
+    service_id: UUID = Query(..., description="Service identifier"),
+    date_str: str = Query(..., alias="date", description="ISO date (YYYY-MM-DD)"),
+    db: Session = Depends(get_db),
+) -> list[datetime]:
+    """Return available start times for the given service and date."""
+
+    try:
+        target_date = date.fromisoformat(date_str)
+    except ValueError as exc:  # pragma: no cover - fast validation path
+        raise HTTPException(status_code=400, detail="Invalid date format") from exc
+
+    service = db.query(Service).filter(Service.id == service_id, Service.is_active.is_(True)).one_or_none()
+    if service is None:
+        raise HTTPException(status_code=400, detail="Service not found")
+
+    slots = get_daily_availability(db, service, target_date)
+    return slots
