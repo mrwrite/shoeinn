@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useMemo, useState } from "react";
+import React, {
+  createContext,
+  useContext,
+  useMemo,
+  useState,
+  type PropsWithChildren,
+} from "react";
 
 import type { Appointment, AppointmentHold, Service } from "../types/booking";
 
@@ -36,48 +42,51 @@ const initialState: BookingState = {
   step: "services",
 };
 
-export const BookingProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
+export function BookingProvider({ children }: PropsWithChildren<unknown>) {
   const [state, setState] = useState<BookingState>(initialState);
 
-  const actions = useMemo<BookingActions>(() => ({
-    setStep(step) {
-      setState((prev) => ({ ...prev, step }));
-    },
-    setService(service) {
-      console.log("[Services] Selected service", service?.name ?? "none");
-      setState((prev) => ({
-        ...prev,
-        selectedService: service,
-      }));
-    },
-    setDate(date) {
-      setState((prev) => ({
-        ...prev,
-        selectedDate: date,
-      }));
-    },
-    setStartTime(start) {
-      setState((prev) => ({
-        ...prev,
-        selectedStartTime: start,
-      }));
-    },
-    setHold(hold) {
-      setState((prev) => ({
-        ...prev,
-        hold,
-      }));
-    },
-    setAppointment(appointment) {
-      setState((prev) => ({
-        ...prev,
-        appointment,
-      }));
-    },
-    reset() {
-      setState(initialState);
-    },
-  }), []);
+  const actions = useMemo<BookingActions>(
+    () => ({
+      setStep(step) {
+        setState((prev) => ({ ...prev, step }));
+      },
+      setService(service) {
+        console.log("[Services] Selected service", service?.name ?? "none");
+        setState((prev) => ({
+          ...prev,
+          selectedService: service,
+        }));
+      },
+      setDate(date) {
+        setState((prev) => ({
+          ...prev,
+          selectedDate: date,
+        }));
+      },
+      setStartTime(start) {
+        setState((prev) => ({
+          ...prev,
+          selectedStartTime: start,
+        }));
+      },
+      setHold(hold) {
+        setState((prev) => ({
+          ...prev,
+          hold,
+        }));
+      },
+      setAppointment(appointment) {
+        setState((prev) => ({
+          ...prev,
+          appointment,
+        }));
+      },
+      reset() {
+        setState(initialState);
+      },
+    }),
+    [],
+  );
 
   const value = useMemo<BookingContextValue>(
     () => ({
@@ -87,8 +96,12 @@ export const BookingProvider: React.FC<React.PropsWithChildren> = ({ children })
     [state, actions],
   );
 
-  return <BookingContext.Provider value={value}>{children}</BookingContext.Provider>;
-};
+  return React.createElement(
+    BookingContext.Provider,
+    { value },
+    children,
+  );
+}
 
 export function useBooking(): BookingContextValue {
   const ctx = useContext(BookingContext);
