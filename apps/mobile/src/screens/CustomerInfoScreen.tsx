@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   StyleSheet,
   Text,
@@ -11,7 +12,7 @@ import {
   View,
 } from "react-native";
 
-import { confirmAppointment } from "../api/http";
+import { confirmAppointment, getAppointment } from "../api/http";
 import { useBooking } from "../state/bookingStore";
 
 interface Props {
@@ -25,6 +26,35 @@ const CustomerInfoScreen: React.FC<Props> = ({ onConfirmed, onBack }) => {
   const [phone, setPhone] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
+  const [polling, setPolling] = React.useState(false);
+
+  const wait = React.useCallback((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)), []);
+
+  const pollPaymentStatus = React.useCallback(
+    async (appointmentId: string) => {
+      setPolling(true);
+      try {
+        const maxAttempts = 20;
+        for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+          await wait(3000);
+          const latest = await getAppointment(appointmentId);
+          setAppointment(latest);
+          const status = latest.payment_status ?? "pending";
+          if (status === "succeeded") {
+            onConfirmed();
+            return;
+          }
+          if (status === "failed") {
+            throw new Error("Payment failed. Please try again.");
+          }
+        }
+        throw new Error("Timed out waiting for payment confirmation");
+      } finally {
+        setPolling(false);
+      }
+    },
+    [onConfirmed, setAppointment, wait],
+  );
 
   const handleSubmit = async () => {
     if (!hold || !name || !phone) {
@@ -39,9 +69,24 @@ const CustomerInfoScreen: React.FC<Props> = ({ onConfirmed, onBack }) => {
         customer_email: email || undefined,
         idempotencyKey: `app-${Date.now()}`,
       });
-      console.log("[Booking] Appointment confirmed", appointment.id);
+      console.log("[Booking] Appointment created", appointment.id);
       setAppointment(appointment);
-      onConfirmed();
+
+      const paymentStatus = appointment.payment_status ?? "pending";
+      if (paymentStatus === "succeeded") {
+        onConfirmed();
+        return;
+      }
+
+      if (appointment.payment_checkout_url) {
+        try {
+          await Linking.openURL(appointment.payment_checkout_url);
+        } catch (err) {
+          console.warn("[Booking] Unable to open checkout", err);
+        }
+      }
+
+      await pollPaymentStatus(appointment.id);
     } catch (error: any) {
       console.warn("[Booking] Confirmation failed", error);
       Alert.alert("Confirmation failed", error?.message ?? "Unable to confirm appointment");
@@ -61,7 +106,7 @@ const CustomerInfoScreen: React.FC<Props> = ({ onConfirmed, onBack }) => {
     );
   }
 
-  const disabled = submitting || !name || !phone;
+  const disabled = submitting || polling || !name || !phone;
 
   return (
     <KeyboardAvoidingView
@@ -103,7 +148,7 @@ const CustomerInfoScreen: React.FC<Props> = ({ onConfirmed, onBack }) => {
         disabled={disabled}
         accessibilityRole="button"
       >
-        {submitting ? (
+        {submitting || polling ? (
           <ActivityIndicator color="#f9fafb" />
         ) : (
           <Text style={styles.buttonText}>Confirm appointment</Text>

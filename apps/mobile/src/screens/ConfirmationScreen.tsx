@@ -30,6 +30,18 @@ const ConfirmationScreen: React.FC<Props> = ({ onDone }) => {
     timeStyle: "short",
   });
 
+  const paymentStatus = appointment.payment_status ?? "pending";
+  const paymentLabel = (() => {
+    switch (paymentStatus) {
+      case "succeeded":
+        return "Payment status: Confirmed";
+      case "failed":
+        return "Payment status: Action needed";
+      default:
+        return "Payment status: Pending";
+    }
+  })();
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>You're booked!</Text>
@@ -42,6 +54,7 @@ const ConfirmationScreen: React.FC<Props> = ({ onDone }) => {
         {appointment.customer_email ? (
           <Text style={styles.cardText}>Email: {appointment.customer_email}</Text>
         ) : null}
+        <Text style={[styles.cardText, paymentStatus !== "succeeded" && styles.warningText]}>{paymentLabel}</Text>
       </View>
       <TouchableOpacity style={styles.primaryButton} onPress={onDone} accessibilityRole="button">
         <Text style={styles.buttonText}>Book another cleaning</Text>
@@ -83,6 +96,10 @@ const styles = StyleSheet.create({
   cardText: {
     color: "#e5e7eb",
     fontSize: 15,
+  },
+  warningText: {
+    color: "#fbbf24",
+    fontWeight: "600",
   },
   primaryButton: {
     backgroundColor: "#2563eb",

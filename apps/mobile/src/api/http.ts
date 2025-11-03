@@ -83,6 +83,10 @@ export function confirmAppointment(
   });
 }
 
+export function getAppointment(id: string): Promise<Appointment> {
+  return request<Appointment>("GET", `/appointments/${id}`);
+}
+
 export function expireHolds(): Promise<{ expired: number }> {
   return request<{ expired: number }>("POST", "/appointments/holds/expire");
 }

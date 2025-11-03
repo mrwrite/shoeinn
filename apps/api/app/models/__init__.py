@@ -2,7 +2,7 @@
 
 from .service import Service
 from .appointment_hold import AppointmentHold, HoldStatus
-from .appointment import Appointment
+from .appointment import Appointment, AppointmentStatus, PaymentStatus
 from .notification_outbox import NotificationOutbox
 
 __all__ = [
@@ -10,5 +10,7 @@ __all__ = [
     "AppointmentHold",
     "HoldStatus",
     "Appointment",
+    "AppointmentStatus",
+    "PaymentStatus",
     "NotificationOutbox",
 ]

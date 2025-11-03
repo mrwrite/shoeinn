@@ -7,6 +7,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.models.appointment import AppointmentStatus, PaymentStatus
 from app.models.appointment_hold import HoldStatus
 
 
@@ -50,11 +51,19 @@ class AppointmentRead(BaseModel):
 
     id: UUID
     service_id: UUID
+    hold_id: UUID | None = None
     customer_name: str
     customer_phone: str
     customer_email: str | None
     start_time: datetime
     end_time: datetime
+    status: AppointmentStatus
+    payment_id: str | None = None
+    payment_status: PaymentStatus | None = None
+    payment_checkout_url: str | None = None
+    payment_amount_expected: int | None = None
+    payment_amount_received: int | None = None
+    payment_currency: str | None = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

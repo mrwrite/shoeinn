@@ -16,6 +16,13 @@ class Settings(BaseSettings):
     notification_backoff_seconds: int = 30
     enable_notification_dispatcher: bool = True
     db_auto_create: bool = False
+    payment_service_base_url: str | None = None
+    payment_checkout_success_url: str = "https://example.com/payment/success"
+    payment_checkout_cancel_url: str = "https://example.com/payment/cancel"
+    payment_service_timeout_seconds: float = 10.0
+    payment_currency: str = "usd"
+    enable_payment_sync_worker: bool = True
+    payment_sync_interval_seconds: int = 5
 
     class Config:
         env_file = ".env"

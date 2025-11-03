@@ -5,11 +5,23 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from threading import Lock
 from typing import Dict, Tuple
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.db import get_db
-from app.models import Appointment, AppointmentHold, HoldStatus, NotificationOutbox, Service
+from app.models import (
+    Appointment,
+    AppointmentHold,
+    AppointmentStatus,
+    HoldStatus,
+    NotificationOutbox,
+    PaymentStatus,
+    Service,
+)
+from app.services.payment_gateway import PaymentGateway, PaymentGatewayError
 from app.schemas.appointment import AppointmentConfirm, AppointmentRead, HoldCreate, HoldRead
 
 router = APIRouter(prefix="/appointments", tags=["appointments"])
@@ -73,11 +85,19 @@ def _serialize_appointment(appointment: Appointment) -> AppointmentRead:
         {
             "id": appointment.id,
             "service_id": appointment.service_id,
+            "hold_id": appointment.hold_id,
             "customer_name": appointment.customer_name,
             "customer_phone": appointment.customer_phone,
             "customer_email": appointment.customer_email,
             "start_time": _ensure_utc(appointment.start_time),
             "end_time": _ensure_utc(appointment.end_time),
+            "status": appointment.status,
+            "payment_id": appointment.payment_id,
+            "payment_status": appointment.payment_status,
+            "payment_checkout_url": appointment.payment_checkout_url,
+            "payment_amount_expected": appointment.payment_amount_expected,
+            "payment_amount_received": appointment.payment_amount_received,
+            "payment_currency": appointment.payment_currency,
             "created_at": _ensure_utc(appointment.created_at),
         },
         from_attributes=True,
@@ -101,7 +121,11 @@ def create_hold(payload: HoldCreate, db: Session = Depends(get_db)) -> HoldRead:
 
     conflict = (
         db.query(Appointment)
-        .filter(Appointment.start_time < end_time, Appointment.end_time > start_time)
+        .filter(
+            Appointment.start_time < end_time,
+            Appointment.end_time > start_time,
+            Appointment.status != AppointmentStatus.CANCELLED,
+        )
         .first()
     )
     if conflict:
@@ -126,11 +150,24 @@ def create_hold(payload: HoldCreate, db: Session = Depends(get_db)) -> HoldRead:
     return _serialize_hold(hold)
 
 
+def get_payment_gateway() -> PaymentGateway:
+    return PaymentGateway()
+
+
+@router.get("/{appointment_id}", response_model=AppointmentRead)
+def read_appointment(appointment_id: UUID, db: Session = Depends(get_db)) -> AppointmentRead:
+    appointment = db.get(Appointment, appointment_id)
+    if appointment is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
+    return _serialize_appointment(appointment)
+
+
 @router.post("/confirm", response_model=AppointmentRead)
 def confirm_hold(
     payload: AppointmentConfirm,
     idempotency_key: str | None = Header(default=None, convert_underscores=False, alias="Idempotency-Key"),
     db: Session = Depends(get_db),
+    gateway: PaymentGateway = Depends(get_payment_gateway),
 ) -> AppointmentRead:
     """Confirm an existing appointment hold and create an appointment."""
 
@@ -171,7 +208,11 @@ def confirm_hold(
 
     conflict = (
         db.query(Appointment)
-        .filter(Appointment.start_time < hold_end, Appointment.end_time > hold_start)
+        .filter(
+            Appointment.start_time < hold_end,
+            Appointment.end_time > hold_start,
+            Appointment.status != AppointmentStatus.CANCELLED,
+        )
         .first()
     )
     if conflict:
@@ -180,41 +221,99 @@ def confirm_hold(
     hold.customer_name = payload.customer_name
     hold.customer_phone = payload.customer_phone
     hold.customer_email = payload.customer_email
-    hold.status = HoldStatus.CONFIRMED
     hold.start_time = hold_start
     hold.end_time = hold_end
     hold.ttl_expires_at = expires_at
 
+    appointment = (
+        db.query(Appointment)
+        .filter(Appointment.hold_id == hold.id)
+        .order_by(Appointment.created_at.desc())
+        .first()
+    )
+    if appointment and appointment.status != AppointmentStatus.CANCELLED:
+        response = _serialize_appointment(appointment)
+        if idempotency_key:
+            _store_idempotent_payload(idempotency_key, response.model_dump())
+        return response
+
     appointment = Appointment(
         service_id=hold.service_id,
+        hold_id=hold.id,
         customer_name=payload.customer_name,
         customer_phone=payload.customer_phone,
         customer_email=payload.customer_email,
         start_time=hold_start,
         end_time=hold_end,
+        status=AppointmentStatus.PENDING,
     )
     db.add(appointment)
+    db.flush()
 
-    outbox_entry = NotificationOutbox(
-        type="APPOINTMENT_CONFIRMED",
-        payload={
+    booking_id = str(appointment.id)
+    currency = settings.payment_currency
+    amount_cents = service.price_cents
+
+    using_stub = not gateway.enabled
+
+    try:
+        checkout = gateway.create_checkout_session(
+            booking_id=booking_id,
+            amount_cents=amount_cents,
+            currency=currency,
+            customer_email=payload.customer_email,
+        )
+    except PaymentGatewayError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+    hold.customer_name = payload.customer_name
+    hold.customer_phone = payload.customer_phone
+    hold.customer_email = payload.customer_email
+
+    appointment.payment_id = checkout.payment_id
+    try:
+        appointment.payment_status = PaymentStatus(checkout.status)
+    except ValueError:
+        appointment.payment_status = PaymentStatus.PENDING
+    appointment.payment_checkout_url = checkout.checkout_url
+    appointment.payment_amount_expected = amount_cents
+    appointment.payment_currency = currency
+
+    if appointment.payment_status == PaymentStatus.SUCCEEDED and using_stub:
+        appointment.status = AppointmentStatus.CONFIRMED
+        appointment.payment_amount_received = appointment.payment_amount_expected
+        hold.status = HoldStatus.CONFIRMED
+        payload = {
             "appointment_id": str(appointment.id),
-            "service_id": str(hold.service_id),
-            "customer_name": payload.customer_name,
-            "customer_phone": payload.customer_phone,
-            "customer_email": payload.customer_email,
-            "start_time": hold_start.isoformat(),
-            "end_time": hold_end.isoformat(),
-        },
-    )
-    db.add(outbox_entry)
+            "service_id": str(appointment.service_id),
+            "customer_name": appointment.customer_name,
+            "customer_phone": appointment.customer_phone,
+            "customer_email": appointment.customer_email,
+            "start_time": _ensure_utc(appointment.start_time).isoformat(),
+            "end_time": _ensure_utc(appointment.end_time).isoformat(),
+            "payment_id": appointment.payment_id,
+            "payment_status": appointment.payment_status.value,
+            "payment_amount_expected": appointment.payment_amount_expected,
+            "payment_amount_received": appointment.payment_amount_received,
+            "payment_currency": appointment.payment_currency,
+        }
+        db.add(
+            NotificationOutbox(
+                type="APPOINTMENT_CONFIRMED",
+                payload=payload,
+            )
+        )
 
     db.add(hold)
+    db.add(appointment)
     db.commit()
     db.refresh(appointment)
     db.refresh(hold)
 
-    print(f"[Booking] Appointment confirmed {appointment.id} from hold {hold.id}")
+    print(
+        f"[Booking] Appointment {appointment.id} awaiting payment for hold {hold.id}"
+    )
 
     response = _serialize_appointment(appointment)
     if idempotency_key:
@@ -235,6 +334,20 @@ def expire_holds(db: Session = Depends(get_db)) -> dict[str, int]:
 
     for hold in holds:
         hold.status = HoldStatus.EXPIRED
+        appointment = (
+            db.query(Appointment)
+            .filter(Appointment.hold_id == hold.id, Appointment.status != AppointmentStatus.CANCELLED)
+            .first()
+        )
+        if appointment:
+            appointment.status = AppointmentStatus.CANCELLED
+            if appointment.payment_status not in {
+                PaymentStatus.FAILED,
+                PaymentStatus.REFUNDED,
+                PaymentStatus.DISPUTED,
+            }:
+                appointment.payment_status = PaymentStatus.FAILED
+            appointment.payment_checkout_url = None
     if holds:
         db.commit()
 
