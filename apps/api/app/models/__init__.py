@@ -1,16 +1,24 @@
 """Database models exported for easy import."""
 
-from .service import Service
-from .appointment_hold import AppointmentHold, HoldStatus
 from .appointment import Appointment, AppointmentStatus, PaymentStatus
+from .appointment_event import AppointmentEvent
+from .appointment_hold import AppointmentHold, HoldStatus
+from .available_slot import AvailableSlot
+from .company import Company
+from .company_user import CompanyUser
 from .notification_outbox import NotificationOutbox
+from .service import Service
 
 __all__ = [
-    "Service",
-    "AppointmentHold",
-    "HoldStatus",
     "Appointment",
+    "AppointmentEvent",
+    "AppointmentHold",
     "AppointmentStatus",
-    "PaymentStatus",
+    "AvailableSlot",
+    "Company",
+    "CompanyUser",
+    "HoldStatus",
     "NotificationOutbox",
+    "PaymentStatus",
+    "Service",
 ]

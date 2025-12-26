@@ -20,6 +20,16 @@ make dev
 make seed
 ```
 
+### Demo data
+
+Running `make seed` (or calling `POST /dev/seed`) now loads demo providers and logins:
+
+- Companies: Clean Kicks (Austin, TX), Fresh Soles (Austin, TX), Sole Spa (Denver, CO)
+- Provider logins: `c1@test.com`, `c2@test.com`, `c3@test.com` (password `Password1!`)
+- Customer login: `customer@test.com` (password `Password1!`)
+
+Provider dashboards authenticate via `POST /company/auth/login` and use the returned bearer token for `/company/appointments` operations.
+
 ### Curl examples
 
 ```bash

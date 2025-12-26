@@ -35,5 +35,8 @@ def get_company(company_id: UUID, db: Session = Depends(get_db)):
 
 @router.get("/{company_id}/services", response_model=list[ServiceOut])
 def company_services(company_id: UUID, db: Session = Depends(get_db)):
-    q = db.query(Service).filter_by(company_id=company_id, active=True)
+    company = db.get(Company, company_id)
+    if not company or not company.is_active:
+        raise HTTPException(status_code=404, detail="Not found")
+    q = db.query(Service).filter_by(company_id=company_id).filter(Service.is_active.is_(True))
     return q.all()
