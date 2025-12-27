@@ -3,8 +3,10 @@
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
+from sqlalchemy import text
 
-revision = "normalize_services_and_appointments"
+
+revision = "norm_services_and_appts"
 down_revision = "dee02c1bc9c1"
 branch_labels = None
 depends_on = None
@@ -48,24 +50,31 @@ def upgrade() -> None:
     if _table_exists("services"):
         if not _column_exists("services", "company_id"):
             op.add_column("services", sa.Column("company_id", postgresql.UUID(as_uuid=True), nullable=True))
-        op.execute(
-            sa.text(
-                """
-                UPDATE services
-                SET company_id = (
-                    SELECT id FROM companies ORDER BY created_at NULLS LAST LIMIT 1
-                )
-                WHERE company_id IS NULL
-                """
+
+        # Only backfill if companies table exists AND has at least 1 row
+        if _table_exists("companies"):
+            has_company = bind.execute(text("SELECT EXISTS (SELECT 1 FROM companies LIMIT 1)")).scalar()
+            if has_company:
+                bind.execute(text("""
+                    UPDATE services
+                    SET company_id = (
+                        SELECT id FROM companies ORDER BY created_at NULLS LAST LIMIT 1
+                    )
+                    WHERE company_id IS NULL
+                """))
+
+        # Only enforce NOT NULL if there are no NULLs remaining
+        null_count = bind.execute(text("SELECT COUNT(*) FROM services WHERE company_id IS NULL")).scalar()
+        if null_count == 0:
+            op.alter_column(
+                "services",
+                "company_id",
+                existing_type=postgresql.UUID(as_uuid=True),
+                nullable=False,
+                existing_nullable=True,
             )
-        )
-        op.alter_column(
-            "services",
-            "company_id",
-            existing_type=postgresql.UUID(as_uuid=True),
-            nullable=False,
-            existing_nullable=True,
-        )
+
+        # FK + index can be created if companies exists (FK will fail if it doesn't)
         if _table_exists("companies") and not _fk_exists("services", "fk_services_company"):
             op.create_foreign_key(
                 "fk_services_company",
@@ -74,6 +83,7 @@ def upgrade() -> None:
                 ["company_id"],
                 ["id"],
             )
+
         op.execute("CREATE INDEX IF NOT EXISTS ix_services_company ON services (company_id)")
 
     # Appointments lifecycle columns
@@ -116,13 +126,16 @@ def upgrade() -> None:
         op.execute("UPDATE appointments SET status='requested' WHERE status IS NULL")
         op.execute("UPDATE appointments SET updated_at = created_at WHERE updated_at IS NULL")
 
-        op.alter_column(
-            "appointments",
-            "company_id",
-            existing_type=postgresql.UUID(as_uuid=True),
-            nullable=False,
-            existing_nullable=True,
-        )
+        null_appt_company = bind.execute(text("SELECT COUNT(*) FROM appointments WHERE company_id IS NULL")).scalar()
+        if null_appt_company == 0:
+            op.alter_column(
+                "appointments",
+                "company_id",
+                existing_type=postgresql.UUID(as_uuid=True),
+                nullable=False,
+                existing_nullable=True,
+            )
+
         op.alter_column(
             "appointments",
             "type",
