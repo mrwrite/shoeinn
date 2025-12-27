@@ -260,10 +260,17 @@ def confirm_hold(
             _store_idempotent_payload(idempotency_key, response.model_dump())
         return response
 
+    if payload.company_id and payload.company_id != service.company_id:
+        raise HTTPException(status_code=400, detail="company_id does not match service")
+
+    company_id = payload.company_id or service.company_id
+    if company_id is None:
+        raise HTTPException(status_code=400, detail="Missing company_id for appointment")
+
     appointment = Appointment(
         service_id=hold.service_id,
         hold_id=hold.id,
-        company_id=payload.company_id,
+        company_id=company_id,
         type=payload.type,
         customer_name=payload.customer_name,
         customer_phone=payload.customer_phone,
