@@ -54,8 +54,11 @@ curl "http://localhost:8000/appointments/me?email=joe@example.com&phone=123"
 
 ```bash
 cd apps/mobile
-npm start
+EXPO_PUBLIC_API_URL=http://localhost:8000 npm start -- --tunnel
 ```
+
+- The `--tunnel` flag makes the Metro dev server reachable from Expo Go when your phone and computer are on different networks; it also prevents Expo Go from attempting to fetch a remote OTA update (the usual cause of `Failed to download remote update`).
+- If you still see that message in Expo Go, clear the bundler cache before retrying: `npm start -- --clear --tunnel`.
 
 ## Running tests
 

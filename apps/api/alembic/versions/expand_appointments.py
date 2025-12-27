@@ -94,7 +94,7 @@ def upgrade() -> None:
                 END::appointmentstatus
                 """
             )
-            # default requested (as you intended)
+            # default requested (as intended)
             op.alter_column("appointments", "status", server_default="requested")
         else:
             # Fresh DB path: add status column
@@ -138,8 +138,7 @@ def upgrade() -> None:
         ),
     )
 
-    # FK / indexes (guard company table existence if your early schema isn't consistent)
-    # If companies always exists at this point, you can remove these guards.
+    # FK / indexes
     if table_exists("companies"):
         op.create_foreign_key(
             "fk_appointments_company",
@@ -150,8 +149,9 @@ def upgrade() -> None:
         )
         op.execute("CREATE INDEX IF NOT EXISTS ix_appointments_company_status ON appointments (company_id, status)")
 
-    
-    # backfill status and updated_at (only if columns exist)
+    # NOTE: ix_appointments_start_time is owned by mvp_booking_tables.py (avoid duplicate creation here)
+
+    # backfill status and updated_at
     if column_exists("appointments", "status"):
         op.execute("UPDATE appointments SET status='requested' WHERE status IS NULL")
     if column_exists("appointments", "updated_at") and column_exists("appointments", "created_at"):
@@ -182,6 +182,7 @@ def upgrade() -> None:
         sa.Column("payload", sa.JSON(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("timezone('utc', now())")),
     )
+
 
 def downgrade() -> None:
     op.drop_table("appointment_events")
