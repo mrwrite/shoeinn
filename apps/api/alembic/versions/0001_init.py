@@ -89,7 +89,7 @@ def upgrade():
         sa.Column("created_at", sa.DateTime(timezone=True)),
         sa.UniqueConstraint("company_id", "start_time_utc", name="uq_appointments_company_start_time"),
     )
-    op.create_index("ix_appointments_start_time", "appointments", ["start_time_utc"])
+    op.create_index("ix_appointments_start_time_utc", "appointments", ["start_time_utc"])
 
     op.create_table(
         "notifications",
@@ -155,7 +155,7 @@ def downgrade():
     op.drop_index("ix_notifications_company_status", table_name="notifications")
     op.drop_table("notifications")
 
-    op.drop_index("ix_appointments_start_time", table_name="appointments")
+    op.drop_index("ix_appointments_start_time_utc", table_name="appointments")
     op.drop_table("appointments")
 
     op.drop_index("ix_company_users_company_id", table_name="company_users")

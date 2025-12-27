@@ -3,6 +3,7 @@
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
+from sqlalchemy import text
 
 # revision identifiers, used by Alembic.
 revision = "3b8d2f1ef4d4"
@@ -11,7 +12,7 @@ branch_labels = None
 depends_on = None
 
 
-APPOINTMENT_STATUS_VALUES = ("PENDING", "CONFIRMED", "CANCELLED")
+
 PAYMENT_STATUS_VALUES = (
     "pending",
     "requires_action",
@@ -25,10 +26,7 @@ PAYMENT_STATUS_VALUES = (
 def upgrade() -> None:
     bind = op.get_bind()
 
-    appointment_status = postgresql.ENUM(
-        *APPOINTMENT_STATUS_VALUES, name="appointmentstatus", create_type=False
-    )
-    appointment_status.create(bind, checkfirst=True)
+   
 
     payment_status = postgresql.ENUM(
         *PAYMENT_STATUS_VALUES, name="appointmentpaymentstatus", create_type=False
@@ -48,13 +46,7 @@ def upgrade() -> None:
         ["id"],
         ondelete="SET NULL",
     )
-
-    op.add_column(
-        "appointments",
-        sa.Column(
-            "status", appointment_status, nullable=False, server_default="CONFIRMED"
-        ),
-    )
+   
     op.add_column(
         "appointments",
         sa.Column("payment_id", sa.String(length=64), nullable=True),
@@ -81,8 +73,7 @@ def upgrade() -> None:
         sa.Column("payment_currency", sa.String(length=3), nullable=True),
     )
 
-    op.execute("UPDATE appointments SET status='CONFIRMED' WHERE status IS NULL")
-    op.alter_column("appointments", "status", server_default=None)
+    
 
 
 def downgrade() -> None:
@@ -93,8 +84,7 @@ def downgrade() -> None:
     op.drop_column("appointments", "payment_checkout_url")
     op.drop_column("appointments", "payment_status")
     op.drop_constraint("uq_appointments_payment_id", "appointments", type_="unique")
-    op.drop_column("appointments", "payment_id")
-    op.drop_column("appointments", "status")
+    op.drop_column("appointments", "payment_id")    
     op.drop_constraint("fk_appointments_hold_id", "appointments", type_="foreignkey")
     op.drop_constraint("uq_appointments_hold_id", "appointments", type_="unique")
     op.drop_column("appointments", "hold_id")
@@ -102,9 +92,4 @@ def downgrade() -> None:
     payment_status = postgresql.ENUM(
         *PAYMENT_STATUS_VALUES, name="appointmentpaymentstatus", create_type=False
     )
-    payment_status.drop(op.get_bind(), checkfirst=True)
-
-    appointment_status = postgresql.ENUM(
-        *APPOINTMENT_STATUS_VALUES, name="appointmentstatus", create_type=False
-    )
-    appointment_status.drop(op.get_bind(), checkfirst=True)
+    payment_status.drop(op.get_bind(), checkfirst=True) 
