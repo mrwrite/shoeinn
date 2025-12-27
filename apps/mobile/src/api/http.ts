@@ -8,20 +8,33 @@ import type {
   HoldCreatePayload,
   Service,
 } from "../types/booking";
+import type { LoginPayload, LoginResponse, RegisterPayload, RegisterResponse } from "../types/auth";
+import type { ProviderAppointment, StatusUpdatePayload } from "../types/company";
+import { getAuthToken } from "../state/authStore";
 
 export const API_URL: string =
-  (Constants.expoConfig?.extra as any)?.API_URL ?? "http://CHANGE_ME:8000";
+  (Constants.expoConfig?.extra as any)?.API_URL ??
+  // eslint-disable-next-line no-process-env
+  (process.env.EXPO_PUBLIC_API_URL as string) ??
+  "http://CHANGE_ME:8000";
+
+type HttpMethod = "GET" | "POST";
+
+interface RequestOptions extends RequestInit {
+  auth?: boolean;
+  timeoutMs?: number;
+}
 
 async function request<T>(
-  method: "GET" | "POST",
+  method: HttpMethod,
   path: string,
   body?: unknown,
-  init: RequestInit = {},
-  timeoutMs = 10000,
+  { auth = false, timeoutMs = 10000, ...init }: RequestOptions = {},
 ): Promise<T> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   const url = `${API_URL.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
+  const token = auth ? getAuthToken() : null;
   console.log(`[HTTP] ${method}`, url);
 
   try {
@@ -31,6 +44,7 @@ async function request<T>(
       body: body ? JSON.stringify(body) : undefined,
       headers: {
         "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(init.headers ?? {}),
       },
       signal: ctrl.signal,
@@ -38,7 +52,14 @@ async function request<T>(
 
     if (!response.ok) {
       const text = await response.text().catch(() => "");
-      throw new Error(`HTTP ${response.status}: ${text.slice(0, 200)}`);
+      let detail = text;
+      try {
+        const parsed = JSON.parse(text);
+        detail = parsed?.detail ?? text;
+      } catch (err) {
+        // fall through to throw below
+      }
+      throw new Error(`HTTP ${response.status}: ${detail.slice(0, 200)}`);
     }
 
     if (response.status === 204) {
@@ -49,6 +70,14 @@ async function request<T>(
   } finally {
     clearTimeout(timer);
   }
+}
+
+export function login(payload: LoginPayload): Promise<LoginResponse> {
+  return request<LoginResponse>("POST", "/auth/login", payload);
+}
+
+export function register(payload: RegisterPayload): Promise<RegisterResponse> {
+  return request<RegisterResponse>("POST", "/auth/register", payload);
 }
 
 export function listServices(): Promise<Service[]> {
@@ -69,9 +98,7 @@ export function createHold(payload: HoldCreatePayload): Promise<AppointmentHold>
   return request<AppointmentHold>("POST", "/appointments/holds", payload);
 }
 
-export function confirmAppointment(
-  payload: ConfirmAppointmentPayload,
-): Promise<Appointment> {
+export function confirmAppointment(payload: ConfirmAppointmentPayload): Promise<Appointment> {
   const { idempotencyKey, ...rest } = payload;
   console.log("[Booking] Confirming appointment", rest.hold_id);
   return request<Appointment>("POST", "/appointments/confirm", rest, {
@@ -89,4 +116,17 @@ export function getAppointment(id: string): Promise<Appointment> {
 
 export function expireHolds(): Promise<{ expired: number }> {
   return request<{ expired: number }>("POST", "/appointments/holds/expire");
+}
+
+export function fetchOpenAppointments(): Promise<ProviderAppointment[]> {
+  return request<ProviderAppointment[]>("GET", "/company/appointments/open", undefined, { auth: true });
+}
+
+export function updateAppointmentStatus(
+  id: string,
+  payload: StatusUpdatePayload,
+): Promise<{ id: string; status: string }> {
+  return request<{ id: string; status: string }>("POST", `/company/appointments/${id}/status`, payload, {
+    auth: true,
+  });
 }

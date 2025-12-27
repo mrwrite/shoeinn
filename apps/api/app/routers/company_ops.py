@@ -121,12 +121,19 @@ def update_status(
 ):
     _, company_id = current
     appt = db.get(Appointment, appointment_id)
-    if not appt or appt.company_id != company_id:
+    if not appt:
         raise HTTPException(status_code=404, detail="Not found")
+    if appt.company_id and appt.company_id != company_id:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    if appt.company_id is None:
+        appt.company_id = company_id
 
     appt.status = payload.status
     if payload.confirmed_time:
         appt.confirmed_time = payload.confirmed_time.astimezone(timezone.utc)
+    elif payload.status == AppointmentStatus.CONFIRMED:
+        appt.confirmed_time = datetime.now(timezone.utc)
 
     db.add(
         AppointmentEvent(

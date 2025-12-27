@@ -11,7 +11,8 @@ from app.core.security import (
     verify_password,
 )
 from app.models.user import User
-from app.schemas.auth import LoginRequest, RefreshRequest, RegisterRequest, TokenPair
+from app.models.company_user import CompanyUser
+from app.schemas.auth import LoginRequest, LoginResponse, RefreshRequest, RegisterRequest, TokenPair
 from app.schemas.user import UserOut
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -33,7 +34,7 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     return user
 
 
-@router.post("/login", response_model=TokenPair)
+@router.post("/login", response_model=LoginResponse)
 def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)):
     user = db.query(User).filter_by(email=payload.email).first()
     if not user or not verify_password(payload.password, user.password_hash):
@@ -45,7 +46,15 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
         user_agent=request.headers.get("user-agent"),
         ip_address=request.client.host if request.client else None,
     )
-    return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer"}
+    company_link = db.query(CompanyUser).filter(CompanyUser.user_id == user.id).first()
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "role": user.role,
+        "user_id": user.id,
+        "company_id": company_link.company_id if company_link else None,
+    }
 
 
 @router.post("/refresh", response_model=TokenPair)
