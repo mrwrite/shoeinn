@@ -17,15 +17,13 @@ router = APIRouter(tags=["services"])
 
 
 @router.get("/services", response_model=list[ServiceRead])
-def list_services(db: Session = Depends(get_db)) -> list[ServiceRead]:
+def list_services(company_id: UUID | None = None, db: Session = Depends(get_db)) -> list[ServiceRead]:
     """Return all active services ordered by name."""
 
-    services = (
-        db.query(Service)
-        .filter(Service.is_active.is_(True))
-        .order_by(Service.name.asc())
-        .all()
-    )
+    q = db.query(Service).filter(Service.is_active.is_(True))
+    if company_id:
+        q = q.filter(Service.company_id == company_id)
+    services = q.order_by(Service.name.asc()).all()
     return services
 
 

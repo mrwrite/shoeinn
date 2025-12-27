@@ -14,6 +14,7 @@ from app.core.config import settings
 from app.core.db import get_db
 from app.models import (
     Appointment,
+    AppointmentEvent,
     AppointmentHold,
     AppointmentStatus,
     HoldStatus,
@@ -22,7 +23,7 @@ from app.models import (
     Service,
 )
 from app.services.payment_gateway import PaymentGateway, PaymentGatewayError
-from app.schemas.appointment import AppointmentConfirm, AppointmentRead, HoldCreate, HoldRead
+from app.schemas.appointment import AppointmentConfirm, AppointmentEventRead, AppointmentRead, HoldCreate, HoldRead
 
 router = APIRouter(prefix="/appointments", tags=["appointments"])
 
@@ -84,13 +85,23 @@ def _serialize_appointment(appointment: Appointment) -> AppointmentRead:
     return AppointmentRead.model_validate(
         {
             "id": appointment.id,
+            "company_id": appointment.company_id,
             "service_id": appointment.service_id,
             "hold_id": appointment.hold_id,
+            "type": appointment.type,
             "customer_name": appointment.customer_name,
             "customer_phone": appointment.customer_phone,
             "customer_email": appointment.customer_email,
+            "address_line1": appointment.address_line1,
+            "address_line2": appointment.address_line2,
+            "city": appointment.city,
+            "state": appointment.state,
+            "postal_code": appointment.postal_code,
             "start_time": _ensure_utc(appointment.start_time),
-            "end_time": _ensure_utc(appointment.end_time),
+            "confirmed_time": _ensure_utc(appointment.confirmed_time)
+            if appointment.confirmed_time
+            else None,
+            "end_time": _ensure_utc(appointment.end_time) if appointment.end_time else None,
             "status": appointment.status,
             "payment_id": appointment.payment_id,
             "payment_status": appointment.payment_status,
@@ -99,6 +110,7 @@ def _serialize_appointment(appointment: Appointment) -> AppointmentRead:
             "payment_amount_received": appointment.payment_amount_received,
             "payment_currency": appointment.payment_currency,
             "created_at": _ensure_utc(appointment.created_at),
+            "updated_at": _ensure_utc(appointment.updated_at),
         },
         from_attributes=True,
     )
@@ -160,6 +172,17 @@ def read_appointment(appointment_id: UUID, db: Session = Depends(get_db)) -> App
     if appointment is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
     return _serialize_appointment(appointment)
+
+
+@router.get("/{appointment_id}/events", response_model=list[AppointmentEventRead])
+def read_appointment_events(appointment_id: UUID, db: Session = Depends(get_db)) -> list[AppointmentEventRead]:
+    events = (
+        db.query(AppointmentEvent)
+        .filter(AppointmentEvent.appointment_id == appointment_id)
+        .order_by(AppointmentEvent.created_at.asc())
+        .all()
+    )
+    return [AppointmentEventRead.model_validate(event, from_attributes=True) for event in events]
 
 
 @router.post("/confirm", response_model=AppointmentRead)
@@ -240,12 +263,19 @@ def confirm_hold(
     appointment = Appointment(
         service_id=hold.service_id,
         hold_id=hold.id,
+        company_id=payload.company_id,
+        type=payload.type,
         customer_name=payload.customer_name,
         customer_phone=payload.customer_phone,
         customer_email=payload.customer_email,
+        address_line1=payload.address_line1,
+        address_line2=payload.address_line2,
+        city=payload.city,
+        state=payload.state,
+        postal_code=payload.postal_code,
         start_time=hold_start,
         end_time=hold_end,
-        status=AppointmentStatus.PENDING,
+        status=AppointmentStatus.REQUESTED,
     )
     db.add(appointment)
     db.flush()
@@ -307,6 +337,16 @@ def confirm_hold(
 
     db.add(hold)
     db.add(appointment)
+    db.flush()
+
+    db.add(
+        AppointmentEvent(
+            appointment_id=appointment.id,
+            kind="status_change",
+            payload={"status": appointment.status.value},
+        )
+    )
+
     db.commit()
     db.refresh(appointment)
     db.refresh(hold)
