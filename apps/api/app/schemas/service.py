@@ -12,7 +12,7 @@ class ServiceRead(BaseModel):
     """Service representation for API responses."""
 
     id: UUID
-    company_id: UUID | None = None
+    company_id: UUID
     name: str
     slug: str
     description: str | None = None
@@ -27,7 +27,7 @@ class ServiceRead(BaseModel):
 
 class ServiceOut(BaseModel):
     id: UUID
-    company_id: UUID | None = None
+    company_id: UUID
     name: str
     description: str | None = None
     duration_minutes: int

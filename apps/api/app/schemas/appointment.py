@@ -55,7 +55,7 @@ class AppointmentConfirm(BaseModel):
     """Request body for confirming an appointment hold."""
 
     hold_id: UUID
-    company_id: UUID | None = None
+    company_id: UUID
     customer_name: str = Field(max_length=255)
     customer_phone: str = Field(max_length=50)
     customer_email: str | None = Field(default=None, max_length=255)
@@ -71,7 +71,7 @@ class AppointmentRead(BaseModel):
     """Serialized appointment."""
 
     id: UUID
-    company_id: UUID | None = None
+    company_id: UUID
     service_id: UUID
     hold_id: UUID | None = None
     type: str

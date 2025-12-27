@@ -42,7 +42,7 @@ class Appointment(Base):
     __tablename__ = "appointments"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    company_id = Column(UUID(as_uuid=True), ForeignKey("companies.id"), nullable=True)
+    company_id = Column(UUID(as_uuid=True), ForeignKey("companies.id"), nullable=False)
     service_id = Column(UUID(as_uuid=True), ForeignKey("services.id"), nullable=False)
     hold_id = Column(UUID(as_uuid=True), ForeignKey("appointment_holds.id"), nullable=True, unique=True)
     type = Column(String(50), nullable=False, default="pickup")
