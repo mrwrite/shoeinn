@@ -23,33 +23,102 @@ NEW_STATUS_VALUES = [
 
 
 def upgrade() -> None:
-    # update status enum
-    old_status = postgresql.ENUM("PENDING", "CONFIRMED", "CANCELLED", name="appointmentstatus")
-    op.execute("ALTER TYPE appointmentstatus RENAME TO appointmentstatus_old")
-    new_status = postgresql.ENUM(*NEW_STATUS_VALUES, name="appointmentstatus")
-    new_status.create(op.get_bind(), checkfirst=False)
-    op.alter_column(
-        "appointments",
-        "status",
-        type_=new_status,
-        postgresql_using=(
-            "CASE "
-            "WHEN status='PENDING' THEN 'requested' "
-            "WHEN status='CONFIRMED' THEN 'confirmed' "
-            "WHEN status='CANCELLED' THEN 'cancelled' "
-            "ELSE lower(status::text) END::appointmentstatus"
-        ),
-        existing_type=old_status,
-        existing_nullable=False,
-    )
-    op.alter_column(
-        "appointments",
-        "status",
-        existing_type=new_status,
-        server_default="requested",
-    )
-    op.execute("DROP TYPE appointmentstatus_old")
+    bind = op.get_bind()
 
+    # -----------------------------
+    # Helpers (Postgres schema-aware)
+    # -----------------------------
+    def column_exists(table: str, column: str) -> bool:
+        return bind.execute(
+            sa.text(
+                """
+                SELECT 1
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = :t
+                  AND column_name = :c
+                LIMIT 1
+                """
+            ),
+            {"t": table, "c": column},
+        ).first() is not None
+
+    def type_exists(type_name: str) -> bool:
+        return bind.execute(
+            sa.text("SELECT 1 FROM pg_type WHERE typname = :n LIMIT 1"),
+            {"n": type_name},
+        ).first() is not None
+
+    def table_exists(table: str) -> bool:
+        return bind.execute(
+            sa.text(
+                """
+                SELECT 1
+                FROM information_schema.tables
+                WHERE table_schema = 'public'
+                  AND table_name = :t
+                LIMIT 1
+                """
+            ),
+            {"t": table},
+        ).first() is not None
+
+    # -----------------------------
+    # 1) Ensure appointmentstatus enum is in the NEW shape
+    # -----------------------------
+    had_old_type = False
+    if type_exists("appointmentstatus"):
+        # rename existing to *_old (could be old values or already-new from partial runs)
+        op.execute("ALTER TYPE appointmentstatus RENAME TO appointmentstatus_old")
+        had_old_type = True
+
+    new_status = postgresql.ENUM(*NEW_STATUS_VALUES, name="appointmentstatus")
+    new_status.create(bind, checkfirst=False)
+
+    # -----------------------------
+    # 2) Ensure appointments.status exists and is correct type
+    # -----------------------------
+    if table_exists("appointments"):
+        if column_exists("appointments", "status"):
+            # Convert existing column to new enum.
+            # Works for TEXT and for old enum (now renamed to appointmentstatus_old).
+            op.execute(
+                """
+                ALTER TABLE appointments
+                ALTER COLUMN status TYPE appointmentstatus
+                USING CASE
+                    WHEN status='PENDING' THEN 'requested'
+                    WHEN status='CONFIRMED' THEN 'confirmed'
+                    WHEN status='CANCELLED' THEN 'cancelled'
+                    ELSE lower(status::text)
+                END::appointmentstatus
+                """
+            )
+            # default requested (as intended)
+            op.alter_column("appointments", "status", server_default="requested")
+        else:
+            # Fresh DB path: add status column
+            op.add_column(
+                "appointments",
+                sa.Column(
+                    "status",
+                    postgresql.ENUM(
+                        *NEW_STATUS_VALUES,
+                        name="appointmentstatus",
+                        create_type=False,  # already created above
+                    ),
+                    nullable=False,
+                    server_default="requested",
+                ),
+            )
+
+    # Drop old enum type only if we renamed one
+    if had_old_type and type_exists("appointmentstatus_old"):
+        op.execute("DROP TYPE appointmentstatus_old")
+
+    # -----------------------------
+    # 3) Other appointments expansions
+    # -----------------------------
     op.add_column("appointments", sa.Column("company_id", postgresql.UUID(as_uuid=True), nullable=True))
     op.add_column("appointments", sa.Column("type", sa.String(length=50), nullable=False, server_default="pickup"))
     op.add_column("appointments", sa.Column("address_line1", sa.String(length=255), nullable=True))
@@ -68,32 +137,43 @@ def upgrade() -> None:
             server_default=sa.text("timezone('utc', now())"),
         ),
     )
-    op.create_foreign_key(
-        "fk_appointments_company",
-        "appointments",
-        "companies",
-        ["company_id"],
-        ["id"],
-    )
-    op.create_index("ix_appointments_company_status", "appointments", ["company_id", "status"])
-    op.create_index("ix_appointments_start_time", "appointments", ["start_time"])
+
+    # FK / indexes
+    if table_exists("companies"):
+        op.create_foreign_key(
+            "fk_appointments_company",
+            "appointments",
+            "companies",
+            ["company_id"],
+            ["id"],
+        )
+        op.execute("CREATE INDEX IF NOT EXISTS ix_appointments_company_status ON appointments (company_id, status)")
+
+    # NOTE: ix_appointments_start_time is owned by mvp_booking_tables.py (avoid duplicate creation here)
 
     # backfill status and updated_at
-    op.execute("UPDATE appointments SET status='requested' WHERE status IS NULL")
-    op.execute("UPDATE appointments SET updated_at = created_at WHERE updated_at IS NULL")
+    if column_exists("appointments", "status"):
+        op.execute("UPDATE appointments SET status='requested' WHERE status IS NULL")
+    if column_exists("appointments", "updated_at") and column_exists("appointments", "created_at"):
+        op.execute("UPDATE appointments SET updated_at = created_at WHERE updated_at IS NULL")
 
-    # service company relation
+    # -----------------------------
+    # 4) service company relation
+    # -----------------------------
     op.add_column("services", sa.Column("company_id", postgresql.UUID(as_uuid=True), nullable=True))
     op.create_index("ix_services_company", "services", ["company_id"])
-    op.create_foreign_key(
-        "fk_services_company",
-        "services",
-        "companies",
-        ["company_id"],
-        ["id"],
-    )
+    if table_exists("companies"):
+        op.create_foreign_key(
+            "fk_services_company",
+            "services",
+            "companies",
+            ["company_id"],
+            ["id"],
+        )
 
-    # appointment events table
+    # -----------------------------
+    # 5) appointment events table
+    # -----------------------------
     op.create_table(
         "appointment_events",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
@@ -111,7 +191,6 @@ def downgrade() -> None:
     op.drop_index("ix_services_company", table_name="services")
     op.drop_column("services", "company_id")
 
-    op.drop_index("ix_appointments_start_time", table_name="appointments")
     op.drop_index("ix_appointments_company_status", table_name="appointments")
     op.drop_constraint("fk_appointments_company", "appointments", type_="foreignkey")
     op.drop_column("appointments", "updated_at")
