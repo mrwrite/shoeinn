@@ -70,7 +70,7 @@ def get_current_customer(current_user=Depends(get_current_user)):
 
 
 def get_current_company_user(db: Session = Depends(get_db), current_user=Depends(get_current_user)):
-    if current_user.role != "company":
+    if current_user.role not in {"company", "provider"}:
         raise HTTPException(status_code=403, detail="Forbidden")
     from app.models.company_user import CompanyUser
 

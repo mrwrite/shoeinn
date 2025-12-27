@@ -1,7 +1,5 @@
 from datetime import datetime, timedelta, timezone
 
-from datetime import datetime, timedelta, timezone
-
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
@@ -139,12 +137,10 @@ def seed(db: Session = Depends(get_db)):
 
     db.commit()
 
-    # If nothing new was created, return skipped; otherwise ok
-    if all(v == 0 for v in created.values()):
-        return {"status": "skipped", "created": created}
+    status = "ok" if any(v > 0 for v in created.values()) else "skipped"
 
     return {
-        "status": "ok",
+        "status": status,
         "created": created,
         "demo_logins": {
             "companies": [

@@ -1,0 +1,16 @@
+import React from "react";
+
+import CompanyStack from "./CompanyStack";
+import CustomerStack from "./CustomerStack";
+import type { UserRole } from "../state/authStore";
+
+interface Props {
+  role: Exclude<UserRole, null>;
+}
+
+export default function AppStack({ role }: Props) {
+  if (role === "company") {
+    return <CompanyStack />;
+  }
+  return <CustomerStack />;
+}

@@ -1,0 +1,155 @@
+import React, { useState } from "react";
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { useMutation } from "@tanstack/react-query";
+import { SafeAreaView } from "react-native-safe-area-context";
+
+import { login } from "../../api/http";
+import { AuthStackParamList } from "../../navigation/AuthStack";
+import { useAuthStore } from "../../state/authStore";
+
+const demoAccounts = [
+  { label: "Customer", email: "customer@test.com", password: "Password1!" },
+  { label: "Provider 1", email: "c1@test.com", password: "Password1!" },
+  { label: "Provider 2", email: "c2@test.com", password: "Password1!" },
+  { label: "Provider 3", email: "c3@test.com", password: "Password1!" },
+];
+
+type Props = NativeStackScreenProps<AuthStackParamList, "Login">;
+
+export default function LoginScreen({ navigation }: Props) {
+  const setAuth = useAuthStore((s) => s.setAuth);
+  const [email, setEmail] = useState("customer@test.com");
+  const [password, setPassword] = useState("Password1!");
+  const [error, setError] = useState<string | null>(null);
+
+  const mutation = useMutation({
+    mutationFn: login,
+    onSuccess: async (data) => {
+      await setAuth(data.access_token, data.role);
+    },
+    onError: (err: any) => {
+      setError(err?.message ?? "Login failed");
+    },
+  });
+
+  const submit = () => {
+    setError(null);
+    mutation.mutate({ email, password });
+  };
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={styles.flex}
+      >
+        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+          <Text style={styles.title}>Welcome back</Text>
+          <Text style={styles.subtitle}>Sign in to continue</Text>
+
+          {error ? <Text style={styles.error}>{error}</Text> : null}
+
+          <View style={styles.field}>
+            <Text style={styles.label}>Email</Text>
+            <TextInput
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              style={styles.input}
+              placeholder="you@example.com"
+            />
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.label}>Password</Text>
+            <TextInput
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              style={styles.input}
+              placeholder="••••••••"
+            />
+          </View>
+
+          <Pressable style={[styles.button, mutation.isPending && styles.buttonDisabled]} onPress={submit} disabled={mutation.isPending}>
+            {mutation.isPending ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Sign in</Text>}
+          </Pressable>
+
+          <Text style={styles.sectionTitle}>Quick demo logins</Text>
+          <View style={styles.demoRow}>
+            {demoAccounts.map((acct) => (
+              <Pressable
+                key={acct.email}
+                style={styles.demoButton}
+                onPress={() => {
+                  setEmail(acct.email);
+                  setPassword(acct.password);
+                  setError(null);
+                  mutation.mutate({ email: acct.email, password: acct.password });
+                }}
+              >
+                <Text style={styles.demoText}>{acct.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <Pressable onPress={() => navigation.navigate("Register")}> 
+            <Text style={styles.link}>Need an account? Register</Text>
+          </Pressable>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  flex: { flex: 1 },
+  safeArea: { flex: 1, backgroundColor: "#f3f4f6" },
+  container: {
+    padding: 24,
+    gap: 12,
+  },
+  title: { fontSize: 28, fontWeight: "700", marginTop: 12 },
+  subtitle: { fontSize: 16, color: "#4b5563" },
+  field: { gap: 4 },
+  label: { fontSize: 14, color: "#374151" },
+  input: {
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  button: {
+    backgroundColor: "#111827",
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  buttonDisabled: { opacity: 0.6 },
+  buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
+  error: { color: "#b91c1c", backgroundColor: "#fee2e2", padding: 10, borderRadius: 8 },
+  sectionTitle: { fontWeight: "700", marginTop: 6 },
+  demoRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  demoButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: "#e5e7eb",
+    borderRadius: 8,
+  },
+  demoText: { fontWeight: "600" },
+  link: { color: "#1d4ed8", marginTop: 8, fontWeight: "600" },
+});
