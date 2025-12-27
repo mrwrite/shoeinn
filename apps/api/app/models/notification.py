@@ -44,12 +44,12 @@ class Notification(Base):
     dead_lettered = Column(Boolean, default=False, nullable=False)
     metadata_json = Column(Text)
 
-    outbox_entry = relationship(
+    """ outbox_entry = relationship(
         "NotificationOutbox",
         back_populates="notification",
         uselist=False,
         cascade="all, delete-orphan",
-    )
+    ) """
     events = relationship(
         "NotificationEvent",
         back_populates="notification",
