@@ -38,7 +38,7 @@ def open_appointments(current=Depends(get_current_company_user), db: Session = D
     _, company_id = current
     q = (
         db.query(Appointment)
-        .filter(Appointment.status == AppointmentStatus.requested)
+        # .filter(Appointment.status == AppointmentStatus.confirmed)
         .filter((Appointment.company_id == company_id) | (Appointment.company_id.is_(None)))
         .order_by(Appointment.start_time.asc())
     )
@@ -133,7 +133,7 @@ def update_status(
     appt.status = payload.status
     if payload.confirmed_time:
         appt.confirmed_time = payload.confirmed_time.astimezone(timezone.utc)
-    elif payload.status == AppointmentStatus.CONFIRMED:
+    elif payload.status == AppointmentStatus.confirmed:
         appt.confirmed_time = datetime.now(timezone.utc)
 
     db.add(
