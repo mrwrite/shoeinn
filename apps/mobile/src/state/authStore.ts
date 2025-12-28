@@ -4,23 +4,38 @@ import { create } from "zustand";
 export type UserRole = "customer" | "company" | null;
 
 interface AuthState {
-  token: string | null;
-  role: UserRole;
-  rememberMe: boolean;
-  loading: boolean;
-  hydrate: () => Promise<void>;
-  setAuth: (token: string, role: Exclude<UserRole, null>) => Promise<void>;
-  setRememberMe: (remember: boolean) => Promise<void>;
-  logout: () => Promise<void>;
+    token: string | null;
+    role: UserRole;
+    userId: string | null;
+    fullName: string | null;
+    companyId: string | null;
+    rememberMe: boolean;
+    loading: boolean;
+    hydrate: () => Promise<void>;
+    setAuth: (
+        token: string,
+        role: Exclude<UserRole, null>,
+        userId: string,
+        fullName: string,
+        companyId: string | null,
+    ) => Promise<void>;
+    setRememberMe: (remember: boolean) => Promise<void>;
+    logout: () => Promise<void>;
 }
 
 const TOKEN_KEY = "auth_token";
 const ROLE_KEY = "auth_role";
+const USER_ID_KEY = "auth_user_id";
+const FULL_NAME_KEY = "auth_full_name";
+const COMPANY_ID_KEY = "auth_company_id";
 const REMEMBER_KEY = "auth_remember";
 
 export const useAuthStore = create<AuthState>((set) => ({
   token: null,
   role: null,
+  userId: null,
+  fullName: null,
+  companyId: null,
   rememberMe: false,
   loading: true,
   hydrate: async () => {
@@ -34,25 +49,42 @@ export const useAuthStore = create<AuthState>((set) => ({
         return;
       }
 
-      const [[, token], [, role]] = await AsyncStorage.multiGet([TOKEN_KEY, ROLE_KEY]);
-      set({ token: token ?? null, role: (role as UserRole) ?? null, rememberMe: remember, loading: false });
+      const [[, token], [, role], [, userId], [, fullName], [, companyId]] = await AsyncStorage.multiGet([
+        TOKEN_KEY,
+        ROLE_KEY,
+        USER_ID_KEY,
+        FULL_NAME_KEY,
+        COMPANY_ID_KEY,
+      ]);
+      set({
+        token: token ?? null,
+        role: (role as UserRole) ?? null,
+        userId: userId ?? null,
+        fullName: fullName ?? null,
+        companyId: companyId ?? null,
+        rememberMe: remember,
+        loading: false,
+      });
     } catch (error) {
       console.warn("[Auth] Failed to hydrate", error);
-      set({ token: null, role: null, rememberMe: false, loading: false });
+      set({ token: null, role: null, userId: null, fullName: null, companyId: null, rememberMe: false, loading: false });
     }
   },
-  setAuth: async (token, role) => {
-    set((state) => ({ token, role, rememberMe: state.rememberMe }));
+  setAuth: async (token, role, userId, fullName, companyId) => {
+    set((state) => ({ token, role, userId, fullName, companyId, rememberMe: state.rememberMe }));
 
     const rememberValue = useAuthStore.getState().rememberMe;
     if (rememberValue) {
       await AsyncStorage.multiSet([
         [TOKEN_KEY, token],
         [ROLE_KEY, role],
+        [USER_ID_KEY, userId],
+        [FULL_NAME_KEY, fullName],
+        [COMPANY_ID_KEY, companyId ?? ""],
         [REMEMBER_KEY, "true"],
       ]);
     } else {
-      await AsyncStorage.multiRemove([TOKEN_KEY, ROLE_KEY]);
+      await AsyncStorage.multiRemove([TOKEN_KEY, ROLE_KEY, USER_ID_KEY, FULL_NAME_KEY, COMPANY_ID_KEY]);
       await AsyncStorage.setItem(REMEMBER_KEY, "false");
     }
   },
@@ -61,8 +93,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     await AsyncStorage.setItem(REMEMBER_KEY, remember ? "true" : "false");
   },
   logout: async () => {
-    await AsyncStorage.multiRemove([TOKEN_KEY, ROLE_KEY, REMEMBER_KEY]);
-    set({ token: null, role: null, rememberMe: false });
+    await AsyncStorage.multiRemove([TOKEN_KEY, ROLE_KEY, USER_ID_KEY, FULL_NAME_KEY, COMPANY_ID_KEY, REMEMBER_KEY]);
+    set({ token: null, role: null, userId: null, fullName: null, companyId: null, rememberMe: false });
   },
 }));
 

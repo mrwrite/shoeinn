@@ -6,6 +6,7 @@ from .appointment_hold import AppointmentHold, HoldStatus
 from .available_slot import AvailableSlot
 from .company import Company
 from .company_user import CompanyUser
+from .notification import Notification
 from .notification_outbox import NotificationOutbox
 from .service import Service
 
@@ -17,6 +18,7 @@ __all__ = [
     "AvailableSlot",
     "Company",
     "CompanyUser",
+    "Notification",
     "HoldStatus",
     "NotificationOutbox",
     "PaymentStatus",

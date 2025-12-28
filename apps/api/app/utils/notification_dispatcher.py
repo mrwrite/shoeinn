@@ -142,7 +142,14 @@ def dispatch_outbox_batch(
         notification.last_attempt_at = now
         notification.delivery_attempts += 1
 
-        provider = _ensure_provider(entry.channel or notification.channel, providers)
+        channel = entry.channel or notification.channel
+
+        if channel == "in_app":
+            succeeded += 1
+            _mark_in_app_delivered(session, notification, entry, now)
+            continue
+
+        provider = _ensure_provider(channel, providers)
         payload = _load_payload(entry)
 
         if not provider:
@@ -334,4 +341,22 @@ class NotificationDispatcherWorker:
 
 
 notification_dispatcher = NotificationDispatcherWorker()
+
+
+def _mark_in_app_delivered(
+    session: Session, notification: Notification, entry: NotificationOutbox, now: datetime
+) -> None:
+    notification.status = "delivered"
+    notification.delivered = True
+    notification.delivered_at = now
+    notification.next_attempt_at = None
+    entry.status = "completed"
+    entry.processed_at = now
+    entry.locked_at = None
+    record_notification_event(
+        session,
+        notification,
+        "in_app_recorded",
+        {"channel": "in_app"},
+    )
 

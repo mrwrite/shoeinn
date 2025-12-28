@@ -22,6 +22,8 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     if db.query(User).filter_by(email=payload.email).first():
         raise HTTPException(status_code=400, detail="Email exists")
+    if not payload.full_name.strip():
+        raise HTTPException(status_code=400, detail="full_name is required")
     user = User(
         email=payload.email,
         password_hash=hash_password(payload.password),
@@ -54,6 +56,7 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
         "role": user.role,
         "user_id": user.id,
         "company_id": company_link.company_id if company_link else None,
+        "full_name": user.full_name,
     }
 
 

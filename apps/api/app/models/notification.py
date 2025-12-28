@@ -29,6 +29,7 @@ class Notification(Base):
     payload_json = Column(Text)
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
     updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+    read_at = Column(DateTime(timezone=True))
 
     # Delivery lifecycle metadata
     status = Column(String, default="pending", nullable=False)
@@ -55,6 +56,12 @@ class Notification(Base):
         back_populates="notification",
         cascade="all, delete-orphan",
         order_by="NotificationEvent.created_at",
+    )
+    outbox_entry = relationship(
+        "NotificationOutbox",
+        back_populates="notification",
+        uselist=False,
+        cascade="all, delete-orphan",
     )
 
     __table_args__ = (

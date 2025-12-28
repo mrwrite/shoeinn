@@ -15,11 +15,17 @@ from app.core.db import get_db
 from app.models import (
     Appointment,
     AppointmentEvent,
-    AppointmentHold,    
+    AppointmentHold,
     HoldStatus,
-    NotificationOutbox,
     PaymentStatus,
     Service,
+)
+from app.services.notifications import (
+    APPOINTMENT_CONFIRMED,
+    APPOINTMENT_STATUS_CHANGED,
+    NEW_APPOINTMENT,
+    enqueue_company_user_notifications,
+    enqueue_customer_notification,
 )
 from app.enums import AppointmentStatus
 from app.services.payment_gateway import PaymentGateway, PaymentGatewayError
@@ -298,6 +304,13 @@ def confirm_hold(
     db.add(appointment)
     db.flush()
 
+    enqueue_customer_notification(
+        db,
+        appointment,
+        APPOINTMENT_STATUS_CHANGED,
+        payload={"old_status": None, "new_status": appointment.status.value},
+    )
+
     booking_id = str(appointment.id)
     currency = settings.payment_currency
     amount_cents = service.price_cents
@@ -333,29 +346,21 @@ def confirm_hold(
     appointment.payment_currency = currency
 
     if appointment.payment_status == PaymentStatus.succeeded and using_stub:
+        previous_status = appointment.status
         appointment.status = AppointmentStatus.confirmed
         appointment.payment_amount_received = appointment.payment_amount_expected
         hold.status = HoldStatus.CONFIRMED
-        payload = {
-            "appointment_id": str(appointment.id),
-            "service_id": str(appointment.service_id),
-            "customer_name": appointment.customer_name,
-            "customer_phone": appointment.customer_phone,
-            "customer_email": appointment.customer_email,
-            "start_time": _ensure_utc(appointment.start_time).isoformat(),
-            "end_time": _ensure_utc(appointment.end_time).isoformat(),
-            "payment_id": appointment.payment_id,
-            "payment_status": appointment.payment_status.value,
-            "payment_amount_expected": appointment.payment_amount_expected,
-            "payment_amount_received": appointment.payment_amount_received,
-            "payment_currency": appointment.payment_currency,
-        }
-        db.add(
-            NotificationOutbox(
-                type="APPOINTMENT_CONFIRMED",
-                payload=payload,
-            )
+        enqueue_customer_notification(db, appointment, APPOINTMENT_CONFIRMED)
+        enqueue_customer_notification(
+            db,
+            appointment,
+            APPOINTMENT_STATUS_CHANGED,
+            payload={
+                "old_status": previous_status.value if previous_status else None,
+                "new_status": appointment.status.value,
+            },
         )
+        enqueue_company_user_notifications(db, appointment.company_id, appointment, NEW_APPOINTMENT)
 
     db.add(hold)
     db.add(appointment)

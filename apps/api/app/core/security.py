@@ -80,6 +80,12 @@ def get_current_company_user(db: Session = Depends(get_db), current_user=Depends
     return current_user, cu.company_id
 
 
+def get_current_admin_user(current_user=Depends(get_current_user)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Forbidden")
+    return current_user
+
+
 def _hash_refresh_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 

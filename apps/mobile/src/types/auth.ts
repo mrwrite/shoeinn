@@ -6,7 +6,7 @@ export interface LoginPayload {
 export interface RegisterPayload {
   email: string;
   password: string;
-  full_name?: string;
+  full_name: string;
   role: "customer" | "company";
 }
 
@@ -17,11 +17,12 @@ export interface LoginResponse {
   role: "customer" | "company";
   user_id: string;
   company_id: string | null;
+  full_name: string;
 }
 
 export interface RegisterResponse {
   id: string;
   email: string;
-  full_name?: string | null;
+  full_name: string;
   role: string;
 }

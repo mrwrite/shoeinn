@@ -11,6 +11,7 @@ from app.routers import (
     auth,
     companies,
     company_ops,
+    admin,
     dev_seed,
     health,
     services,
@@ -31,6 +32,7 @@ app.add_middleware(
 
 app.include_router(health.router)
 app.include_router(auth.router)
+app.include_router(admin.router)
 app.include_router(companies.router)
 app.include_router(services.router)
 app.include_router(appointments.router)

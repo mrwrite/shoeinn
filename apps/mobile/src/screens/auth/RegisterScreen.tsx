@@ -30,9 +30,13 @@ export default function RegisterScreen({ navigation }: Props) {
   const mutation = useMutation({
     mutationFn: async () => {
       setError(null);
-      await register({ email, password, full_name: fullName || undefined, role: "customer" });
+      const trimmedName = fullName.trim();
+      if (!trimmedName) {
+        throw new Error("Full name is required");
+      }
+      await register({ email, password, full_name: trimmedName, role: "customer" });
       const tokens = await login({ email, password });
-      await setAuth(tokens.access_token, tokens.role);
+      await setAuth(tokens.access_token, tokens.role, tokens.user_id, tokens.full_name, tokens.company_id);
     },
     onError: (err: any) => {
       setError(err?.message ?? "Registration failed");
