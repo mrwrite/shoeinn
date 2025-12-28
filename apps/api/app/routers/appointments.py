@@ -140,7 +140,7 @@ def create_hold(payload: HoldCreate, db: Session = Depends(get_db)) -> HoldRead:
         .filter(
             Appointment.start_time < end_time,
             Appointment.end_time > start_time,
-            Appointment.status != AppointmentStatus.CANCELLED,
+            Appointment.status != AppointmentStatus.CANCELLED.value,
         )
         .filter(Appointment.company_id == service.company_id)
         .first()
@@ -243,7 +243,7 @@ def confirm_hold(
         .filter(
             Appointment.start_time < hold_end,
             Appointment.end_time > hold_start,
-            Appointment.status != AppointmentStatus.CANCELLED,
+            Appointment.status != AppointmentStatus.CANCELLED.value,
         )
         .filter(Appointment.company_id == service.company_id)
         .first()
@@ -393,7 +393,9 @@ def expire_holds(db: Session = Depends(get_db)) -> dict[str, int]:
         hold.status = HoldStatus.EXPIRED
         appointment = (
             db.query(Appointment)
-            .filter(Appointment.hold_id == hold.id, Appointment.status != AppointmentStatus.CANCELLED)
+            .filter(
+                Appointment.hold_id == hold.id, Appointment.status != AppointmentStatus.CANCELLED.value
+            )
             .first()
         )
         if appointment:
