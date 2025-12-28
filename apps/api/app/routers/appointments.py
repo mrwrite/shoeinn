@@ -31,6 +31,7 @@ _IDEMPOTENCY_CACHE: Dict[str, Tuple[datetime, dict]] = {}
 _CACHE_LOCK = Lock()
 _IDEMPOTENCY_TTL = timedelta(minutes=10)
 _HOLD_TTL = timedelta(minutes=15)
+CANCELLED_STATUS = AppointmentStatus.CANCELLED
 
 
 def _utcnow() -> datetime:
@@ -140,7 +141,7 @@ def create_hold(payload: HoldCreate, db: Session = Depends(get_db)) -> HoldRead:
         .filter(
             Appointment.start_time < end_time,
             Appointment.end_time > start_time,
-            Appointment.status != AppointmentStatus.CANCELLED,
+            Appointment.status != CANCELLED_STATUS,
         )
         .filter(Appointment.company_id == service.company_id)
         .first()
@@ -243,7 +244,7 @@ def confirm_hold(
         .filter(
             Appointment.start_time < hold_end,
             Appointment.end_time > hold_start,
-            Appointment.status != AppointmentStatus.CANCELLED,
+            Appointment.status != CANCELLED_STATUS,
         )
         .filter(Appointment.company_id == service.company_id)
         .first()
@@ -264,7 +265,7 @@ def confirm_hold(
         .order_by(Appointment.created_at.desc())
         .first()
     )
-    if appointment and appointment.status != AppointmentStatus.CANCELLED:
+    if appointment and appointment.status != CANCELLED_STATUS:
         response = _serialize_appointment(appointment)
         if idempotency_key:
             _store_idempotent_payload(idempotency_key, response.model_dump())
@@ -393,11 +394,13 @@ def expire_holds(db: Session = Depends(get_db)) -> dict[str, int]:
         hold.status = HoldStatus.EXPIRED
         appointment = (
             db.query(Appointment)
-            .filter(Appointment.hold_id == hold.id, Appointment.status != AppointmentStatus.CANCELLED)
+            .filter(
+                Appointment.hold_id == hold.id, Appointment.status != CANCELLED_STATUS
+            )
             .first()
         )
         if appointment:
-            appointment.status = AppointmentStatus.CANCELLED
+            appointment.status = CANCELLED_STATUS
             if appointment.payment_status not in {
                 PaymentStatus.FAILED,
                 PaymentStatus.REFUNDED,
