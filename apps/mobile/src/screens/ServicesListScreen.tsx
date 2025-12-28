@@ -15,6 +15,7 @@ import type { Service } from "../types/booking";
 
 interface Props {
   onSelect: (service: Service) => void;
+  companyId?: string;
 }
 
 const ServiceCard: React.FC<{ service: Service; onPress: () => void }> = ({ service, onPress }) => {
@@ -29,8 +30,12 @@ const ServiceCard: React.FC<{ service: Service; onPress: () => void }> = ({ serv
   );
 };
 
-const ServicesListScreen: React.FC<Props> = ({ onSelect }) => {
-  const query = useQuery<Service[], Error>({ queryKey: ["services"], queryFn: listServices });
+const ServicesListScreen: React.FC<Props> = ({ onSelect, companyId }) => {
+  const query = useQuery<Service[], Error>({
+    queryKey: ["services", companyId ?? "all"],
+    queryFn: () => listServices(companyId),
+    enabled: Boolean(companyId),
+  });
   const services = query.data ?? [];
 
   React.useEffect(() => {

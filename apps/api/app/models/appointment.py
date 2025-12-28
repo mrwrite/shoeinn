@@ -47,7 +47,7 @@ class Appointment(Base):
     hold_id = Column(UUID(as_uuid=True), ForeignKey("appointment_holds.id"), nullable=True, unique=True)
     type = Column(String(50), nullable=False, default="pickup")
     status = Column(
-        Enum(AppointmentStatus, name="appointmentstatus"),
+        Enum(AppointmentStatus, name="appointmentstatus", native_enum=True),
         nullable=False,
         default=AppointmentStatus.REQUESTED,
     )
@@ -64,7 +64,7 @@ class Appointment(Base):
     end_time = Column(DateTime(timezone=True), nullable=True)
     payment_id = Column(String(64), nullable=True, unique=True)
     payment_status = Column(
-        Enum(PaymentStatus, name="appointmentpaymentstatus"),
+        Enum(PaymentStatus, name="appointmentpaymentstatus", native_enum=True),
         nullable=True,
     )
     payment_checkout_url = Column(String(2048), nullable=True)

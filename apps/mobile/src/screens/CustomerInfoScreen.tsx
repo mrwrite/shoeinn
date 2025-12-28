@@ -14,6 +14,7 @@ import {
 
 import { confirmAppointment, getAppointment } from "../api/http";
 import { useBooking } from "../state/bookingStore";
+import { useCompanyStore } from "../state/companyStore";
 
 interface Props {
   onConfirmed: () => void;
@@ -22,6 +23,7 @@ interface Props {
 
 const CustomerInfoScreen: React.FC<Props> = ({ onConfirmed, onBack }) => {
   const { hold, setAppointment } = useBooking();
+  const selectedCompany = useCompanyStore((s) => s.selectedCompany);
   const [name, setName] = React.useState("");
   const [phone, setPhone] = React.useState("");
   const [email, setEmail] = React.useState("");
@@ -57,13 +59,14 @@ const CustomerInfoScreen: React.FC<Props> = ({ onConfirmed, onBack }) => {
   );
 
   const handleSubmit = async () => {
-    if (!hold || !name || !phone) {
+    if (!hold || !name || !phone || !selectedCompany) {
       return;
     }
     setSubmitting(true);
     try {
       const appointment = await confirmAppointment({
         hold_id: hold.id,
+        company_id: selectedCompany.id,
         customer_name: name,
         customer_phone: phone,
         customer_email: email || undefined,

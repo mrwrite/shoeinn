@@ -7,7 +7,7 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from app.core.db import SessionLocal
-from app.models import Service
+from app.models import Company, Service
 
 SEED_SERVICES: list[dict[str, object]] = [
     {
@@ -55,8 +55,14 @@ def seed_services(session: Session) -> int:
     if existing is not None:
         return 0
 
+    company = session.execute(select(Company).limit(1)).scalar_one_or_none()
+    if company is None:
+        company = Company(name="ShoeInn", city="Anywhere", state="CA")
+        session.add(company)
+        session.flush()
+
     for payload in SEED_SERVICES:
-        session.add(Service(**payload))
+        session.add(Service(company_id=company.id, **payload))
     session.commit()
     return len(SEED_SERVICES)
 

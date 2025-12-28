@@ -9,6 +9,7 @@ import type {
   Service,
 } from "../types/booking";
 import type { LoginPayload, LoginResponse, RegisterPayload, RegisterResponse } from "../types/auth";
+import type { Company } from "../types/company";
 import type { ProviderAppointment, StatusUpdatePayload } from "../types/company";
 import { getAuthToken } from "../state/authStore";
 
@@ -80,8 +81,13 @@ export function register(payload: RegisterPayload): Promise<RegisterResponse> {
   return request<RegisterResponse>("POST", "/auth/register", payload);
 }
 
-export function listServices(): Promise<Service[]> {
-  return request<Service[]>("GET", "/services");
+export function listServices(companyId?: string): Promise<Service[]> {
+  const search = companyId ? `?company_id=${encodeURIComponent(companyId)}` : "";
+  return request<Service[]>("GET", `/services${search}`);
+}
+
+export function listCompanies(): Promise<Company[]> {
+  return request<Company[]>("GET", "/companies");
 }
 
 export function getJson<T>(path: string): Promise<T> {

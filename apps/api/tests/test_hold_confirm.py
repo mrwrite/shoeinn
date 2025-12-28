@@ -9,15 +9,15 @@ from sqlalchemy.orm import Session
 from app.models import Appointment, AppointmentHold, HoldStatus, NotificationOutbox
 
 
-def _pick_service_id(client: TestClient) -> UUID:
+def _pick_service(client: TestClient) -> tuple[UUID, UUID]:
     res = client.get("/services")
     assert res.status_code == 200
     data = res.json()
-    return UUID(data[0]["id"])
+    return UUID(data[0]["id"]), UUID(data[0]["company_id"])
 
 
 def test_hold_and_confirm_flow(client: TestClient, db_session: Session) -> None:
-    service_id = _pick_service_id(client)
+    service_id, company_id = _pick_service(client)
     start_time = datetime.now(timezone.utc).replace(hour=9, minute=0, second=0, microsecond=0) + timedelta(days=1)
 
     hold_res = client.post(
@@ -34,11 +34,12 @@ def test_hold_and_confirm_flow(client: TestClient, db_session: Session) -> None:
 
     confirm_res = client.post(
         "/appointments/confirm",
-        json={
-            "hold_id": hold_data["id"],
-            "customer_name": "Test User",
-            "customer_phone": "1234567890",
-            "customer_email": "test@example.com",
+            json={
+                "hold_id": hold_data["id"],
+            "company_id": str(company_id),
+                "customer_name": "Test User",
+                "customer_phone": "1234567890",
+                "customer_email": "test@example.com",
         },
     )
     assert confirm_res.status_code == 200, confirm_res.text
@@ -58,7 +59,7 @@ def test_hold_and_confirm_flow(client: TestClient, db_session: Session) -> None:
 
 
 def test_confirm_expired_hold_returns_gone(client: TestClient, db_session: Session) -> None:
-    service_id = _pick_service_id(client)
+    service_id, company_id = _pick_service(client)
     start_time = datetime.now(timezone.utc).replace(hour=10, minute=0, second=0, microsecond=0) + timedelta(days=1)
     hold = AppointmentHold(
         service_id=service_id,
@@ -74,6 +75,7 @@ def test_confirm_expired_hold_returns_gone(client: TestClient, db_session: Sessi
         "/appointments/confirm",
         json={
             "hold_id": str(hold.id),
+            "company_id": str(company_id),
             "customer_name": "Expired User",
             "customer_phone": "000",
             "customer_email": "expired@example.com",

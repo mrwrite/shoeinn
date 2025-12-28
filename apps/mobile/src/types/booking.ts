@@ -1,5 +1,6 @@
 export interface Service {
   id: string;
+  company_id?: string | null;
   name: string;
   slug: string;
   description?: string | null;
@@ -24,6 +25,7 @@ export interface AppointmentHold {
 
 export interface Appointment {
   id: string;
+  company_id?: string;
   service_id: string;
   hold_id?: string | null;
   customer_name: string;
@@ -31,7 +33,15 @@ export interface Appointment {
   customer_email?: string | null;
   start_time: string;
   end_time: string;
-  status: "PENDING" | "CONFIRMED" | "CANCELLED";
+  status:
+    | "requested"
+    | "confirmed"
+    | "picked_up"
+    | "cleaning"
+    | "ready"
+    | "delivered"
+    | "completed"
+    | "cancelled";
   payment_id?: string | null;
   payment_status?: "pending" | "requires_action" | "succeeded" | "failed" | "refunded" | "disputed" | null;
   payment_checkout_url?: string | null;
@@ -44,6 +54,13 @@ export interface Appointment {
 export interface HoldCreatePayload {
   service_id: string;
   start_time: string;
+  company_id?: string;
+  type?: string;
+  address_line1?: string;
+  address_line2?: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
   customer_name?: string;
   customer_phone?: string;
   customer_email?: string;
@@ -51,8 +68,15 @@ export interface HoldCreatePayload {
 
 export interface ConfirmAppointmentPayload {
   hold_id: string;
+  company_id: string;
   customer_name: string;
   customer_phone: string;
   customer_email?: string;
   idempotencyKey?: string;
+  type?: string;
+  address_line1?: string;
+  address_line2?: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
 }

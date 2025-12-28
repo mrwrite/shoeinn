@@ -127,9 +127,13 @@ def create_hold(payload: HoldCreate, db: Session = Depends(get_db)) -> HoldRead:
     if payload.start_time.tzinfo is None:
         raise HTTPException(status_code=400, detail="start_time must include timezone information")
 
-    start_time = payload.start_time.astimezone(timezone.utc)
-    duration = timedelta(minutes=service.duration_minutes) if service.duration_minutes > 0 else timedelta()
+    start_time = _ensure_utc(payload.start_time)
+    duration_minutes = service.duration_minutes if service.duration_minutes is not None else 0
+    duration = timedelta(minutes=duration_minutes)
     end_time = start_time + duration
+
+    if end_time <= start_time:
+        raise HTTPException(status_code=400, detail="Service duration must be greater than zero")
 
     conflict = (
         db.query(Appointment)
@@ -138,10 +142,11 @@ def create_hold(payload: HoldCreate, db: Session = Depends(get_db)) -> HoldRead:
             Appointment.end_time > start_time,
             Appointment.status != AppointmentStatus.CANCELLED,
         )
+        .filter(Appointment.company_id == service.company_id)
         .first()
     )
     if conflict:
-        raise HTTPException(status_code=400, detail="Time slot already booked")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Time slot already booked")
 
     hold = AppointmentHold(
         service_id=service.id,
@@ -225,9 +230,13 @@ def confirm_hold(
 
     service = db.query(Service).filter(Service.id == hold.service_id).one()
 
-    duration = timedelta(minutes=service.duration_minutes) if service.duration_minutes > 0 else timedelta()
+    duration_minutes = service.duration_minutes if service.duration_minutes is not None else 0
+    duration = timedelta(minutes=duration_minutes)
     hold_start = _ensure_utc(hold.start_time)
     hold_end = hold_start + duration
+
+    if hold_end <= hold_start:
+        raise HTTPException(status_code=400, detail="Service duration must be greater than zero")
 
     conflict = (
         db.query(Appointment)
@@ -236,10 +245,11 @@ def confirm_hold(
             Appointment.end_time > hold_start,
             Appointment.status != AppointmentStatus.CANCELLED,
         )
+        .filter(Appointment.company_id == service.company_id)
         .first()
     )
     if conflict:
-        raise HTTPException(status_code=400, detail="Time slot already booked")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Time slot already booked")
 
     hold.customer_name = payload.customer_name
     hold.customer_phone = payload.customer_phone
