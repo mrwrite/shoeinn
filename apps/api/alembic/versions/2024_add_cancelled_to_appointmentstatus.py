@@ -1,11 +1,10 @@
-"""Ensure cancelled status exists on appointmentstatus enum
-
 """Ensure cancelled status exists on appointmentstatus enum.
 
 Revision ID: add_cancelled_status
 Revises: dee02c1bc9c1
 Create Date: 2024-01-01 00:00:00
 """
+
 from typing import Union
 
 from alembic import op
