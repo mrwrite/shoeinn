@@ -6,6 +6,7 @@ import logging
 import threading
 from datetime import datetime, timezone
 
+from app.enums import AppointmentStatus
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
@@ -13,8 +14,7 @@ from app.core.config import settings
 from app.core.db import SessionLocal
 from app.models import (
     Appointment,
-    AppointmentHold,
-    AppointmentStatus,
+    AppointmentHold,    
     HoldStatus,
     PaymentStatus,
     NotificationOutbox,
@@ -24,10 +24,10 @@ from app.services.payment_gateway import PaymentGateway, PaymentGatewayError
 logger = logging.getLogger(__name__)
 
 _TERMINAL_PAYMENT_STATUSES = {
-    PaymentStatus.SUCCEEDED,
-    PaymentStatus.FAILED,
-    PaymentStatus.REFUNDED,
-    PaymentStatus.DISPUTED,
+    PaymentStatus.succeeded,
+    PaymentStatus.failed,
+    PaymentStatus.refunded,
+    PaymentStatus.disputed,
 }
 
 
@@ -121,11 +121,11 @@ class PaymentSyncWorker:
         appointment.payment_amount_received = payment_record.amount_received
         appointment.payment_currency = payment_record.currency or appointment.payment_currency
 
-        if new_status == PaymentStatus.SUCCEEDED:
-            appointment.status = AppointmentStatus.CONFIRMED
+        if new_status == PaymentStatus.succeeded:
+            appointment.status = AppointmentStatus.confirmed
             self._confirm_hold(session, appointment)
-        elif new_status == PaymentStatus.FAILED:
-            appointment.status = AppointmentStatus.CANCELLED
+        elif new_status == PaymentStatus.failed:
+            appointment.status = AppointmentStatus.cancelled
             self._release_hold(session, appointment)
 
     def _confirm_hold(self, session: Session, appointment: Appointment) -> None:

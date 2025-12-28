@@ -3,11 +3,12 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from app.enums import AppointmentStatus
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.core.security import create_access_token, get_current_company_user, verify_password
-from app.models import Appointment, AppointmentEvent, AppointmentStatus, Service
+from app.models import Appointment, AppointmentEvent, Service
 from app.models.user import User
 
 router = APIRouter(prefix="/company", tags=["company"])
@@ -37,7 +38,7 @@ def open_appointments(current=Depends(get_current_company_user), db: Session = D
     _, company_id = current
     q = (
         db.query(Appointment)
-        .filter(Appointment.status == AppointmentStatus.REQUESTED)
+        .filter(Appointment.status == AppointmentStatus.requested)
         .filter((Appointment.company_id == company_id) | (Appointment.company_id.is_(None)))
         .order_by(Appointment.start_time.asc())
     )

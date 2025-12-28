@@ -15,13 +15,13 @@ from app.core.db import get_db
 from app.models import (
     Appointment,
     AppointmentEvent,
-    AppointmentHold,
-    AppointmentStatus,
+    AppointmentHold,    
     HoldStatus,
     NotificationOutbox,
     PaymentStatus,
     Service,
 )
+from app.enums import AppointmentStatus
 from app.services.payment_gateway import PaymentGateway, PaymentGatewayError
 from app.schemas.appointment import AppointmentConfirm, AppointmentEventRead, AppointmentRead, HoldCreate, HoldRead
 
@@ -31,7 +31,7 @@ _IDEMPOTENCY_CACHE: Dict[str, Tuple[datetime, dict]] = {}
 _CACHE_LOCK = Lock()
 _IDEMPOTENCY_TTL = timedelta(minutes=10)
 _HOLD_TTL = timedelta(minutes=15)
-CANCELLED_STATUS = AppointmentStatus.CANCELLED
+CANCELLED_STATUS = AppointmentStatus.cancelled
 
 
 def _utcnow() -> datetime:
@@ -293,7 +293,7 @@ def confirm_hold(
         postal_code=payload.postal_code,
         start_time=hold_start,
         end_time=hold_end,
-        status=AppointmentStatus.REQUESTED,
+        status=AppointmentStatus.requested,
     )
     db.add(appointment)
     db.flush()
@@ -320,16 +320,20 @@ def confirm_hold(
     hold.customer_email = payload.customer_email
 
     appointment.payment_id = checkout.payment_id
+
+    raw_status = (checkout.status or "").strip().lower()
+
     try:
-        appointment.payment_status = PaymentStatus(checkout.status)
+        appointment.payment_status = PaymentStatus(raw_status)
     except ValueError:
-        appointment.payment_status = PaymentStatus.PENDING
+        appointment.payment_status = PaymentStatus.pending
+        
     appointment.payment_checkout_url = checkout.checkout_url
     appointment.payment_amount_expected = amount_cents
     appointment.payment_currency = currency
 
-    if appointment.payment_status == PaymentStatus.SUCCEEDED and using_stub:
-        appointment.status = AppointmentStatus.CONFIRMED
+    if appointment.payment_status == PaymentStatus.succeeded and using_stub:
+        appointment.status = AppointmentStatus.confirmed
         appointment.payment_amount_received = appointment.payment_amount_expected
         hold.status = HoldStatus.CONFIRMED
         payload = {
@@ -402,11 +406,11 @@ def expire_holds(db: Session = Depends(get_db)) -> dict[str, int]:
         if appointment:
             appointment.status = CANCELLED_STATUS
             if appointment.payment_status not in {
-                PaymentStatus.FAILED,
-                PaymentStatus.REFUNDED,
-                PaymentStatus.DISPUTED,
+                PaymentStatus.failed,
+                PaymentStatus.refunded,
+                PaymentStatus.disputed,
             }:
-                appointment.payment_status = PaymentStatus.FAILED
+                appointment.payment_status = PaymentStatus.failed
             appointment.payment_checkout_url = None
     if holds:
         db.commit()

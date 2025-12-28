@@ -6,35 +6,21 @@ from datetime import datetime, timezone
 import enum
 import uuid
 
+from app.enums import AppointmentStatus
 from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, String
 from sqlalchemy.dialects.postgresql import UUID
 
 from app.core.db import Base
 
-
-class AppointmentStatus(str, enum.Enum):
-    """Lifecycle state for an appointment."""
-
-    REQUESTED = "requested"
-    CONFIRMED = "confirmed"
-    PICKED_UP = "picked_up"
-    CLEANING = "cleaning"
-    READY = "ready"
-    DELIVERED = "delivered"
-    COMPLETED = "completed"
-    CANCELLED = "cancelled"
-
-
 class PaymentStatus(str, enum.Enum):
     """Shadow of the payment service status values."""
 
-    PENDING = "pending"
-    REQUIRES_ACTION = "requires_action"
-    SUCCEEDED = "succeeded"
-    FAILED = "failed"
-    REFUNDED = "refunded"
-    DISPUTED = "disputed"
-
+    pending = "pending"
+    requires_action = "requires_action"
+    succeeded = "succeeded"
+    failed = "failed"
+    refunded = "refunded"
+    disputed = "disputed"
 
 class Appointment(Base):
     """Represents a confirmed customer booking."""
@@ -49,7 +35,7 @@ class Appointment(Base):
     status = Column(
         Enum(AppointmentStatus, name="appointmentstatus", native_enum=True),
         nullable=False,
-        default=AppointmentStatus.REQUESTED,
+        default=AppointmentStatus.requested,
     )
     customer_name = Column(String(255), nullable=False)
     customer_phone = Column(String(50), nullable=False)
