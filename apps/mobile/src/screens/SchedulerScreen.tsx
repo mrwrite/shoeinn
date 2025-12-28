@@ -12,6 +12,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { createHold, getAvailability } from "../api/http";
 import { useBooking } from "../state/bookingStore";
+import { useCompanyStore } from "../state/companyStore";
 
 interface Props {
   onHoldCreated: () => void;
@@ -25,6 +26,7 @@ const SchedulerScreen: React.FC<Props> = ({ onHoldCreated, onBack }) => {
     setHold,
     setStartTime,
   } = useBooking();
+  const selectedCompany = useCompanyStore((s) => s.selectedCompany);
   const [creating, setCreating] = React.useState(false);
 
   const availabilityQuery = useQuery<string[], Error>(
@@ -47,6 +49,7 @@ const SchedulerScreen: React.FC<Props> = ({ onHoldCreated, onBack }) => {
       const hold = await createHold({
         service_id: selectedService.id,
         start_time: slot,
+        company_id: selectedCompany?.id,
       });
       setHold(hold);
       setStartTime(slot);

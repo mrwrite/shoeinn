@@ -1,19 +1,22 @@
 import React, { useEffect } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import ConfirmationScreen from "../../screens/ConfirmationScreen";
 import CustomerInfoScreen from "../../screens/CustomerInfoScreen";
 import SchedulerScreen from "../../screens/SchedulerScreen";
 import ServiceDetailScreen from "../../screens/ServiceDetailScreen";
-import ServicesListScreen from "../../screens/ServicesListScreen";
-import { BookingProvider, useBooking } from "../../state/bookingStore";
+import { useBooking } from "../../state/bookingStore";
+import { useCompanyStore } from "../../state/companyStore";
 
 const ScreenWrapper: React.FC<React.PropsWithChildren> = ({ children }) => (
   <SafeAreaView style={styles.safeArea}>{children}</SafeAreaView>
 );
 
 const BookingFlow: React.FC = () => {
+  const navigation = useNavigation();
+  const selectedCompany = useCompanyStore((s) => s.selectedCompany);
   const {
     step,
     selectedService,
@@ -27,6 +30,13 @@ const BookingFlow: React.FC = () => {
     setAppointment,
     reset,
   } = useBooking();
+
+  useEffect(() => {
+    if (!selectedCompany) {
+      reset();
+      navigation.navigate("CompanyPicker" as never);
+    }
+  }, [navigation, reset, selectedCompany]);
 
   useEffect(() => {
     console.log("[UI] Step", step);
@@ -46,6 +56,12 @@ const BookingFlow: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    if (!selectedService) {
+      setStep("services");
+      navigation.navigate("CompanyServices" as never);
+      return;
+    }
+
     if (step === "detail" && !selectedService) {
       reset();
       setStep("services");
@@ -54,9 +70,10 @@ const BookingFlow: React.FC = () => {
     } else if (step === "customer" && !hold) {
       setStep("schedule");
     }
-  }, [step, selectedService, selectedDate, hold, reset, setStep]);
+  }, [hold, navigation, reset, selectedDate, selectedService, setStep, step]);
 
   if (
+    !selectedService ||
     (step === "detail" && !selectedService) ||
     (step === "schedule" && (!selectedService || !selectedDate)) ||
     (step === "customer" && !hold)
@@ -66,23 +83,6 @@ const BookingFlow: React.FC = () => {
         <View style={styles.center}>
           <ActivityIndicator />
         </View>
-      </ScreenWrapper>
-    );
-  }
-
-  if (step === "services") {
-    return (
-      <ScreenWrapper>
-        <ServicesListScreen
-          onSelect={(service) => {
-            setService(service);
-            setDate(undefined);
-            setStartTime(undefined);
-            setHold(undefined);
-            setAppointment(undefined);
-            setStep("detail");
-          }}
-        />
       </ScreenWrapper>
     );
   }
@@ -97,7 +97,10 @@ const BookingFlow: React.FC = () => {
             setDate(date);
           }}
           onContinue={() => setStep("schedule")}
-          onBack={() => setStep("services")}
+          onBack={() => {
+            setStep("services");
+            navigation.navigate("CompanyServices" as never);
+          }}
         />
       </ScreenWrapper>
     );
@@ -125,6 +128,7 @@ const BookingFlow: React.FC = () => {
         onDone={() => {
           reset();
           setStep("services");
+          navigation.navigate("CompanyServices" as never);
         }}
       />
     </ScreenWrapper>
@@ -132,11 +136,7 @@ const BookingFlow: React.FC = () => {
 };
 
 export default function BookingScreen() {
-  return (
-    <BookingProvider>
-      <BookingFlow />
-    </BookingProvider>
-  );
+  return <BookingFlow />;
 }
 
 const styles = StyleSheet.create({

@@ -21,3 +21,10 @@ export interface StatusUpdatePayload {
   status: AppointmentStatus;
   confirmed_time?: string | null;
 }
+
+export interface Company {
+  id: string;
+  name: string;
+  city?: string | null;
+  state?: string | null;
+}
