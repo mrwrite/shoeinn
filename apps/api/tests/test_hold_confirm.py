@@ -6,7 +6,7 @@ from uuid import UUID
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.models import Appointment, AppointmentHold, HoldStatus, NotificationOutbox
+from app.models import Appointment, AppointmentHold, HoldStatus, Notification
 
 
 def _pick_service(client: TestClient) -> tuple[UUID, UUID]:
@@ -53,9 +53,9 @@ def test_hold_and_confirm_flow(client: TestClient, db_session: Session) -> None:
     appts = db_session.query(Appointment).all()
     assert len(appts) == 1
 
-    outbox_entries = db_session.query(NotificationOutbox).all()
-    assert len(outbox_entries) == 1
-    assert outbox_entries[0].type == "APPOINTMENT_CONFIRMED"
+    notifications = db_session.query(Notification).all()
+    kinds = {n.kind for n in notifications}
+    assert "APPOINTMENT_CONFIRMED" in kinds
 
 
 def test_confirm_expired_hold_returns_gone(client: TestClient, db_session: Session) -> None:

@@ -44,7 +44,7 @@ def test_create_hold_conflict_with_active_appointment(client: TestClient, db_ses
         customer_phone="555-1111",
         start_time=start_time,
         end_time=end_time,
-        status=AppointmentStatus.CONFIRMED,
+        status=AppointmentStatus.confirmed,
     )
     db_session.add(existing)
     db_session.commit()
@@ -71,7 +71,7 @@ def test_create_hold_allows_cancelled_overlap(client: TestClient, db_session: Se
         customer_phone="555-2222",
         start_time=start_time,
         end_time=end_time,
-        status=AppointmentStatus.CANCELLED,
+        status=AppointmentStatus.cancelled,
     )
     db_session.add(cancelled)
     db_session.commit()

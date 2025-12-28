@@ -12,6 +12,7 @@ import type { LoginPayload, LoginResponse, RegisterPayload, RegisterResponse } f
 import type { Company } from "../types/company";
 import type { ProviderAppointment, StatusUpdatePayload } from "../types/company";
 import { getAuthToken } from "../state/authStore";
+import type { Notification } from "../types/notification";
 
 export const API_URL: string =
   (Constants.expoConfig?.extra as any)?.API_URL ??
@@ -135,4 +136,12 @@ export function updateAppointmentStatus(
   return request<{ id: string; status: string }>("POST", `/company/appointments/${id}/status`, payload, {
     auth: true,
   });
+}
+
+export function fetchNotifications(): Promise<Notification[]> {
+  return request<Notification[]>("GET", "/company/notifications", undefined, { auth: true });
+}
+
+export function ackNotification(id: string): Promise<Notification> {
+  return request<Notification>("POST", `/company/notifications/${id}/ack`, undefined, { auth: true });
 }

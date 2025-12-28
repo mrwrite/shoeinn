@@ -41,9 +41,14 @@ export default function ProviderDashboardScreen({ navigation }: Props) {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Provider dashboard</Text>
-        <Pressable onPress={logout}>
-          <Text style={styles.logout}>Logout</Text>
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable onPress={() => navigation.navigate("Notifications")} style={styles.linkButton}>
+            <Text style={styles.linkText}>🔔</Text>
+          </Pressable>
+          <Pressable onPress={logout} style={styles.linkButton}>
+            <Text style={styles.linkText}>Logout</Text>
+          </Pressable>
+        </View>
       </View>
 
       {isLoading ? (
@@ -76,7 +81,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   headerTitle: { fontSize: 20, fontWeight: "700" },
-  logout: { color: "#1d4ed8", fontWeight: "600" },
+  headerActions: { flexDirection: "row", alignItems: "center", columnGap: 12 },
+  linkButton: { paddingHorizontal: 6, paddingVertical: 4 },
+  linkText: { color: "#1d4ed8", fontWeight: "600", fontSize: 16 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   error: { color: "#b91c1c", paddingHorizontal: 20 },
   list: { paddingHorizontal: 20, paddingBottom: 24, gap: 12 },
