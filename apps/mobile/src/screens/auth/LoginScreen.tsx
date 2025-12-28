@@ -29,6 +29,8 @@ type Props = NativeStackScreenProps<AuthStackParamList, "Login">;
 
 export default function LoginScreen({ navigation }: Props) {
   const setAuth = useAuthStore((s) => s.setAuth);
+  const rememberMe = useAuthStore((s) => s.rememberMe);
+  const setRememberMe = useAuthStore((s) => s.setRememberMe);
   const [email, setEmail] = useState("customer@test.com");
   const [password, setPassword] = useState("Password1!");
   const [error, setError] = useState<string | null>(null);
@@ -82,6 +84,13 @@ export default function LoginScreen({ navigation }: Props) {
               placeholder="••••••••"
             />
           </View>
+
+          <Pressable style={styles.checkboxRow} onPress={() => setRememberMe(!rememberMe)} accessibilityRole="checkbox">
+            <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
+              {rememberMe ? <Text style={styles.checkboxMark}>✓</Text> : null}
+            </View>
+            <Text style={styles.checkboxLabel}>Remember me</Text>
+          </Pressable>
 
           <Pressable style={[styles.button, mutation.isPending && styles.buttonDisabled]} onPress={submit} disabled={mutation.isPending}>
             {mutation.isPending ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Sign in</Text>}
@@ -142,6 +151,34 @@ const styles = StyleSheet.create({
   buttonDisabled: { opacity: 0.6 },
   buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
   error: { color: "#b91c1c", backgroundColor: "#fee2e2", padding: 10, borderRadius: 8 },
+  checkboxRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fff",
+  },
+  checkboxChecked: {
+    backgroundColor: "#111827",
+    borderColor: "#111827",
+  },
+  checkboxMark: {
+    color: "#fff",
+    fontWeight: "800",
+    fontSize: 12,
+  },
+  checkboxLabel: {
+    fontSize: 14,
+    color: "#111827",
+  },
   sectionTitle: { fontWeight: "700", marginTop: 6 },
   demoRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   demoButton: {

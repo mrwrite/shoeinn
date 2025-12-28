@@ -9,17 +9,17 @@ from sqlalchemy.orm import Session
 from app.models import Appointment
 
 
-def _service_with_duration(client: TestClient) -> tuple[UUID, int]:
+def _service_with_duration(client: TestClient) -> tuple[UUID, int, UUID]:
     res = client.get("/services")
     assert res.status_code == 200
     for item in res.json():
         if item["duration_minutes"] > 0:
-            return UUID(item["id"]), item["duration_minutes"]
+            return UUID(item["id"]), item["duration_minutes"], UUID(item["company_id"])
     raise AssertionError("Expected at least one service with duration")
 
 
 def test_availability_lists_slots(client: TestClient) -> None:
-    service_id, _ = _service_with_duration(client)
+    service_id, _, _ = _service_with_duration(client)
     target_date = (date.today() + timedelta(days=1)).isoformat()
 
     res = client.get("/availability", params={"service_id": str(service_id), "date": target_date})
@@ -30,7 +30,7 @@ def test_availability_lists_slots(client: TestClient) -> None:
 
 
 def test_conflicting_appointment_blocks_slot(client: TestClient, db_session: Session) -> None:
-    service_id, duration = _service_with_duration(client)
+    service_id, duration, company_id = _service_with_duration(client)
     target_date = (date.today() + timedelta(days=1)).isoformat()
     res = client.get("/availability", params={"service_id": str(service_id), "date": target_date})
     assert res.status_code == 200
@@ -39,6 +39,7 @@ def test_conflicting_appointment_blocks_slot(client: TestClient, db_session: Ses
 
     appointment = Appointment(
         service_id=service_id,
+        company_id=company_id,
         customer_name="Blocker",
         customer_phone="000",
         customer_email=None,
