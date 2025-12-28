@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useQuery } from "@tanstack/react-query";
 
 import { listCompanies } from "../../api/http";
@@ -30,11 +31,11 @@ const CompanyCard: React.FC<{ name: string; city?: string | null; state?: string
 );
 
 export default function CompanyPickerScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<CustomerStackParamList>>();
   const logout = useAuthStore((s) => s.logout);
   const setSelectedCompany = useCompanyStore((s) => s.setSelectedCompany);
   const clearCompany = useCompanyStore((s) => s.clearSelectedCompany);
-  const resetBooking = useBooking((s) => s.reset);
+  const { reset: resetBooking } = useBooking();
 
   const query = useQuery({ queryKey: ["companies"], queryFn: listCompanies });
   const companies = query.data ?? [];
@@ -91,7 +92,7 @@ export default function CompanyPickerScreen() {
           onPress={() => {
             resetBooking();
             setSelectedCompany(item);
-            navigation.navigate("CompanyServices" as keyof CustomerStackParamList);
+            navigation.navigate("CompanyServices");
           }}
         />
       )}
