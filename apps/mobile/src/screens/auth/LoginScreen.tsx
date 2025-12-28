@@ -77,7 +77,7 @@ export default function LoginScreen({ navigation }: Props) {
             <TextInput
               value={password}
               onChangeText={setPassword}
-              secureTextEntry
+              secureTextEntry={true}
               style={styles.input}
               placeholder="••••••••"
             />

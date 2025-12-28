@@ -78,7 +78,7 @@ export default function RegisterScreen({ navigation }: Props) {
             <TextInput
               value={password}
               onChangeText={setPassword}
-              secureTextEntry
+              secureTextEntry={true}
               style={styles.input}
               placeholder="••••••••"
             />

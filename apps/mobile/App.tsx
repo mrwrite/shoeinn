@@ -5,7 +5,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import AuthGate from "./src/navigation/AuthGate";
 
-enableScreens();
+enableScreens(true);
 
 const queryClient = new QueryClient({
   defaultOptions: {
