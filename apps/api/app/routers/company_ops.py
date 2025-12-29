@@ -185,10 +185,13 @@ def update_status(
 def _serialize_notification(notification: Notification) -> NotificationRead:
     payload = {}
     if notification.payload_json:
-        try:
-            payload = json.loads(notification.payload_json)
-        except json.JSONDecodeError:
-            payload = {}
+        if isinstance(notification.payload_json, dict):
+            payload = notification.payload_json
+        else:
+            try:
+                payload = json.loads(notification.payload_json)
+            except json.JSONDecodeError:
+                payload = {}
     return NotificationRead(
         id=notification.id,
         company_id=notification.company_id,

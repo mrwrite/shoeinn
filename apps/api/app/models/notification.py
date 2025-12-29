@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 
 from sqlalchemy import (
@@ -9,12 +9,12 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
-    Text,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
 
 from app.core.db import Base
+from app.models._types import JSONBType
 
 
 class Notification(Base):
@@ -22,13 +22,20 @@ class Notification(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     company_id = Column(UUID(as_uuid=True), ForeignKey("companies.id"), nullable=False)
-    appointment_id = Column(UUID(as_uuid=True), ForeignKey("appointments.id"), nullable=False)
+    appointment_id = Column(UUID(as_uuid=True), ForeignKey("appointments.id"), nullable=True)
     kind = Column(String, nullable=False)
     channel = Column(String, default="email", nullable=False)
-    target = Column(String)
-    payload_json = Column(Text)
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
-    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+    target = Column(String, nullable=False)
+    payload_json = Column(JSONBType, nullable=False, default=dict)
+    created_at = Column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
     read_at = Column(DateTime(timezone=True))
 
     # Delivery lifecycle metadata
@@ -40,10 +47,10 @@ class Notification(Base):
     last_attempt_at = Column(DateTime(timezone=True))
     next_attempt_at = Column(DateTime(timezone=True))
     last_error_code = Column(String)
-    last_error_message = Column(Text)
+    last_error_message = Column(String)
     last_error_at = Column(DateTime(timezone=True))
     dead_lettered = Column(Boolean, default=False, nullable=False)
-    metadata_json = Column(Text)
+    metadata_json = Column(JSONBType)
 
     """ outbox_entry = relationship(
         "NotificationOutbox",
