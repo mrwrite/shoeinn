@@ -13,6 +13,7 @@ import type { Company } from "../types/company";
 import type { ProviderAppointment, StatusUpdatePayload } from "../types/company";
 import { getAuthToken } from "../state/authStore";
 import type { Notification } from "../types/notification";
+import type { PushRegisterRequest, PushUnregisterRequest } from "../types/push";
 
 export const API_URL: string =
   (Constants.expoConfig?.extra as any)?.API_URL ??
@@ -144,4 +145,12 @@ export function fetchNotifications(): Promise<Notification[]> {
 
 export function ackNotification(id: string): Promise<Notification> {
   return request<Notification>("POST", `/company/notifications/${id}/ack`, undefined, { auth: true });
+}
+
+export function registerPushToken(payload: PushRegisterRequest): Promise<void> {
+  return request<void>("POST", "/push/register", payload, { auth: true });
+}
+
+export function unregisterPushToken(payload: PushUnregisterRequest): Promise<void> {
+  return request<void>("POST", "/push/unregister", payload, { auth: true });
 }

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from threading import Event, Thread
 from typing import Dict, Protocol
+from uuid import UUID
 
 from sqlalchemy import inspect
 from sqlalchemy.orm import Session
@@ -15,6 +16,8 @@ from app.core.db import SessionLocal
 from app.models.notification import Notification
 from app.models.notification_outbox import NotificationOutbox
 from app.utils.notifications import record_notification_event
+from app.models.push_token import PushToken
+from app.services.push_sender import ExpoPushResult, send_expo_push
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +39,9 @@ class NotificationProvider(Protocol):
 
     channel: str
 
-    def send(self, *, notification: Notification, payload: dict) -> ProviderResult:  # pragma: no cover - protocol definition
+    def send(  # pragma: no cover - protocol definition
+        self, *, session: Session, notification: Notification, payload: dict
+    ) -> ProviderResult:
         raise NotImplementedError
 
 
@@ -46,7 +51,7 @@ class StubProvider:
     def __init__(self, channel: str) -> None:
         self.channel = channel
 
-    def send(self, *, notification: Notification, payload: dict) -> ProviderResult:
+    def send(self, *, session: Session, notification: Notification, payload: dict) -> ProviderResult:
         target = (notification.target or "").lower()
         if target in {"temporary-failure", "temp-fail"}:
             return ProviderResult(
@@ -74,12 +79,61 @@ class StubProvider:
         return ProviderResult(success=True, message_id=message_id)
 
 
+class PushProvider:
+    channel = "push"
+
+    def send(self, *, session: Session, notification: Notification, payload: dict) -> ProviderResult:
+        target = notification.target
+        if not target:
+            return ProviderResult(success=False, temporary_failure=False, error_message="Missing push target")
+
+        try:
+            user_id = UUID(str(target))
+        except (TypeError, ValueError):
+            return ProviderResult(success=False, temporary_failure=False, error_message="Invalid push target")
+
+        tokens = (
+            session.query(PushToken)
+            .filter(PushToken.user_id == user_id, PushToken.enabled.is_(True))
+            .all()
+        )
+        if not tokens:
+            return ProviderResult(success=True, message_id="push:no_tokens")
+
+        title, body = _push_text(notification, payload)
+        result: ExpoPushResult = send_expo_push([t.token for t in tokens], title, body, payload)
+
+        if result.invalid_tokens:
+            now = datetime.now(timezone.utc)
+            for token_value in result.invalid_tokens:
+                token_model = (
+                    session.query(PushToken)
+                    .filter(PushToken.user_id == user_id, PushToken.token == token_value)
+                    .first()
+                )
+                if token_model:
+                    token_model.enabled = False
+                    token_model.last_seen_at = now
+                    session.add(token_model)
+
+        if result.temporary_failure:
+            return ProviderResult(
+                success=False,
+                temporary_failure=True,
+                error_code="PUSH_TEMP",
+                error_message=result.error_message,
+            )
+
+        return ProviderResult(success=True, message_id="expo_push")
+
+
 def default_provider_registry() -> Dict[str, NotificationProvider]:
     return {
         "email": StubProvider("email"),
         "sms": StubProvider("sms"),
         "fcm": StubProvider("fcm"),
         "apns": StubProvider("apns"),
+        "push": PushProvider(),
     }
 
 
@@ -105,9 +159,45 @@ def _ensure_provider(channel: str, providers: Dict[str, NotificationProvider]) -
     return None
 
 
+def _push_text(notification: Notification, payload: dict) -> tuple[str, str]:
+    kind = (notification.kind or "").upper()
+    appointment_id = payload.get("appointment_id") if isinstance(payload, dict) else None
+    base_title = "Appointment update"
+    base_body = "There is an update to your appointment."
+
+    if kind == "NEW_APPOINTMENT":
+        base_title = "New appointment booked"
+        base_body = "A customer just booked an appointment."
+    elif kind == "APPOINTMENT_CONFIRMED":
+        base_title = "Appointment confirmed"
+        base_body = "Your appointment has been confirmed."
+    elif kind == "APPOINTMENT_STATUS_CHANGED":
+        new_status = payload.get("new_status") if isinstance(payload, dict) else None
+        base_title = "Appointment status updated"
+        if new_status:
+            base_body = f"Status changed to {new_status}."
+    elif kind == "PAYMENT_SUCCEEDED":
+        base_title = "Payment received"
+        base_body = "Your payment was received."
+    elif kind == "PAYMENT_FAILED":
+        base_title = "Payment failed"
+        base_body = "Payment for your appointment failed."
+
+    if appointment_id:
+        base_body = f"{base_body} (ID: {appointment_id})"
+
+    return base_title, base_body
+
+
+_BACKOFF_SCHEDULE = [30, 120, 600, 1800, 7200]
+
+
 def compute_backoff_seconds(attempt: int) -> int:
-    base = max(1, settings.notification_backoff_seconds)
-    return base * (2 ** max(0, attempt - 1))
+    if attempt <= 0:
+        return _BACKOFF_SCHEDULE[0]
+    if attempt <= len(_BACKOFF_SCHEDULE):
+        return _BACKOFF_SCHEDULE[attempt - 1]
+    return _BACKOFF_SCHEDULE[-1]
 
 
 def dispatch_outbox_batch(
@@ -133,8 +223,10 @@ def dispatch_outbox_batch(
         .filter(
             NotificationOutbox.status == "pending",
             NotificationOutbox.available_at <= now,
+            NotificationOutbox.locked_at.is_(None),
         )
         .order_by(NotificationOutbox.created_at.asc())
+        .with_for_update(skip_locked=True)
         .all()
     )
 
@@ -172,7 +264,7 @@ def dispatch_outbox_batch(
             )
             continue
 
-        result = provider.send(notification=notification, payload=payload)
+        result = provider.send(session=session, notification=notification, payload=payload)
 
         if result.success:
             succeeded += 1
