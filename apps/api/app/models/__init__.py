@@ -7,6 +7,7 @@ from .available_slot import AvailableSlot
 from .company import Company
 from .company_user import CompanyUser
 from .notification import Notification
+from .push_token import PushToken
 from .notification_outbox import NotificationOutbox
 from .notification_event import NotificationEvent
 from .service import Service
@@ -20,6 +21,7 @@ __all__ = [
     "Company",
     "CompanyUser",
     "Notification",
+    "PushToken",
     "HoldStatus",
     "NotificationOutbox",
     "NotificationEvent",

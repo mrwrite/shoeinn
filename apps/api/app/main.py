@@ -17,6 +17,7 @@ from app.routers import (
     services,
     slots,
     webhooks,
+    push,
 )
 from app.workers.payment_sync import payment_sync_worker
 
@@ -40,6 +41,7 @@ app.include_router(company_ops.router)
 app.include_router(dev_seed.router)
 app.include_router(slots.router)
 app.include_router(webhooks.router)
+app.include_router(push.router)
 
 
 @app.on_event("startup")

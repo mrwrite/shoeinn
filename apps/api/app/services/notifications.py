@@ -3,9 +3,10 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Iterable
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.models import Appointment, CompanyUser
+from app.models import Appointment, CompanyUser, PushToken, User
 from app.utils.notifications import enqueue_notification_intent
 
 
@@ -68,11 +69,43 @@ def enqueue_customer_notification(
     )
     if channel == "in_app" and notification.outbox_entry:
         _mark_in_app_delivered(notification, notification.outbox_entry)
+
+    customer_user_id = _customer_user_id(db, appointment)
+    if customer_user_id and _has_push_tokens(db, customer_user_id):
+        enqueue_notification_intent(
+            db,
+            company_id=appointment.company_id,
+            appointment_id=appointment.id,
+            kind=kind,
+            channel="push",
+            target=str(customer_user_id),
+            payload=payload_data,
+        )
     return notification
 
 
 def _company_users(db: Session, company_id) -> Iterable[CompanyUser]:
     return db.query(CompanyUser).filter(CompanyUser.company_id == company_id).all()
+
+
+def _has_push_tokens(db: Session, user_id) -> bool:
+    return (
+        db.query(PushToken)
+        .filter(PushToken.user_id == user_id, PushToken.enabled.is_(True))
+        .count()
+        > 0
+    )
+
+
+def _customer_user_id(db: Session, appointment: Appointment):
+    if not appointment.customer_email:
+        return None
+    user = (
+        db.query(User)
+        .filter(func.lower(User.email) == appointment.customer_email.lower())
+        .first()
+    )
+    return user.id if user else None
 
 
 def enqueue_company_user_notifications(
@@ -101,6 +134,16 @@ def enqueue_company_user_notifications(
         )
         if notification.outbox_entry:
             _mark_in_app_delivered(notification, notification.outbox_entry)
+        if _has_push_tokens(db, company_user.user_id):
+            enqueue_notification_intent(
+                db,
+                company_id=company_id,
+                appointment_id=appointment.id,
+                kind=kind,
+                channel="push",
+                target=str(company_user.user_id),
+                payload=payload_data,
+            )
         notifications.append(notification)
     return notifications
 
