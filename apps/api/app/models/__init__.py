@@ -8,9 +8,11 @@ from .company import Company
 from .company_user import CompanyUser
 from .notification import Notification
 from .push_token import PushToken
+from .refresh_token import RefreshToken
 from .notification_outbox import NotificationOutbox
 from .notification_event import NotificationEvent
 from .service import Service
+from .user import User
 
 __all__ = [
     "Appointment",
@@ -22,9 +24,11 @@ __all__ = [
     "CompanyUser",
     "Notification",
     "PushToken",
+    "RefreshToken",
     "HoldStatus",
     "NotificationOutbox",
     "NotificationEvent",
     "PaymentStatus",
     "Service",
+    "User",
 ]
