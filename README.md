@@ -1,87 +1,295 @@
-# shoeinn
+# ShoeInn 👟
+**Sneaker Care Scheduling & Notification Platform**
 
-## Project overview
+ShoeInn is a full-stack appointment scheduling platform designed for sneaker care businesses. It supports customer bookings, provider workflows, and multi-channel notifications including **in-app**, **email**, and **push notifications**.
 
-Shoeinn is a full-stack demo composed of a FastAPI backend and an Expo React Native mobile client. The source code lives under `apps`:
+---
 
-- `apps/api` – backend service implemented with FastAPI, SQLAlchemy and Alembic.
-- `apps/mobile` – Expo application built with React Native.
+## 🧱 Tech Stack
 
-## Run the API locally
+### Backend (API)
+- FastAPI
+- PostgreSQL
+- SQLAlchemy
+- Alembic
+- JWT Authentication
+- Background workers (notification outbox pattern)
+
+### Mobile App
+- Expo (React Native)
+- Expo Notifications
+- EAS (Expo Application Services)
+
+---
+
+## ✨ Core Features
+
+### 👤 Authentication
+- Email + password login
+- JWT access & refresh tokens
+- Role-based access control:
+  - Customer
+  - Provider
+  - Admin
+
+### 📅 Appointments
+- Customers can:
+  - Create appointment holds
+  - Confirm appointments
+  - View appointment history and status
+- Providers can:
+  - View open appointments
+  - Update appointment status
+  - Receive notifications on changes
+
+### 🏢 Companies
+- Providers belong to companies
+- Appointments are scoped to companies
+- Admin users can:
+  - Create companies
+  - Manage company users
+  - Assign provider roles
+
+---
+
+## 🔔 Notifications System
+
+ShoeInn uses a **reliable outbox-based notification system** to guarantee delivery and avoid race conditions.
+
+### Supported Channels
+- In-app
+- Email
+- Push (Expo)
+
+### Notification Types
+- `NEW_APPOINTMENT`
+- `APPOINTMENT_CONFIRMED`
+- `APPOINTMENT_STATUS_CHANGED`
+
+---
+
+## 📤 Notification Outbox Pattern
+
+Notifications are processed in three distinct steps:
+
+1. Business logic creates a notification record
+2. A corresponding outbox entry is created
+3. A background worker delivers the notification
+
+### Benefits
+- Guaranteed delivery
+- Retry support
+- Dead-letter handling
+- Decoupled business logic
+
+---
+
+## 🔁 Notification Worker
+
+The notification worker is responsible for dispatching queued notifications.
+
+### Run the worker manually
+
+```bash
+python -m app.workers.notification_worker
+```
+
+---
+
+## 🧠 Worker Responsibilities
+
+- Fetch pending outbox records
+- Lock records to prevent duplicate processing
+- Dispatch notifications by channel (email, push, in-app)
+- Mark records as completed or failed
+- Retry failed deliveries
+- Move unrecoverable failures to dead-letter state
+
+---
+
+## 📲 Push Notifications (Expo)
+
+Push notifications are delivered using **Expo Push Notifications**.
+
+### Who receives push notifications
+- Customers receive appointment confirmations and status updates
+- Providers receive new appointment and status change alerts
+
+---
+
+## 🔧 Push Notification Setup
+
+### Install EAS CLI
+
+```bash
+npm install -g eas-cli
+```
+
+### Initialize EAS
+
+```bash
+cd apps/mobile
+eas init
+```
+
+### Configure `app.json`
+
+```json
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "YOUR_EAS_PROJECT_ID"
+      }
+    }
+  }
+}
+```
+
+### Register Push Token (Mobile)
+
+```ts
+import * as Notifications from "expo-notifications";
+import Constants from "expo-constants";
+
+const token = await Notifications.getExpoPushTokenAsync({
+  projectId: Constants.expoConfig?.extra?.eas?.projectId,
+});
+```
+
+---
+
+## 📁 Project Structure
+
+```
+shoeinn/
+├── apps/
+│   ├── api/
+│   │   ├── app/
+│   │   │   ├── models/
+│   │   │   ├── routers/
+│   │   │   ├── services/
+│   │   │   ├── workers/
+│   │   │   └── utils/
+│   │   ├── alembic/
+│   │   ├── main.py
+│   │   └── requirements.txt
+│   └── mobile/
+│       ├── app.json
+│       ├── eas.json
+│       ├── src/
+│       └── package.json
+```
+
+---
+
+## 🚀 Getting Started (Local Development)
+
+### Backend Setup
 
 ```bash
 cd apps/api
-cp .env.example .env
-make up
-python -m venv .venv && source .venv/bin/activate
-pip install -e .
+python -m venv .venv
+```
+
+Activate the virtual environment:
+
+```bash
+# macOS / Linux
+source .venv/bin/activate
+
+# Windows
+.\.venv\Scripts\Activate.ps1
+```
+
+Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+Create `.env`:
+
+```
+DATABASE_URL=postgresql://user:password@localhost:5432/shoeinn
+JWT_SECRET=your-secret-key
+```
+
+Run migrations:
+
+```bash
 alembic upgrade head
+```
+
+Start the API:
+
+```bash
 make dev
-make seed
 ```
 
-### Demo data
-
-Running `make seed` (or calling `POST /dev/seed`) now loads demo providers and logins:
-
-- Companies: Clean Kicks (Austin, TX), Fresh Soles (Austin, TX), Sole Spa (Denver, CO)
-- Provider logins: `c1@test.com`, `c2@test.com`, `c3@test.com` (password `Password1!`)
-- Customer login: `customer@test.com` (password `Password1!`)
-
-Provider dashboards authenticate via `POST /company/auth/login` and use the returned bearer token for `/company/appointments` operations.
-
-### Curl examples
+or
 
 ```bash
-curl http://localhost:8000/health
-curl http://localhost:8000/services
-curl "http://localhost:8000/slots?date=2025-08-18&type=pickup"
-curl -X POST http://localhost:8000/appointments \
-  -H "Content-Type: application/json" \
-  -d '{"service_id":"<uuid>","type":"pickup","address":{"line1":"123","line2":"","city":"Town","state":"TX","postal_code":"75001"},"start_time_iso":"2025-08-18T15:30:00-05:00","customer":{"name":"Joe","email":"joe@example.com","phone":"123"}}'
-curl "http://localhost:8000/appointments/me?email=joe@example.com&phone=123"
+python -m uvicorn app.main:app --reload
 ```
 
-### Authentication and token refresh
+---
 
-- Access tokens now expire after approximately 15 minutes by default. You can change the window by setting `ACCESS_TOKEN_TTL_MINUTES` in the API environment.
-- `POST /auth/login` returns both an `access_token` and a long-lived `refresh_token`. Persist the refresh token securely on the client.
-- When the API responds with `401` due to an expired access token, call `POST /auth/refresh` with the stored refresh token to receive a rotated token pair. Each refresh invalidates the previous refresh token, so always replace the stored value with the latest one.
-- Call `POST /auth/logout` with the current refresh token when the user signs out or you detect compromise so the server revokes the session immediately.
-- The mobile app should follow the same pattern—refresh quietly when the access token expires and fall back to login if refresh fails (e.g., after logout or suspected compromise).
-
-## Run the mobile app locally
+## 📱 Mobile App Setup
 
 ```bash
 cd apps/mobile
-EXPO_PUBLIC_API_URL=http://localhost:8000 npm start -- --tunnel
+npm install
+npx expo start -c
 ```
 
-- The `--tunnel` flag makes the Metro dev server reachable from Expo Go when your phone and computer are on different networks; it also prevents Expo Go from attempting to fetch a remote OTA update (the usual cause of `Failed to download remote update`).
-- If you still see that message in Expo Go, clear the bundler cache before retrying: `npm start -- --clear --tunnel`.
+> Push notifications require a physical device.
 
-## Running tests
+---
 
-Backend tests:
+## 🗄 Database Overview
 
-```bash
-cd apps/api
-pytest
-```
+### notifications
+- Stores logical notification records
+- Tracks user-visible notification state
 
-Mobile tests:
+### notification_outbox
+- Asynchronous delivery queue
+- Processed by notification worker
 
-```bash
-cd apps/mobile
-npm test
-```
+### push_tokens
+- Stores Expo push tokens
+- One user can have multiple devices
 
-## Mobile offline behavior
+---
 
-The Expo client now layers TanStack Query over the REST API to provide caching and offline resilience:
+## 🧪 Troubleshooting
 
-- Service lists are hydrated from AsyncStorage on launch so previously viewed data is available immediately.
-- Network reads and writes use a retry strategy with exponential backoff, and mutations optimistically update the UI.
-- When offline, service status changes are queued on disk and replayed once connectivity returns; a banner surfaces the offline state and pending work.
-- During synchronization the app disables destructive actions until all queued writes have been flushed.
-- Run `npm test` from `apps/mobile` to execute Jest suites that cover cache hydration and offline queue processing.
+### Push warning: `No projectId found`
+- Run `eas init`
+- Ensure `extra.eas.projectId` exists in `app.json`
+
+### SQLAlchemy error: `failed to locate a name ('RefreshToken')`
+- Ensure all models are imported in `app/models/__init__.py`
+- Or remove unused relationships
+
+### Notifications not sending
+- Ensure the notification worker is running
+- Check `notification_outbox.status`
+- Verify push tokens exist for users
+
+---
+
+## 🛣 Roadmap
+
+- Admin notification dashboard
+- Notification preferences per user
+- SMS notifications
+- Delivery analytics
+- Provider availability scheduling
+
+---
+
+## 📄 License
+
+MIT
