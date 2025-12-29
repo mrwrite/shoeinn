@@ -23,10 +23,10 @@ def _ensure_utc(dt: datetime | None) -> datetime | None:
     return dt.astimezone(timezone.utc)
 
 
-def _serialize_payload(payload: dict[str, Any] | None) -> str:
+def _normalize_payload(payload: dict[str, Any] | None) -> dict[str, Any]:
     if not payload:
-        return "{}"
-    return json.dumps(payload)
+        return {}
+    return payload
 
 
 def enqueue_notification_intent(
@@ -44,14 +44,15 @@ def enqueue_notification_intent(
 
     now = datetime.now(timezone.utc)
     next_attempt_at = _ensure_utc(available_at) or now
-    payload_json = _serialize_payload(payload)
+    payload_json = _normalize_payload(payload)
+    target_value = target or ""
 
     notification = Notification(
         company_id=company_id,
         appointment_id=appointment_id,
         kind=kind,
         channel=channel,
-        target=target,
+        target=target_value,
         payload_json=payload_json,
         status="pending",
         delivered=False,
@@ -68,8 +69,10 @@ def enqueue_notification_intent(
         channel=notification.channel,
         target=notification.target,
         payload_json=payload_json,
-        available_at=datetime.now(timezone.utc),
-    )    
+        available_at=next_attempt_at,
+        created_at=now,
+        updated_at=now,
+    )
     db.add(outbox)
     logger.debug(
         "Enqueued notification intent",
@@ -93,7 +96,7 @@ def record_notification_event(
     event = NotificationEvent(
         notification_id=notification.id,
         event_type=event_type,
-        payload_json=_serialize_payload(payload),
+        payload_json=json.dumps(_normalize_payload(payload)),
     )
     db.add(event)
     logger.debug(

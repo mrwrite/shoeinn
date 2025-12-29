@@ -86,6 +86,10 @@ def default_provider_registry() -> Dict[str, NotificationProvider]:
 def _load_payload(entry: NotificationOutbox) -> dict:
     if not entry.payload_json:
         return {}
+
+    if isinstance(entry.payload_json, dict):
+        return entry.payload_json
+
     try:
         return json.loads(entry.payload_json)
     except json.JSONDecodeError:  # pragma: no cover - defensive
