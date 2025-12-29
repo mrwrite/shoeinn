@@ -240,7 +240,7 @@ python -m uvicorn app.main:app --reload
 ```bash
 cd apps/mobile
 npm install
-npx expo start -c
+npx expo start -c (specifically run $env:EXPO_PUBLIC_API_URL="http://192.168.1.131:8000"; npm start -- --tunnel)
 ```
 
 > Push notifications require a physical device.
