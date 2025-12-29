@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import uuid
 
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy import Column, DateTime, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -22,8 +23,9 @@ class NotificationOutbox(Base):
     status = Column(String, default="pending", nullable=False)
     channel = Column(String, nullable=False)
     target = Column(String)
-    payload_json = Column(Text, nullable=False)
+    payload_json = Column(JSONB, nullable=False)
     available_at = Column(DateTime(timezone=True), nullable=False)
+    kind = Column(String(64), nullable=False)
     locked_at = Column(DateTime(timezone=True))
     processed_at = Column(DateTime(timezone=True))
     dead_letter_reason = Column(Text)

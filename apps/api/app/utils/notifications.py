@@ -58,15 +58,18 @@ def enqueue_notification_intent(
         delivery_attempts=0,
         next_attempt_at=next_attempt_at,
     )
-    outbox = NotificationOutbox(
-        notification=notification,
-        channel=channel,
-        target=target,
-        payload_json=payload_json,
-        available_at=next_attempt_at,
-        status="pending",
-    )
     db.add(notification)
+    db.flush()  # to get notification.id
+
+    outbox = NotificationOutbox(
+        notification_id=notification.id,
+        kind=notification.kind,          # ✅ add this
+        status="pending",
+        channel=notification.channel,
+        target=notification.target,
+        payload_json=payload_json,
+        available_at=datetime.now(timezone.utc),
+    )    
     db.add(outbox)
     logger.debug(
         "Enqueued notification intent",

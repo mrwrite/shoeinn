@@ -100,24 +100,43 @@ def seed(db: Session = Depends(get_db)):
     get_or_create_slot(c2.id, s3.id, tomorrow)
     get_or_create_slot(c3.id, s5.id, tomorrow + timedelta(minutes=45))
 
-    # ---- Users (upsert by email) ----
-    def get_or_create_user(email: str, role: str) -> User:
+       # ---- Users (upsert by email) ----
+    def default_full_name(email: str, role: str) -> str:
+        # simple, deterministic names for demo accounts
+        local = email.split("@")[0]
+        if role == "customer":
+            return "Demo Customer"
+        if role == "company":
+            return f"Demo {local.upper()}"
+        return f"Demo {local}"
+
+    def get_or_create_user(email: str, role: str, full_name: str | None = None) -> User:
         u = db.query(User).filter(User.email == email).first()
         if u:
             # ensure role matches
             if u.role != role:
                 u.role = role
+            # ensure full_name is populated (handles older seeded rows if any)
+            if not getattr(u, "full_name", None):
+                u.full_name = full_name or default_full_name(email, role)
             return u
-        u = User(email=email, password_hash=hash_password("Password1!"), role=role)
+
+        u = User(
+            email=email,
+            password_hash=hash_password("Password1!"),
+            role=role,
+            full_name=full_name or default_full_name(email, role),
+        )
         db.add(u)
         db.flush()
         created["users"] += 1
         return u
 
-    u1 = get_or_create_user("c1@test.com", "company")
-    u2 = get_or_create_user("c2@test.com", "company")
-    u3 = get_or_create_user("c3@test.com", "company")
-    customer = get_or_create_user("customer@test.com", "customer")
+    u1 = get_or_create_user("c1@test.com", "company", full_name="Clean Kicks Admin")
+    u2 = get_or_create_user("c2@test.com", "company", full_name="Fresh Soles Admin")
+    u3 = get_or_create_user("c3@test.com", "company", full_name="Sole Spa Admin")
+    customer = get_or_create_user("customer@test.com", "customer", full_name="Demo Customer")
+
 
     # ---- CompanyUser links (upsert) ----
     def ensure_company_user(user_id, company_id):

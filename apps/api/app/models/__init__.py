@@ -8,6 +8,7 @@ from .company import Company
 from .company_user import CompanyUser
 from .notification import Notification
 from .notification_outbox import NotificationOutbox
+from .notification_event import NotificationEvent
 from .service import Service
 
 __all__ = [
@@ -21,6 +22,7 @@ __all__ = [
     "Notification",
     "HoldStatus",
     "NotificationOutbox",
+    "NotificationEvent",
     "PaymentStatus",
     "Service",
 ]

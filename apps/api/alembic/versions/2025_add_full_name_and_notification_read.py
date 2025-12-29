@@ -1,6 +1,6 @@
 """Require full name and add notification read timestamp
 
-Revision ID: add_full_name_and_notification_read
+Revision ID: add_full_name_and_ntf_read
 Revises: 9fefdaea12cf
 Create Date: 2025-01-01 00:00:00
 """
@@ -14,7 +14,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = "add_full_name_and_notification_read"
+revision: str = "add_full_name_and_ntf_read"
 down_revision: Union[str, Sequence[str], None] = "9fefdaea12cf"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
