@@ -11,7 +11,14 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.core.db import Base
 from app.main import app
 from app.core.db import get_db
-from app.models import Appointment, AppointmentHold, NotificationOutbox, Service  # noqa: F401
+from app.models import (
+    Appointment,
+    AppointmentAssignment,
+    AppointmentHold,
+    AppointmentLocationUpdate,
+    NotificationOutbox,
+    Service,
+)  # noqa: F401
 from scripts.seed_services import seed_services
 
 
