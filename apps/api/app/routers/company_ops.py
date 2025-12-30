@@ -2,16 +2,24 @@ from datetime import datetime, timezone
 import json
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from app.enums import AppointmentStatus
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.core.security import create_access_token, get_current_company_user, verify_password
-from app.models import Appointment, AppointmentEvent, Notification, Service
+from app.models import (
+    Appointment,
+    AppointmentAssignment,
+    AppointmentEvent,
+    AppointmentLocationUpdate,
+    Notification,
+    Service,
+)
 from app.models.user import User
 from app.schemas.notification import NotificationRead
+from app.schemas.appointment import AppointmentAssignmentRead, LocationUpdateCreate, LocationUpdateRead
 from app.services.notifications import (
     APPOINTMENT_CONFIRMED,
     APPOINTMENT_STATUS_CHANGED,
@@ -21,6 +29,12 @@ from app.services.notifications import (
 )
 
 router = APIRouter(prefix="/company", tags=["company"])
+
+TRAVEL_STATUSES = {
+    AppointmentStatus.en_route_pickup,
+    AppointmentStatus.picked_up,
+    AppointmentStatus.out_for_delivery,
+}
 
 
 class StatusUpdate(BaseModel):
@@ -70,43 +84,50 @@ def open_appointments(current=Depends(get_current_company_user), db: Session = D
     return items
 
 
-@router.post("/appointments/{appointment_id}/claim")
+@router.post(
+    "/appointments/{appointment_id}/claim",
+    response_model=AppointmentAssignmentRead,
+    status_code=status.HTTP_201_CREATED,
+)
 def claim_appointment(
     appointment_id: UUID, current=Depends(get_current_company_user), db: Session = Depends(get_db)
 ):
-    _, company_id = current
+    current_user, company_id = current
     appt = db.get(Appointment, appointment_id)
     if not appt:
         raise HTTPException(status_code=404, detail="Not found")
     if appt.company_id and appt.company_id != company_id:
-        raise HTTPException(status_code=400, detail="Already claimed")
-    if appt.status != AppointmentStatus.REQUESTED:
-        raise HTTPException(status_code=400, detail="Not available")
+        raise HTTPException(status_code=403, detail="Forbidden")
 
-    appt.company_id = company_id
-    previous_status = appt.status
-    appt.status = AppointmentStatus.CONFIRMED
-    appt.confirmed_time = appt.confirmed_time or datetime.now(timezone.utc)
-
-    db.add(
-        AppointmentEvent(
-            appointment_id=appt.id,
-            kind="status_change",
-            payload={"status": appt.status.value},
-        )
+    existing = (
+        db.query(AppointmentAssignment)
+        .filter(AppointmentAssignment.appointment_id == appointment_id, AppointmentAssignment.is_active.is_(True))
+        .first()
     )
+    if existing:
+        raise HTTPException(status_code=400, detail="Appointment already assigned")
+
+    if appt.company_id is None:
+        appt.company_id = company_id
+
+    assignment = AppointmentAssignment(appointment_id=appointment_id, company_user_id=current_user.id)
     db.add(appt)
-    enqueue_customer_notification(
-        db,
-        appt,
-        APPOINTMENT_STATUS_CHANGED,
-        payload={"old_status": previous_status.value, "new_status": appt.status.value},
-    )
-    enqueue_customer_notification(db, appt, APPOINTMENT_CONFIRMED)
-    enqueue_company_user_notifications(db, company_id, appt, NEW_APPOINTMENT)
+    db.add(assignment)
     db.commit()
-    db.refresh(appt)
-    return {"id": appt.id, "status": appt.status}
+    db.refresh(assignment)
+
+    return AppointmentAssignmentRead.model_validate(
+        {
+            "id": assignment.id,
+            "appointment_id": assignment.appointment_id,
+            "company_user_id": assignment.company_user_id,
+            "assigned_at": assignment.assigned_at,
+            "unassigned_at": assignment.unassigned_at,
+            "is_active": assignment.is_active,
+            "provider_name": current_user.full_name,
+        },
+        from_attributes=True,
+    )
 
 
 @router.get("/appointments")
@@ -129,6 +150,48 @@ def company_appointments(current=Depends(get_current_company_user), db: Session 
             }
         )
     return items
+
+
+@router.post(
+    "/appointments/{appointment_id}/location",
+    response_model=LocationUpdateRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def post_location_update(
+    appointment_id: UUID,
+    payload: LocationUpdateCreate,
+    current=Depends(get_current_company_user),
+    db: Session = Depends(get_db),
+):
+    current_user, company_id = current
+    appt = db.get(Appointment, appointment_id)
+    if not appt or (appt.company_id and appt.company_id != company_id):
+        raise HTTPException(status_code=404, detail="Not found")
+
+    assignment = (
+        db.query(AppointmentAssignment)
+        .filter(
+            AppointmentAssignment.appointment_id == appointment_id,
+            AppointmentAssignment.is_active.is_(True),
+        )
+        .first()
+    )
+    if assignment is None or assignment.company_user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not assigned to this appointment")
+
+    if appt.status not in TRAVEL_STATUSES:
+        raise HTTPException(status_code=400, detail="Appointment not in a travel state")
+
+    update = AppointmentLocationUpdate(
+        appointment_id=appointment_id,
+        company_user_id=current_user.id,
+        **payload.model_dump(),
+    )
+    db.add(update)
+    db.commit()
+    db.refresh(update)
+
+    return LocationUpdateRead.model_validate(update, from_attributes=True)
 
 
 @router.post("/appointments/{appointment_id}/status")

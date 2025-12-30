@@ -12,13 +12,17 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.db import get_db
+from app.core.security import get_current_customer
 from app.models import (
     Appointment,
+    AppointmentAssignment,
     AppointmentEvent,
+    AppointmentLocationUpdate,
     AppointmentHold,
     HoldStatus,
     PaymentStatus,
     Service,
+    User,
 )
 from app.services.notifications import (
     APPOINTMENT_CONFIRMED,
@@ -29,7 +33,15 @@ from app.services.notifications import (
 )
 from app.enums import AppointmentStatus
 from app.services.payment_gateway import PaymentGateway, PaymentGatewayError
-from app.schemas.appointment import AppointmentConfirm, AppointmentEventRead, AppointmentRead, HoldCreate, HoldRead
+from app.schemas.appointment import (
+    AppointmentAssignmentRead,
+    AppointmentConfirm,
+    AppointmentEventRead,
+    AppointmentRead,
+    HoldCreate,
+    HoldRead,
+    LocationUpdateRead,
+)
 
 router = APIRouter(prefix="/appointments", tags=["appointments"])
 
@@ -123,6 +135,25 @@ def _serialize_appointment(appointment: Appointment) -> AppointmentRead:
     )
 
 
+def _ensure_customer_access(appointment: Appointment, current_customer) -> None:
+    if (
+        appointment.customer_email
+        and appointment.customer_email.lower() != current_customer.email.lower()
+    ):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
+
+def _provider_display_name(user: User | None) -> str | None:
+    if not user or not user.full_name:
+        return None
+    parts = [p for p in user.full_name.split(" ") if p]
+    if not parts:
+        return None
+    if len(parts) == 1:
+        return parts[0]
+    return "".join(p[0].upper() for p in parts[:2])
+
+
 @router.post("/holds", response_model=HoldRead, status_code=status.HTTP_201_CREATED)
 def create_hold(payload: HoldCreate, db: Session = Depends(get_db)) -> HoldRead:
     """Create a new appointment hold for the given service and start time."""
@@ -195,6 +226,73 @@ def read_appointment_events(appointment_id: UUID, db: Session = Depends(get_db))
         .all()
     )
     return [AppointmentEventRead.model_validate(event, from_attributes=True) for event in events]
+
+
+@router.get(
+    "/{appointment_id}/location/latest",
+    response_model=LocationUpdateRead,
+)
+def read_latest_location(
+    appointment_id: UUID,
+    current_customer=Depends(get_current_customer),
+    db: Session = Depends(get_db),
+) -> LocationUpdateRead:
+    appointment = db.get(Appointment, appointment_id)
+    if appointment is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
+
+    _ensure_customer_access(appointment, current_customer)
+
+    update = (
+        db.query(AppointmentLocationUpdate)
+        .filter(AppointmentLocationUpdate.appointment_id == appointment_id)
+        .order_by(AppointmentLocationUpdate.recorded_at.desc())
+        .first()
+    )
+    if update is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Location not available")
+    return LocationUpdateRead.model_validate(update, from_attributes=True)
+
+
+@router.get(
+    "/{appointment_id}/assignment",
+    response_model=AppointmentAssignmentRead,
+)
+def read_assignment(
+    appointment_id: UUID,
+    current_customer=Depends(get_current_customer),
+    db: Session = Depends(get_db),
+) -> AppointmentAssignmentRead:
+    appointment = db.get(Appointment, appointment_id)
+    if appointment is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
+
+    _ensure_customer_access(appointment, current_customer)
+
+    assignment = (
+        db.query(AppointmentAssignment)
+        .filter(
+            AppointmentAssignment.appointment_id == appointment_id,
+            AppointmentAssignment.is_active.is_(True),
+        )
+        .first()
+    )
+    if assignment is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No provider assigned")
+
+    provider = db.get(User, assignment.company_user_id)
+    return AppointmentAssignmentRead.model_validate(
+        {
+            "id": assignment.id,
+            "appointment_id": assignment.appointment_id,
+            "company_user_id": assignment.company_user_id,
+            "assigned_at": assignment.assigned_at,
+            "unassigned_at": assignment.unassigned_at,
+            "is_active": assignment.is_active,
+            "provider_name": _provider_display_name(provider),
+        },
+        from_attributes=True,
+    )
 
 
 @router.post("/confirm", response_model=AppointmentRead)
