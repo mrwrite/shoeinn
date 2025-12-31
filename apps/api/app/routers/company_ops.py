@@ -61,7 +61,7 @@ def open_appointments(current=Depends(get_current_company_user), db: Session = D
     _, company_id = current
     q = (
         db.query(Appointment)
-        # .filter(Appointment.status == AppointmentStatus.confirmed)
+        .filter(Appointment.status != AppointmentStatus.completed)
         .filter((Appointment.company_id == company_id) | (Appointment.company_id.is_(None)))
         .order_by(Appointment.start_time.asc())
     )

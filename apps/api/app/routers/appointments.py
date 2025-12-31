@@ -144,6 +144,8 @@ def list_my_appointments(
     q = (
         db.query(Appointment)
         .filter(Appointment.customer_email == current_customer.email)
+        .filter(Appointment.status != AppointmentStatus.cancelled)
+        .filter(Appointment.status != AppointmentStatus.completed)
         .order_by(Appointment.start_time.desc())
     )
     for appt in q.all():
