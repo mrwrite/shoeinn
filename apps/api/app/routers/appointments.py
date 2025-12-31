@@ -37,6 +37,7 @@ from app.schemas.appointment import (
     AppointmentAssignmentRead,
     AppointmentConfirm,
     AppointmentEventRead,
+    AppointmentListItem,
     AppointmentRead,
     HoldCreate,
     HoldRead,
@@ -133,6 +134,35 @@ def _serialize_appointment(appointment: Appointment) -> AppointmentRead:
         },
         from_attributes=True,
     )
+
+
+@router.get("/mine", response_model=list[AppointmentListItem])
+def list_my_appointments(
+    current_customer=Depends(get_current_customer), db: Session = Depends(get_db)
+) -> list[AppointmentListItem]:
+    items: list[AppointmentListItem] = []
+    q = (
+        db.query(Appointment)
+        .filter(Appointment.customer_email == current_customer.email)
+        .order_by(Appointment.start_time.desc())
+    )
+    for appt in q.all():
+        service_name = None
+        if appt.service_id:
+            svc = db.get(Service, appt.service_id)
+            service_name = svc.name if svc else None
+        items.append(
+            AppointmentListItem.model_validate(
+                {
+                    "id": appt.id,
+                    "company_id": appt.company_id,
+                    "service_name": service_name,
+                    "start_time": _ensure_utc(appt.start_time),
+                    "status": appt.status,
+                }
+            )
+        )
+    return items
 
 
 def _ensure_customer_access(appointment: Appointment, current_customer) -> None:

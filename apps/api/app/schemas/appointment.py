@@ -100,6 +100,16 @@ class AppointmentRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class AppointmentListItem(BaseModel):
+    id: UUID
+    company_id: UUID | None = None
+    service_name: str | None = None
+    start_time: datetime
+    status: AppointmentStatus
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class AppointmentEventRead(BaseModel):
     id: UUID
     appointment_id: UUID

@@ -128,7 +128,7 @@ const BookingFlow: React.FC = () => {
         onDone={() => {
           reset();
           setStep("services");
-          navigation.navigate("CompanyServices" as never);
+          navigation.navigate("MyAppointments" as never);
         }}
       />
     </ScreenWrapper>
