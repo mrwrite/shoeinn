@@ -65,6 +65,13 @@ export interface Appointment {
 }
 
 export interface AppointmentSummary {
+  customer_name: string;
+  customer_phone: string;
+  address_line1: any;
+  address_line2: any;
+  city: any;
+  state: any;
+  postal_code: any;
   id: string;
   company_id?: string | null;
   service_name?: string | null;

@@ -235,6 +235,15 @@ def dispatch_outbox_batch(
         entry.status = "processing"
         entry.locked_at = now
         notification = entry.notification
+
+        if notification is None:
+           entry.status = "dead_lettered"
+           entry.processed_at = now
+           entry.locked_at = None
+           entry.dead_letter_reason = "Orphaned outbox entry: notification missing"
+           failed += 1
+           continue
+
         notification.last_attempt_at = now
         notification.delivery_attempts += 1
 

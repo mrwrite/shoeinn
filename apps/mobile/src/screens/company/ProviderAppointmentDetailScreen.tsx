@@ -6,7 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { updateAppointmentStatus } from "../../api/http";
 import { CompanyStackParamList } from "../../navigation/CompanyStack";
-import type { AppointmentStatus } from "../../types/company";
+import type { AppointmentStatus } from "../../types/booking";
 
 const statusOptions: AppointmentStatus[] = [
   "confirmed",
