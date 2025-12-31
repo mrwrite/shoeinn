@@ -1,3 +1,4 @@
+import { useAuthStore } from "../state/authStore";
 import React from "react";
 import {
   ActivityIndicator,
@@ -22,6 +23,17 @@ interface Props {
 }
 
 const CustomerInfoScreen: React.FC<Props> = ({ onConfirmed, onBack }) => {
+  const fullName = useAuthStore((s) => s.fullName);
+  const authEmail = useAuthStore((s) => s.email);
+
+  React.useEffect(() => {
+    if (fullName) setName(fullName);
+    if (authEmail) setEmail(authEmail);
+  }, [fullName, authEmail]);
+
+  const nameLocked = Boolean(fullName);
+  const emailLocked = Boolean(authEmail);
+
   const { hold, setAppointment } = useBooking();
   const selectedCompany = useCompanyStore((s) => s.selectedCompany);
   const [name, setName] = React.useState("");
@@ -30,7 +42,10 @@ const CustomerInfoScreen: React.FC<Props> = ({ onConfirmed, onBack }) => {
   const [submitting, setSubmitting] = React.useState(false);
   const [polling, setPolling] = React.useState(false);
 
-  const wait = React.useCallback((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)), []);
+  const wait = React.useCallback(
+    (ms: number) => new Promise((resolve) => setTimeout(resolve, ms)),
+    []
+  );
 
   const pollPaymentStatus = React.useCallback(
     async (appointmentId: string) => {
@@ -55,7 +70,7 @@ const CustomerInfoScreen: React.FC<Props> = ({ onConfirmed, onBack }) => {
         setPolling(false);
       }
     },
-    [onConfirmed, setAppointment, wait],
+    [onConfirmed, setAppointment, wait]
   );
 
   const handleSubmit = async () => {
@@ -92,7 +107,10 @@ const CustomerInfoScreen: React.FC<Props> = ({ onConfirmed, onBack }) => {
       await pollPaymentStatus(appointment.id);
     } catch (error: any) {
       console.warn("[Booking] Confirmation failed", error);
-      Alert.alert("Confirmation failed", error?.message ?? "Unable to confirm appointment");
+      Alert.alert(
+        "Confirmation failed",
+        error?.message ?? "Unable to confirm appointment"
+      );
     } finally {
       setSubmitting(false);
     }
@@ -121,12 +139,13 @@ const CustomerInfoScreen: React.FC<Props> = ({ onConfirmed, onBack }) => {
       </TouchableOpacity>
       <Text style={styles.heading}>Your details</Text>
       <TextInput
-        style={styles.input}
+        style={[styles.input, nameLocked && styles.lockedInput]}
         placeholder="Full name"
         value={name}
         onChangeText={setName}
         autoCapitalize="words"
         accessibilityLabel="Full name"
+        editable={!nameLocked}
       />
       <TextInput
         style={styles.input}
@@ -137,13 +156,14 @@ const CustomerInfoScreen: React.FC<Props> = ({ onConfirmed, onBack }) => {
         accessibilityLabel="Phone number"
       />
       <TextInput
-        style={styles.input}
-        placeholder="Email (optional)"
+        style={[styles.input, emailLocked && styles.lockedInput]}
+        placeholder="Email"
         value={email}
         onChangeText={setEmail}
         keyboardType="email-address"
         autoCapitalize="none"
         accessibilityLabel="Email"
+        editable={!emailLocked}
       />
       <TouchableOpacity
         style={[styles.primaryButton, disabled && styles.disabledButton]}
@@ -217,4 +237,10 @@ const styles = StyleSheet.create({
     color: "#111827",
     fontWeight: "600",
   },
+  lockedInput: {
+  backgroundColor: "#f3f4f6",
+  color: "#111827",
+  opacity: 0.9,
+},
+
 });

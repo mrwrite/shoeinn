@@ -38,7 +38,7 @@ export default function LoginScreen({ navigation }: Props) {
   const mutation = useMutation({
     mutationFn: login,
     onSuccess: async (data) => {
-      await setAuth(data.access_token, data.role, data.user_id, data.full_name, data.company_id);
+      await setAuth(data.access_token, data.role, data.user_id, data.full_name, data.email, data.company_id);
     },
     onError: (err: any) => {
       setError(err?.message ?? "Login failed");

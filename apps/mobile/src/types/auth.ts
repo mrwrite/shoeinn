@@ -18,6 +18,7 @@ export interface LoginResponse {
   user_id: string;
   company_id: string | null;
   full_name: string;
+  email: string;
 }
 
 export interface RegisterResponse {

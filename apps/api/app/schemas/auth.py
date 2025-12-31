@@ -26,6 +26,7 @@ class LoginResponse(TokenPair):
     user_id: UUID
     company_id: UUID | None = None
     full_name: str
+    email: EmailStr
 
 
 class RefreshRequest(BaseModel):

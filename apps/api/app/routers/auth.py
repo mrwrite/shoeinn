@@ -57,6 +57,7 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
         "user_id": user.id,
         "company_id": company_link.company_id if company_link else None,
         "full_name": user.full_name,
+        "email": user.email,
     }
 
 
