@@ -13,7 +13,7 @@ import type {
   Service,
 } from "../types/booking";
 import type { LoginPayload, LoginResponse, RegisterPayload, RegisterResponse } from "../types/auth";
-import type { Company } from "../types/company";
+import type { Company, CompanyUser, CompanyUserCreateResponse } from "../types/company";
 import type { ProviderAppointment, StatusUpdatePayload } from "../types/company";
 import { getAuthToken } from "../state/authStore";
 import type { Notification } from "../types/notification";
@@ -142,6 +142,12 @@ export function getAppointmentAssignment(id: string): Promise<AppointmentAssignm
   return request<AppointmentAssignment>("GET", `/appointments/${id}/assignment`, undefined, { auth: true });
 }
 
+export function claimAppointment(id: string): Promise<AppointmentAssignment> {
+  return request<AppointmentAssignment>("POST", `/company/appointments/${id}/claim`, undefined, {
+    auth: true,
+  });
+}
+
 export function expireHolds(): Promise<{ expired: number }> {
   return request<{ expired: number }>("POST", "/appointments/holds/expire");
 }
@@ -165,6 +171,19 @@ export function fetchNotifications(): Promise<Notification[]> {
 
 export function ackNotification(id: string): Promise<Notification> {
   return request<Notification>("POST", `/company/notifications/${id}/ack`, undefined, { auth: true });
+}
+
+export function createCompanyUser(payload: {
+  email: string;
+  full_name: string;
+  password?: string | null;
+  role?: "provider";
+}): Promise<CompanyUserCreateResponse> {
+  return request<CompanyUserCreateResponse>("POST", "/company/users", payload, { auth: true });
+}
+
+export function listCompanyUsers(): Promise<CompanyUser[]> {
+  return request<CompanyUser[]>("GET", "/company/users", undefined, { auth: true });
 }
 
 export function registerPushToken(payload: PushRegisterRequest): Promise<void> {

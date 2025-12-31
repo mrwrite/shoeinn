@@ -106,8 +106,10 @@ def seed(db: Session = Depends(get_db)):
         local = email.split("@")[0]
         if role == "customer":
             return "Demo Customer"
-        if role == "company":
+        if role in {"company", "company_admin"}:
             return f"Demo {local.upper()}"
+        if role == "provider":
+            return f"Demo Provider {local.upper()}"
         return f"Demo {local}"
 
     def get_or_create_user(email: str, role: str, full_name: str | None = None) -> User:
@@ -132,9 +134,14 @@ def seed(db: Session = Depends(get_db)):
         created["users"] += 1
         return u
 
-    u1 = get_or_create_user("c1@test.com", "company", full_name="Clean Kicks Admin")
-    u2 = get_or_create_user("c2@test.com", "company", full_name="Fresh Soles Admin")
-    u3 = get_or_create_user("c3@test.com", "company", full_name="Sole Spa Admin")
+    admin = get_or_create_user(
+        "admin@cleankicks.test", "company_admin", full_name="Clean Kicks Admin"
+    )
+    provider = get_or_create_user(
+        "provider@cleankicks.test", "provider", full_name="Clean Kicks Provider"
+    )
+    u2 = get_or_create_user("c2@test.com", "company_admin", full_name="Fresh Soles Admin")
+    u3 = get_or_create_user("c3@test.com", "company_admin", full_name="Sole Spa Admin")
     customer = get_or_create_user("customer@test.com", "customer", full_name="Demo Customer")
 
 
@@ -150,7 +157,8 @@ def seed(db: Session = Depends(get_db)):
         db.add(CompanyUser(user_id=user_id, company_id=company_id))
         created["company_users"] += 1
 
-    ensure_company_user(u1.id, c1.id)
+    ensure_company_user(admin.id, c1.id)
+    ensure_company_user(provider.id, c1.id)
     ensure_company_user(u2.id, c2.id)
     ensure_company_user(u3.id, c3.id)
 
@@ -163,9 +171,10 @@ def seed(db: Session = Depends(get_db)):
         "created": created,
         "demo_logins": {
             "companies": [
-                {"email": "c1@test.com", "password": "Password1!", "company": "Clean Kicks"},
-                {"email": "c2@test.com", "password": "Password1!", "company": "Fresh Soles"},
-                {"email": "c3@test.com", "password": "Password1!", "company": "Sole Spa"},
+                {"email": "admin@cleankicks.test", "password": "Password1!", "company": "Clean Kicks", "role": "company_admin"},
+                {"email": "provider@cleankicks.test", "password": "Password1!", "company": "Clean Kicks", "role": "provider"},
+                {"email": "c2@test.com", "password": "Password1!", "company": "Fresh Soles", "role": "company_admin"},
+                {"email": "c3@test.com", "password": "Password1!", "company": "Sole Spa", "role": "company_admin"},
             ],
             "customer": {"email": "customer@test.com", "password": "Password1!"},
         },

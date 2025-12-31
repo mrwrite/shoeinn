@@ -1,14 +1,23 @@
 from datetime import datetime, timezone
 import json
+import secrets
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, field_validator
 from app.enums import AppointmentStatus
+from sqlalchemy import exists
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.core.security import create_access_token, get_current_company_user, verify_password
+from app.core.security import (
+    create_access_token,
+    get_current_company_admin,
+    get_current_company_user,
+    hash_password,
+    verify_password,
+)
 from app.models import (
     Appointment,
     AppointmentAssignment,
@@ -17,9 +26,11 @@ from app.models import (
     Notification,
     Service,
 )
+from app.models.company_user import CompanyUser
 from app.models.user import User
 from app.schemas.notification import NotificationRead
 from app.schemas.appointment import AppointmentAssignmentRead, LocationUpdateCreate, LocationUpdateRead
+from app.schemas.user import UserOut
 from app.services.notifications import (
     APPOINTMENT_CONFIRMED,
     APPOINTMENT_STATUS_CHANGED,
@@ -47,10 +58,38 @@ class ProviderLogin(BaseModel):
     password: str
 
 
+class CompanyUserCreatePayload(BaseModel):
+    email: EmailStr
+    full_name: str
+    password: str | None = None
+    role: str = "provider"
+
+    @field_validator("role")
+    @classmethod
+    def validate_role(cls, value: str) -> str:
+        if value not in {"provider"}:
+            raise ValueError("Invalid role")
+        return value
+
+
+class CompanyUserCreated(BaseModel):
+    user: UserOut
+    company_id: UUID
+    temp_password: str | None = None
+
+
+def _generate_temp_password() -> str:
+    return secrets.token_urlsafe(8)
+
+
 @router.post("/auth/login")
 def provider_login(payload: ProviderLogin, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == payload.email).first()
-    if not user or user.role != "company" or not verify_password(payload.password, user.password_hash):
+    if (
+        not user
+        or user.role not in {"company", "provider", "company_admin"}
+        or not verify_password(payload.password, user.password_hash)
+    ):
         raise HTTPException(status_code=400, detail="Invalid credentials")
     token = create_access_token({"sub": str(user.id), "role": user.role})
     return {"access_token": token, "token_type": "bearer"}
@@ -59,10 +98,20 @@ def provider_login(payload: ProviderLogin, db: Session = Depends(get_db)):
 @router.get("/appointments/open")
 def open_appointments(current=Depends(get_current_company_user), db: Session = Depends(get_db)):
     _, company_id = current
+    has_active_assignment = (
+        db.query(AppointmentAssignment.id)
+        .filter(
+            AppointmentAssignment.appointment_id == Appointment.id,
+            AppointmentAssignment.is_active.is_(True),
+        )
+        .exists()
+    )
+
     q = (
         db.query(Appointment)
-        .filter(Appointment.status != AppointmentStatus.completed)
-        .filter((Appointment.company_id == company_id) | (Appointment.company_id.is_(None)))
+        .filter(Appointment.company_id == company_id)
+        .filter(Appointment.status == AppointmentStatus.confirmed)
+        .filter(~has_active_assignment)
         .order_by(Appointment.start_time.asc())
     )
     items = []
@@ -79,6 +128,8 @@ def open_appointments(current=Depends(get_current_company_user), db: Session = D
                 "service_name": service_name,
                 "start_time": appt.start_time,
                 "status": appt.status.value,
+                "is_assigned": False,
+                "assigned_to_me": False,
             }
         )
     return items
@@ -93,27 +144,39 @@ def claim_appointment(
     appointment_id: UUID, current=Depends(get_current_company_user), db: Session = Depends(get_db)
 ):
     current_user, company_id = current
-    appt = db.get(Appointment, appointment_id)
+    appt = (
+        db.query(Appointment)
+        .filter(Appointment.id == appointment_id)
+        .with_for_update()
+        .first()
+    )
     if not appt:
         raise HTTPException(status_code=404, detail="Not found")
-    if appt.company_id and appt.company_id != company_id:
+    if appt.company_id != company_id:
         raise HTTPException(status_code=403, detail="Forbidden")
+    if appt.status != AppointmentStatus.confirmed:
+        raise HTTPException(status_code=400, detail="Appointment not claimable")
 
     existing = (
         db.query(AppointmentAssignment)
-        .filter(AppointmentAssignment.appointment_id == appointment_id, AppointmentAssignment.is_active.is_(True))
+        .filter(
+            AppointmentAssignment.appointment_id == appointment_id,
+            AppointmentAssignment.is_active.is_(True),
+        )
         .first()
     )
     if existing:
         raise HTTPException(status_code=400, detail="Appointment already assigned")
 
-    if appt.company_id is None:
-        appt.company_id = company_id
-
-    assignment = AppointmentAssignment(appointment_id=appointment_id, company_user_id=current_user.id)
-    db.add(appt)
+    assignment = AppointmentAssignment(
+        appointment_id=appointment_id, company_user_id=current_user.id
+    )
     db.add(assignment)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Appointment already assigned")
     db.refresh(assignment)
 
     return AppointmentAssignmentRead.model_validate(
@@ -125,8 +188,7 @@ def claim_appointment(
             "unassigned_at": assignment.unassigned_at,
             "is_active": assignment.is_active,
             "provider_name": current_user.full_name,
-        },
-        from_attributes=True,
+        }
     )
 
 
@@ -243,6 +305,49 @@ def update_status(
     db.commit()
     db.refresh(appt)
     return {"id": appt.id, "status": appt.status}
+
+
+@router.post("/users", response_model=CompanyUserCreated, status_code=status.HTTP_201_CREATED)
+def create_company_user(
+    payload: CompanyUserCreatePayload,
+    current=Depends(get_current_company_admin),
+    db: Session = Depends(get_db),
+):
+    _, company_id = current
+
+    existing = db.query(User).filter(User.email == payload.email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Email exists")
+
+    temp_password = payload.password or _generate_temp_password()
+    user = User(
+        email=payload.email,
+        full_name=payload.full_name,
+        role=payload.role,
+        password_hash=hash_password(temp_password),
+    )
+    db.add(user)
+    db.flush()
+    db.add(CompanyUser(user_id=user.id, company_id=company_id))
+    db.commit()
+    db.refresh(user)
+
+    return CompanyUserCreated(
+        user=user, company_id=company_id, temp_password=None if payload.password else temp_password
+    )
+
+
+@router.get("/users", response_model=list[UserOut])
+def list_company_users(current=Depends(get_current_company_admin), db: Session = Depends(get_db)):
+    _, company_id = current
+    users = (
+        db.query(User)
+        .join(CompanyUser, CompanyUser.user_id == User.id)
+        .filter(CompanyUser.company_id == company_id)
+        .order_by(User.full_name.asc())
+        .all()
+    )
+    return users
 
 
 def _serialize_notification(notification: Notification) -> NotificationRead:

@@ -30,10 +30,11 @@ export default function ProviderDashboardScreen({ navigation }: Props) {
     >
       <View style={styles.cardRow}>
         <Text style={styles.cardTitle}>{item.service_name ?? "Appointment"}</Text>
-        <Text style={styles.cardStatus}>{item.status}</Text>
+        <Text style={styles.cardStatus}>{item.status?.toUpperCase?.() ?? item.status}</Text>
       </View>
       <Text style={styles.cardMeta}>{formatDate(item.start_time)}</Text>
       <Text style={styles.cardMeta}>{[item.customer_city, item.customer_state].filter(Boolean).join(", ")}</Text>
+      <Text style={styles.cardHint}>Tap to view and claim</Text>
     </Pressable>
   );
 
@@ -101,5 +102,6 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 16, fontWeight: "700" },
   cardStatus: { color: "#4b5563" },
   cardMeta: { color: "#4b5563", marginTop: 4 },
+  cardHint: { color: "#16a34a", marginTop: 6, fontWeight: "600" },
   empty: { textAlign: "center", color: "#6b7280", paddingVertical: 20 },
 });

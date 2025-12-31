@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { updateAppointmentStatus } from "../../api/http";
+import { claimAppointment, getAppointmentAssignment, updateAppointmentStatus } from "../../api/http";
 import { CompanyStackParamList } from "../../navigation/CompanyStack";
+import { useAuthStore } from "../../state/authStore";
 import type { AppointmentStatus } from "../../types/booking";
 
 const statusOptions: AppointmentStatus[] = [
@@ -23,6 +24,15 @@ type Props = NativeStackScreenProps<CompanyStackParamList, "ProviderAppointmentD
 export default function ProviderAppointmentDetailScreen({ route }: Props) {
   const { appointment } = route.params;
   const [status, setStatus] = useState<AppointmentStatus>(appointment.status);
+  const [claimError, setClaimError] = useState<string | null>(null);
+  const userId = useAuthStore((s) => s.userId);
+  const queryClient = useQueryClient();
+
+  const assignmentQuery = useQuery({
+    queryKey: ["appointment", appointment.id, "assignment"],
+    queryFn: () => getAppointmentAssignment(appointment.id),
+    retry: false,
+  });
 
   const mutation = useMutation({
     mutationFn: (next: AppointmentStatus) =>
@@ -32,6 +42,23 @@ export default function ProviderAppointmentDetailScreen({ route }: Props) {
       }),
     onSuccess: (_, next) => setStatus(next),
   });
+
+  const claimMutation = useMutation({
+    mutationFn: () => claimAppointment(appointment.id),
+    onSuccess: (data) => {
+      setClaimError(null);
+      queryClient.setQueryData(["appointment", appointment.id, "assignment"], data);
+      queryClient.invalidateQueries({ queryKey: ["provider", "open"] });
+    },
+    onError: (err: Error) => {
+      setClaimError(err.message.includes("already assigned") ? "Appointment already assigned" : "Failed to claim");
+    },
+  });
+
+  const assignment = assignmentQuery.data;
+  const assignmentError = assignmentQuery.error as Error | null;
+  const isUnassigned = !assignment && (!assignmentError || assignmentError.message.includes("HTTP 404"));
+  const assignedToMe = assignment?.company_user_id === userId;
 
   const info = useMemo(
     () => [
@@ -60,6 +87,36 @@ export default function ProviderAppointmentDetailScreen({ route }: Props) {
             <Text style={styles.label}>Current status</Text>
             <Text style={styles.value}>{status}</Text>
           </View>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.title}>Assignment</Text>
+          <View style={styles.row}>
+            <Text style={styles.label}>Status</Text>
+            {assignmentQuery.isFetching ? (
+              <ActivityIndicator />
+            ) : assignment ? (
+              <Text style={styles.value}>
+                {assignment.provider_name ? `Assigned to ${assignment.provider_name}` : "Assigned"}
+                {assignedToMe ? " (you)" : ""}
+              </Text>
+            ) : (
+              <Text style={styles.value}>Unassigned</Text>
+            )}
+          </View>
+          {claimError ? <Text style={styles.error}>{claimError}</Text> : null}
+          {appointment.status === "confirmed" && isUnassigned ? (
+            <Pressable
+              style={[styles.button, claimMutation.isPending && styles.buttonDisabled]}
+              disabled={claimMutation.isPending}
+              onPress={() => claimMutation.mutate()}
+            >
+              {claimMutation.isPending ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Claim appointment</Text>}
+            </Pressable>
+          ) : null}
+          {assignmentQuery.isError && !isUnassigned ? (
+            <Text style={styles.error}>Failed to load assignment</Text>
+          ) : null}
         </View>
 
         <View style={styles.card}>
