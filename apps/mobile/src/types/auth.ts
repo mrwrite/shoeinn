@@ -7,14 +7,14 @@ export interface RegisterPayload {
   email: string;
   password: string;
   full_name: string;
-  role: "customer" | "company";
+  role: "customer" | "company" | "provider" | "company_admin";
 }
 
 export interface LoginResponse {
   access_token: string;
   refresh_token: string;
   token_type: string;
-  role: "customer" | "company";
+  role: "customer" | "company" | "provider" | "company_admin";
   user_id: string;
   company_id: string | null;
   full_name: string;

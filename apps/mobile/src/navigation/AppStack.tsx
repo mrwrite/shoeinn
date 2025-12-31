@@ -9,7 +9,7 @@ interface Props {
 }
 
 export default function AppStack({ role }: Props) {
-  if (role === "company") {
+  if (role === "company" || role === "provider" || role === "company_admin") {
     return <CompanyStack />;
   }
   return <CustomerStack />;

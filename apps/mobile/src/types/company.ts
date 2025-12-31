@@ -7,6 +7,8 @@ export interface ProviderAppointment {
   service_name?: string | null;
   start_time: string;
   status: AppointmentStatus;
+  is_assigned?: boolean;
+  assigned_to_me?: boolean;
 }
 
 export interface StatusUpdatePayload {
@@ -19,4 +21,17 @@ export interface Company {
   name: string;
   city?: string | null;
   state?: string | null;
+}
+
+export interface CompanyUser {
+  id: string;
+  email: string;
+  full_name: string;
+  role: string;
+}
+
+export interface CompanyUserCreateResponse {
+  user: CompanyUser;
+  company_id: string;
+  temp_password?: string | null;
 }
