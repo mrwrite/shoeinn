@@ -11,9 +11,11 @@ import type { AppointmentStatus } from "../../types/booking";
 
 const statusOptions: AppointmentStatus[] = [
   "confirmed",
+  "en_route_pickup",
   "picked_up",
   "cleaning",
   "ready",
+  "out_for_delivery",
   "delivered",
   "completed",
   "cancelled",
