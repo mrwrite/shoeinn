@@ -3,6 +3,10 @@ import Constants from "expo-constants";
 
 import type {
   Appointment,
+  AppointmentAssignment,
+  AppointmentEvent,
+  AppointmentLocationUpdate,
+  AppointmentSummary,
   AppointmentHold,
   ConfirmAppointmentPayload,
   HoldCreatePayload,
@@ -120,6 +124,22 @@ export function confirmAppointment(payload: ConfirmAppointmentPayload): Promise<
 
 export function getAppointment(id: string): Promise<Appointment> {
   return request<Appointment>("GET", `/appointments/${id}`);
+}
+
+export function getMyAppointments(): Promise<AppointmentSummary[]> {
+  return request<AppointmentSummary[]>("GET", "/appointments/mine", undefined, { auth: true });
+}
+
+export function getAppointmentEvents(id: string): Promise<AppointmentEvent[]> {
+  return request<AppointmentEvent[]>("GET", `/appointments/${id}/events`, undefined, { auth: true });
+}
+
+export function getAppointmentLatestLocation(id: string): Promise<AppointmentLocationUpdate> {
+  return request<AppointmentLocationUpdate>("GET", `/appointments/${id}/location/latest`, undefined, { auth: true });
+}
+
+export function getAppointmentAssignment(id: string): Promise<AppointmentAssignment> {
+  return request<AppointmentAssignment>("GET", `/appointments/${id}/assignment`, undefined, { auth: true });
 }
 
 export function expireHolds(): Promise<{ expired: number }> {

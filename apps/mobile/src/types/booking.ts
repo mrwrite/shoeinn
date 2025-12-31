@@ -23,25 +23,36 @@ export interface AppointmentHold {
   status: "PENDING" | "EXPIRED" | "CONFIRMED";
 }
 
+export type AppointmentStatus =
+  | "requested"
+  | "confirmed"
+  | "en_route_pickup"
+  | "picked_up"
+  | "cleaning"
+  | "ready"
+  | "out_for_delivery"
+  | "delivered"
+  | "completed"
+  | "cancelled";
+
 export interface Appointment {
   id: string;
-  company_id?: string;
+  company_id?: string | null;
   service_id: string;
   hold_id?: string | null;
+  type?: string;
   customer_name: string;
   customer_phone: string;
   customer_email?: string | null;
+  address_line1?: string | null;
+  address_line2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postal_code?: string | null;
   start_time: string;
-  end_time: string;
-  status:
-    | "requested"
-    | "confirmed"
-    | "picked_up"
-    | "cleaning"
-    | "ready"
-    | "delivered"
-    | "completed"
-    | "cancelled";
+  confirmed_time?: string | null;
+  end_time: string | null;
+  status: AppointmentStatus;
   payment_id?: string | null;
   payment_status?: "pending" | "requires_action" | "succeeded" | "failed" | "refunded" | "disputed" | null;
   payment_checkout_url?: string | null;
@@ -49,6 +60,45 @@ export interface Appointment {
   payment_amount_received?: number | null;
   payment_currency?: string | null;
   created_at: string;
+  updated_at?: string;
+  service_name?: string | null;
+}
+
+export interface AppointmentSummary {
+  id: string;
+  company_id?: string | null;
+  service_name?: string | null;
+  start_time: string;
+  status: AppointmentStatus;
+}
+
+export interface AppointmentEvent {
+  id: string;
+  appointment_id: string;
+  kind: string;
+  payload?: Record<string, any> | null;
+  created_at: string;
+}
+
+export interface AppointmentAssignment {
+  id: string;
+  appointment_id: string;
+  company_user_id: string;
+  provider_name?: string | null;
+  assigned_at: string;
+  unassigned_at?: string | null;
+  is_active: boolean;
+}
+
+export interface AppointmentLocationUpdate {
+  appointment_id: string;
+  company_user_id: string;
+  lat: number;
+  lng: number;
+  heading?: number | null;
+  speed?: number | null;
+  accuracy?: number | null;
+  recorded_at: string;
 }
 
 export interface HoldCreatePayload {

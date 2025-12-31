@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -99,11 +100,54 @@ class AppointmentRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class AppointmentListItem(BaseModel):
+    id: UUID
+    company_id: UUID | None = None
+    service_name: str | None = None
+    start_time: datetime
+    status: AppointmentStatus
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class AppointmentEventRead(BaseModel):
     id: UUID
     appointment_id: UUID
     kind: str
     payload: dict | None = None
     created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AppointmentAssignmentRead(BaseModel):
+    id: UUID
+    appointment_id: UUID
+    company_user_id: UUID
+    assigned_at: datetime
+    unassigned_at: datetime | None = None
+    is_active: bool
+    provider_name: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class LocationUpdateCreate(BaseModel):
+    lat: float
+    lng: float
+    heading: float | None = None
+    speed: float | None = None
+    accuracy: float | None = None
+
+
+class LocationUpdateRead(BaseModel):
+    appointment_id: UUID
+    company_user_id: UUID
+    lat: float
+    lng: float
+    heading: float | None = None
+    speed: float | None = None
+    accuracy: float | None = None
+    recorded_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

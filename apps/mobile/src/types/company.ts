@@ -1,12 +1,4 @@
-export type AppointmentStatus =
-  | "requested"
-  | "confirmed"
-  | "picked_up"
-  | "cleaning"
-  | "ready"
-  | "delivered"
-  | "completed"
-  | "cancelled";
+import type { AppointmentStatus } from "./booking";
 
 export interface ProviderAppointment {
   id: string;
