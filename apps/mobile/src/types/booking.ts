@@ -51,7 +51,7 @@ export interface Appointment {
   postal_code?: string | null;
   start_time: string;
   confirmed_time?: string | null;
-  end_time: string | null;
+  end_time: string;
   status: AppointmentStatus;
   payment_id?: string | null;
   payment_status?: "pending" | "requires_action" | "succeeded" | "failed" | "refunded" | "disputed" | null;
