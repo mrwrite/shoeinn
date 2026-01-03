@@ -51,7 +51,7 @@ export default function BookingConfirmScreen() {
       });
     },
     onSuccess: (appt) => {
-      navigation.getParent()?.navigate("Appointments", {
+      navigation.getParent()?.navigate("AppointmentsTab", {
         screen: "AppointmentDetail",
         params: { appointmentId: appt.id },
       } as never);

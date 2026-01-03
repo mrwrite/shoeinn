@@ -2,6 +2,7 @@ import React from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import AppointmentDetailScreen from "../screens/appointments/AppointmentDetailScreen";
 import AppointmentListScreen from "../screens/appointments/AppointmentListScreen";
@@ -37,14 +38,21 @@ export type ProviderStackParamList = {
 };
 
 export type ProfileStackParamList = {
-  Profile: undefined;
+  ProfileHome: undefined;
 };
 
 const HomeStack = createNativeStackNavigator<HomeStackParamList>();
 const AppointmentStack = createNativeStackNavigator<AppointmentStackParamList>();
 const ProviderStack = createNativeStackNavigator<ProviderStackParamList>();
 const ProfileStack = createNativeStackNavigator<ProfileStackParamList>();
-const Tab = createBottomTabNavigator();
+type RootTabParamList = {
+  HomeTab: undefined;
+  AppointmentsTab: undefined;
+  ProviderTab: undefined;
+  ProfileTab: undefined;
+};
+
+const Tab = createBottomTabNavigator<RootTabParamList>();
 
 function HomeNavigator() {
   return (
@@ -87,7 +95,7 @@ function ProviderNavigator() {
 function ProfileNavigator() {
   return (
     <ProfileStack.Navigator>
-      <ProfileStack.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }} />
+      <ProfileStack.Screen name="ProfileHome" component={ProfileScreen} options={{ headerShown: false }} />
     </ProfileStack.Navigator>
   );
 }
@@ -96,6 +104,8 @@ export default function RootTabs() {
   const theme = useTheme();
   const role = useAuthStore((s) => s.role);
   const showProviderTab = ["provider", "company", "company_admin"].includes(role ?? "");
+  const insets = useSafeAreaInsets();
+  const bottomPadding = Math.max(insets.bottom, 8);
 
   return (
     <Tab.Navigator
@@ -103,13 +113,14 @@ export default function RootTabs() {
         headerShown: false,
         tabBarActiveTintColor: theme.colors.peacockPrimary,
         tabBarInactiveTintColor: theme.colors.mutedText,
-        tabBarStyle: { paddingBottom: 6, height: 62 },
+        tabBarStyle: { paddingBottom: bottomPadding, height: 60 + bottomPadding },
+        tabBarLabelStyle: { paddingBottom: 4 },
         tabBarIcon: ({ color, size }) => {
           const iconMap: Record<string, keyof typeof Ionicons.glyphMap> = {
             HomeTab: "home",
-            Appointments: "calendar",
-            Provider: "briefcase",
-            Profile: "person",
+            AppointmentsTab: "calendar",
+            ProviderTab: "briefcase",
+            ProfileTab: "person",
           };
           const key = iconMap[route.name] ?? "ellipse-outline";
           return <Ionicons name={key} size={size} color={color} />;
@@ -118,14 +129,14 @@ export default function RootTabs() {
     >
       <Tab.Screen name="HomeTab" component={HomeNavigator} options={{ title: "Home" }} />
       <Tab.Screen
-        name="Appointments"
+        name="AppointmentsTab"
         component={AppointmentNavigator}
         options={{ title: "Appointments" }}
       />
       {showProviderTab ? (
-        <Tab.Screen name="Provider" component={ProviderNavigator} options={{ title: "Jobs" }} />
+        <Tab.Screen name="ProviderTab" component={ProviderNavigator} options={{ title: "Jobs" }} />
       ) : null}
-      <Tab.Screen name="Profile" component={ProfileNavigator} />
+      <Tab.Screen name="ProfileTab" component={ProfileNavigator} options={{ title: "Profile" }} />
     </Tab.Navigator>
   );
 }
