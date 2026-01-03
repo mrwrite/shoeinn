@@ -1,136 +1,168 @@
-import React, { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useMemo, useState } from "react";
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, View } from "react-native";
 import { RouteProp, useRoute } from "@react-navigation/native";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { PrimaryButton } from "../../components/PrimaryButton";
-import { ScreenContainer } from "../../components/ScreenContainer";
+import {
+  claimAppointment,
+  getProviderAppointmentAssignment,
+  updateAppointmentStatus,
+} from "../../api/http";
+import { Button } from "../../components/ui/Button";
+import { Card } from "../../components/ui/Card";
+import { Text } from "../../components/ui/Text";
 import type { ProviderStackParamList } from "../../navigation/RootTabs";
-import type { AppointmentStatus } from "../../types/models";
+import { useAuthStore } from "../../state/authStore";
+import { useTheme } from "../../theme/theme";
+import type { AppointmentStatus } from "../../types/booking";
 
-const steps: AppointmentStatus[] = ["confirmed", "in_progress", "completed"];
+const statusOptions: AppointmentStatus[] = [
+  "confirmed",
+  "en_route_pickup",
+  "picked_up",
+  "cleaning",
+  "ready",
+  "out_for_delivery",
+  "delivered",
+  "completed",
+  "cancelled",
+];
 
 export default function ProviderAppointmentDetailScreen() {
+  const theme = useTheme();
   const route = useRoute<RouteProp<ProviderStackParamList, "ProviderAppointmentDetail">>();
-  const [appointment, setAppointment] = useState(route.params.appointment);
+  const { appointment } = route.params;
+  const [status, setStatus] = useState<AppointmentStatus>(appointment.status);
+  const userId = useAuthStore((s) => s.userId);
+  const queryClient = useQueryClient();
 
-  const currentIndex = steps.indexOf(appointment.status);
-  const nextStatus = steps[currentIndex + 1];
+  const assignmentQuery = useQuery({
+    queryKey: ["appointment", appointment.id, "assignment"],
+    queryFn: () => getProviderAppointmentAssignment(appointment.id),
+    retry: false,
+  });
 
-  const advance = () => {
-    if (nextStatus) {
-      setAppointment((prev) => ({ ...prev, status: nextStatus }));
-    }
-  };
+  const statusMutation = useMutation({
+    mutationFn: (next: AppointmentStatus) =>
+      updateAppointmentStatus(appointment.id, {
+        status: next,
+        confirmed_time: next === "confirmed" ? new Date().toISOString() : undefined,
+      }),
+    onSuccess: (_, next) => {
+      setStatus(next);
+      queryClient.invalidateQueries({ queryKey: ["provider", "open"] });
+    },
+    onError: (err: Error) => Alert.alert("Update failed", err.message),
+  });
+
+  const claimMutation = useMutation({
+    mutationFn: () => claimAppointment(appointment.id),
+    onSuccess: (data) => {
+      queryClient.setQueryData(["appointment", appointment.id, "assignment"], data);
+      queryClient.invalidateQueries({ queryKey: ["provider", "open"] });
+    },
+    onError: (err: Error) => Alert.alert("Claim failed", err.message),
+  });
+
+  const assignment = assignmentQuery.data;
+  const isUnassigned = !assignment && (!assignmentQuery.error || `${assignmentQuery.error}`.includes("404"));
+  const assignedToMe = assignment?.user_id === userId;
+
+  const info = useMemo(
+    () => [
+      { label: "Service", value: appointment.service_name ?? "Appointment" },
+      { label: "Start", value: new Date(appointment.start_time).toLocaleString() },
+      {
+        label: "Location",
+        value: [appointment.customer_city, appointment.customer_state].filter(Boolean).join(", ") || "",
+      },
+    ],
+    [appointment],
+  );
 
   return (
-    <ScreenContainer>
-      <View style={styles.section}>
-        <Text style={styles.title}>{appointment.customerName}</Text>
-        <Text style={styles.subtitle}>{appointment.serviceName}</Text>
-        <Text style={styles.meta}>{new Date(appointment.timeISO).toLocaleString()}</Text>
-      </View>
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Status</Text>
-        <View style={styles.stepper}>
-          {steps.map((step, index) => {
-            const active = index <= currentIndex;
-            return (
-              <View key={step} style={styles.stepContainer}>
-                <View style={[styles.dot, active && styles.dotActive]} />
-                <Text style={[styles.stepLabel, active && styles.stepLabelActive]}>{step.replace("_", " ")}</Text>
-                {index < steps.length - 1 ? <View style={[styles.line, active && styles.lineActive]} /> : null}
-              </View>
-            );
-          })}
+    <ScrollView style={{ flex: 1, backgroundColor: theme.colors.surfaceLight }} contentContainerStyle={{ padding: 16, gap: 12 }}>
+      <Text variant="title" weight="bold">
+        {appointment.service_name ?? "Appointment"}
+      </Text>
+
+      <Card>
+        <Text variant="subtitle" weight="semibold">
+          Details
+        </Text>
+        <View style={{ marginTop: 10, gap: 8 }}>
+          {info.map((item) => (
+            <Row key={item.label} label={item.label} value={item.value} />
+          ))}
+          <Row label="Status" value={status.replace(/_/g, " ")} />
         </View>
-      </View>
-      <View style={styles.section}>
-        {!appointment.claimedByMe && (
-          <PrimaryButton label="Claim Appointment" onPress={() => setAppointment({ ...appointment, claimedByMe: true })} />
+      </Card>
+
+      <Card>
+        <Text variant="subtitle" weight="semibold">
+          Assignment
+        </Text>
+        {assignmentQuery.isFetching ? (
+          <ActivityIndicator color={theme.colors.peacockPrimary} style={{ marginTop: 10 }} />
+        ) : assignment ? (
+          <Text style={{ marginTop: 8 }}>
+            Assigned {assignment.provider_name ? `to ${assignment.provider_name}` : ""}
+            {assignedToMe ? " (you)" : ""}
+          </Text>
+        ) : (
+          <Text style={{ marginTop: 8 }} color={theme.colors.mutedText}>
+            No provider assigned yet.
+          </Text>
         )}
-        {appointment.status === "confirmed" && appointment.claimedByMe ? (
-          <PrimaryButton label="Start Job" onPress={advance} style={{ marginTop: 12 }} />
+        {isUnassigned ? (
+          <Button
+            label={claimMutation.isPending ? "Claiming..." : "Claim appointment"}
+            onPress={() => claimMutation.mutate()}
+            loading={claimMutation.isPending}
+            style={{ marginTop: 12 }}
+          />
         ) : null}
-        {appointment.status === "in_progress" ? (
-          <PrimaryButton label="Complete Job" onPress={advance} style={{ marginTop: 12 }} />
-        ) : null}
-        {appointment.status === "completed" ? (
-          <Pressable style={styles.completedBanner}>
-            <Text style={styles.completedText}>Job Completed</Text>
-          </Pressable>
-        ) : null}
-      </View>
-    </ScreenContainer>
+      </Card>
+
+      <Card>
+        <Text variant="subtitle" weight="semibold">
+          Status updates
+        </Text>
+        <View style={{ marginTop: 10, gap: 8 }}>
+          {statusOptions.map((opt) => (
+            <Button
+              key={opt}
+              label={opt.replace(/_/g, " ")}
+              variant={status === opt ? "primary" : "secondary"}
+              onPress={() => statusMutation.mutate(opt)}
+              disabled={statusMutation.isPending}
+              style={{ marginBottom: 8 }}
+            />
+          ))}
+          <Text variant="caption" color={theme.colors.mutedText}>
+            Tap a status to update progress.
+          </Text>
+        </View>
+      </Card>
+    </ScrollView>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  const theme = useTheme();
+  return (
+    <View style={styles.row}>
+      <Text color={theme.colors.mutedText}>{label}</Text>
+      <Text weight="semibold">{value}</Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  section: {
-    padding: 16,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: "#1F2933",
-  },
-  subtitle: {
-    color: "#6B7280",
-    marginTop: 4,
-  },
-  meta: {
-    color: "#4B5563",
-    marginTop: 2,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#1F2933",
-    marginBottom: 12,
-  },
-  stepper: {
+  row: {
     flexDirection: "row",
     justifyContent: "space-between",
-  },
-  stepContainer: {
     alignItems: "center",
-    flex: 1,
-  },
-  dot: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: "#E5E7EB",
-  },
-  dotActive: {
-    backgroundColor: "#0F4C5C",
-  },
-  line: {
-    height: 2,
-    backgroundColor: "#E5E7EB",
-    flex: 1,
-    marginTop: 6,
-  },
-  lineActive: {
-    backgroundColor: "#0F4C5C",
-  },
-  stepLabel: {
-    marginTop: 8,
-    color: "#6B7280",
-    fontSize: 13,
-    textTransform: "capitalize",
-  },
-  stepLabelActive: {
-    color: "#0F4C5C",
-    fontWeight: "700",
-  },
-  completedBanner: {
-    backgroundColor: "#E6AF2E",
-    borderRadius: 12,
-    padding: 12,
-    alignItems: "center",
-  },
-  completedText: {
-    color: "#1F2933",
-    fontWeight: "700",
   },
 });
+
