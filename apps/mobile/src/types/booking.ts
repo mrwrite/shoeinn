@@ -90,7 +90,7 @@ export interface AppointmentEvent {
 export interface AppointmentAssignment {
   id: string;
   appointment_id: string;
-  company_user_id: string;
+  user_id: string;
   provider_name?: string | null;
   assigned_at: string;
   unassigned_at?: string | null;
@@ -99,7 +99,7 @@ export interface AppointmentAssignment {
 
 export interface AppointmentLocationUpdate {
   appointment_id: string;
-  company_user_id: string;
+  user_id: string;
   lat: number;
   lng: number;
   heading?: number | null;

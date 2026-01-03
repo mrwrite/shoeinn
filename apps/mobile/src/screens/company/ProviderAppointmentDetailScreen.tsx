@@ -60,7 +60,7 @@ export default function ProviderAppointmentDetailScreen({ route }: Props) {
   const assignment = assignmentQuery.data;
   const assignmentError = assignmentQuery.error as Error | null;
   const isUnassigned = !assignment && (!assignmentError || assignmentError.message.includes("HTTP 404"));
-  const assignedToMe = assignment?.company_user_id === userId;
+  const assignedToMe = assignment?.user_id === userId;
 
   const info = useMemo(
     () => [

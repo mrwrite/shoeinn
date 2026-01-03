@@ -19,10 +19,14 @@ import { AuthStackParamList } from "../../navigation/AuthStack";
 import { useAuthStore } from "../../state/authStore";
 
 const demoAccounts = [
+  { label: "Global Admin", email: "admin@shoeinn.test", password: "Password1!" },
+  { label: "Clean Kicks Admin", email: "clean-kicks.admin@shoeinn.test", password: "Password1!" },
+  { label: "Clean Kicks Provider", email: "clean-kicks.provider@shoeinn.test", password: "Password1!" },
+  { label: "Fresh Soles Admin", email: "fresh-soles.admin@shoeinn.test", password: "Password1!" },
+  { label: "Fresh Soles Provider", email: "fresh-soles.provider@shoeinn.test", password: "Password1!" },
+  { label: "Sole Spa Admin", email: "sole-spa.admin@shoeinn.test", password: "Password1!" },
+  { label: "Sole Spa Provider", email: "sole-spa.provider@shoeinn.test", password: "Password1!" },
   { label: "Customer", email: "customer@test.com", password: "Password1!" },
-  { label: "Provider 1", email: "c1@test.com", password: "Password1!" },
-  { label: "Provider 2", email: "c2@test.com", password: "Password1!" },
-  { label: "Provider 3", email: "c3@test.com", password: "Password1!" },
 ];
 
 type Props = NativeStackScreenProps<AuthStackParamList, "Login">;

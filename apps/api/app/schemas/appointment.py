@@ -123,7 +123,7 @@ class AppointmentEventRead(BaseModel):
 class AppointmentAssignmentRead(BaseModel):
     id: UUID
     appointment_id: UUID
-    company_user_id: UUID
+    user_id: UUID
     assigned_at: datetime
     unassigned_at: datetime | None = None
     is_active: bool
@@ -142,7 +142,7 @@ class LocationUpdateCreate(BaseModel):
 
 class LocationUpdateRead(BaseModel):
     appointment_id: UUID
-    company_user_id: UUID
+    user_id: UUID
     lat: float
     lng: float
     heading: float | None = None

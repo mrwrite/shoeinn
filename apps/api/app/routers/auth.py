@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response, status
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
@@ -37,18 +38,30 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=LoginResponse)
-def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)):
-    user = db.query(User).filter_by(email=payload.email).first()
-    if not user or not verify_password(payload.password, user.password_hash):
+def login(
+    payload: LoginRequest | None = Body(None),
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    # Accept both JSON payloads and form-encoded requests (e.g., Swagger UI OAuth2 helper)
+    email = payload.email if payload else form_data.username
+    password = payload.password if payload else form_data.password
+
+    user = db.query(User).filter_by(email=email).first()
+    if not user or not verify_password(password, user.password_hash):
         raise HTTPException(status_code=400, detail="Invalid credentials")
-    access_token = create_access_token({"sub": str(user.id), "role": user.role})
+    company_link = db.query(CompanyUser).filter(CompanyUser.user_id == user.id).first()
+    token_payload = {"sub": str(user.id), "role": user.role}
+    if company_link and user.role in {"company", "provider", "company_admin"}:
+        token_payload["company_id"] = str(company_link.company_id)
+    access_token = create_access_token(token_payload)
     refresh_token, _ = create_refresh_token(
         db,
         user_id=user.id,
         user_agent=request.headers.get("user-agent"),
         ip_address=request.client.host if request.client else None,
     )
-    company_link = db.query(CompanyUser).filter(CompanyUser.user_id == user.id).first()
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
@@ -70,7 +83,11 @@ def refresh(payload: RefreshRequest, request: Request, db: Session = Depends(get
         ip_address=request.client.host if request.client else None,
     )
     user = db_token.user
-    access_token = create_access_token({"sub": str(user.id), "role": user.role})
+    company_link = db.query(CompanyUser).filter(CompanyUser.user_id == user.id).first()
+    token_payload = {"sub": str(user.id), "role": user.role}
+    if company_link and user.role in {"company", "provider", "company_admin"}:
+        token_payload["company_id"] = str(company_link.company_id)
+    access_token = create_access_token(token_payload)
     return {
         "access_token": access_token,
         "refresh_token": new_refresh_token,
