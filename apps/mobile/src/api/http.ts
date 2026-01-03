@@ -142,6 +142,10 @@ export function getAppointmentAssignment(id: string): Promise<AppointmentAssignm
   return request<AppointmentAssignment>("GET", `/appointments/${id}/assignment`, undefined, { auth: true });
 }
 
+export function getProviderAppointmentAssignment(id: string): Promise<AppointmentAssignment> {
+  return request<AppointmentAssignment>("GET", `/appointments/${id}/assignment/company`, undefined, { auth: true });
+}
+
 export function claimAppointment(id: string): Promise<AppointmentAssignment> {
   return request<AppointmentAssignment>("POST", `/company/appointments/${id}/claim`, undefined, {
     auth: true,

@@ -4,7 +4,7 @@ import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { claimAppointment, getAppointmentAssignment, updateAppointmentStatus } from "../../api/http";
+import { claimAppointment, getProviderAppointmentAssignment, updateAppointmentStatus } from "../../api/http";
 import { CompanyStackParamList } from "../../navigation/CompanyStack";
 import { useAuthStore } from "../../state/authStore";
 import type { AppointmentStatus } from "../../types/booking";
@@ -32,7 +32,7 @@ export default function ProviderAppointmentDetailScreen({ route }: Props) {
 
   const assignmentQuery = useQuery({
     queryKey: ["appointment", appointment.id, "assignment"],
-    queryFn: () => getAppointmentAssignment(appointment.id),
+    queryFn: () => getProviderAppointmentAssignment(appointment.id),
     retry: false,
   });
 

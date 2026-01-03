@@ -1,12 +1,13 @@
 from datetime import datetime, timezone
 import json
 import secrets
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr, field_validator
 from app.enums import AppointmentStatus
-from sqlalchemy import exists
+from sqlalchemy import exists, and_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -40,6 +41,8 @@ from app.services.notifications import (
 )
 
 router = APIRouter(prefix="/company", tags=["company"])
+
+logger = logging.getLogger(__name__)
 
 TRAVEL_STATUSES = {
     AppointmentStatus.en_route_pickup,
@@ -97,7 +100,17 @@ def provider_login(payload: ProviderLogin, db: Session = Depends(get_db)):
 
 @router.get("/appointments/open")
 def open_appointments(current=Depends(get_current_company_user), db: Session = Depends(get_db)):
-    _, company_id = current
+    user, company_id = current
+    logger.info(f"open_appointments user_id={user.id} email={getattr(user,'email',None)} company_id={company_id}")
+    
+    confirmed_count = (
+        db.query(Appointment.id)
+        .filter(Appointment.company_id == company_id)
+        .filter(Appointment.status == AppointmentStatus.confirmed)
+        .count()
+    )
+    logger.info(f"confirmed_count for company_id={company_id} => {confirmed_count}")
+    
     has_active_assignment = (
         db.query(AppointmentAssignment.id)
         .filter(
@@ -109,9 +122,16 @@ def open_appointments(current=Depends(get_current_company_user), db: Session = D
 
     q = (
         db.query(Appointment)
+        .outerjoin(
+            AppointmentAssignment,
+            and_(
+                AppointmentAssignment.appointment_id == Appointment.id,
+                AppointmentAssignment.is_active.is_(True),
+            ),
+        )
         .filter(Appointment.company_id == company_id)
         .filter(Appointment.status == AppointmentStatus.confirmed)
-        .filter(~has_active_assignment)
+        .filter(AppointmentAssignment.id.is_(None))  # <-- only unassigned
         .order_by(Appointment.start_time.asc())
     )
     items = []
@@ -169,21 +189,22 @@ def claim_appointment(
         raise HTTPException(status_code=400, detail="Appointment already assigned")
 
     assignment = AppointmentAssignment(
-        appointment_id=appointment_id, company_user_id=current_user.id
+        appointment_id=appointment_id, user_id=current_user.id, company_id=company_id, is_active=True
     )
     db.add(assignment)
     try:
         db.commit()
-    except IntegrityError:
+    except IntegrityError as e:
         db.rollback()
-        raise HTTPException(status_code=400, detail="Appointment already assigned")
+        logger.exception("IntegrityError when claiming appointment %s", appointment_id)
+        raise HTTPException(status_code=400, detail=f"IntegrityError: {str(e.orig)}")
     db.refresh(assignment)
 
     return AppointmentAssignmentRead.model_validate(
         {
             "id": assignment.id,
             "appointment_id": assignment.appointment_id,
-            "company_user_id": assignment.company_user_id,
+            "company_user_id": assignment.user_id,
             "assigned_at": assignment.assigned_at,
             "unassigned_at": assignment.unassigned_at,
             "is_active": assignment.is_active,

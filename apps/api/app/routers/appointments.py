@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from asyncio.log import logger
 from datetime import datetime, timedelta, timezone
 from threading import Lock
 from typing import Dict, Tuple
@@ -12,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.db import get_db
-from app.core.security import get_current_customer
+from app.core.security import get_current_customer, get_current_user, get_current_company_user
 from app.models import (
     Appointment,
     AppointmentAssignment,
@@ -166,14 +167,15 @@ def list_my_appointments(
         )
     return items
 
-
-def _ensure_customer_access(appointment: Appointment, current_customer) -> None:
-    if (
-        appointment.customer_email
-        and appointment.customer_email.lower() != current_customer.email.lower()
-    ):
+def _ensure_company_access(appointment: Appointment, company_id) -> None:
+    if appointment.company_id != company_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
+def _ensure_customer_access(appointment: Appointment, current_customer) -> None:
+    if not appointment.customer_email:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    if appointment.customer_email.lower() != current_customer.email.lower():
+        raise HTTPException(status_code=403, detail="Forbidden")
 
 def _provider_display_name(user: User | None) -> str | None:
     if not user or not user.full_name:
@@ -287,19 +289,66 @@ def read_latest_location(
 
 
 @router.get(
+    "/{appointment_id}/assignment/company",
+    response_model=AppointmentAssignmentRead,
+)
+def read_assignment_company(
+    appointment_id: UUID,
+    current=Depends(get_current_company_user),  # returns (user, company_id)
+    db: Session = Depends(get_db),
+) -> AppointmentAssignmentRead:
+    current_user, company_id = current
+
+    appointment = db.get(Appointment, appointment_id)
+    if appointment is None:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+
+    _ensure_company_access(appointment, company_id)
+
+    assignment = (
+        db.query(AppointmentAssignment)
+        .filter(
+            AppointmentAssignment.appointment_id == appointment_id,
+            AppointmentAssignment.is_active.is_(True),
+        )
+        .first()
+    )
+
+    # IMPORTANT: for providers, "no assignment" is normal
+    if assignment is None:
+        raise HTTPException(status_code=404, detail="No provider assigned")
+
+    provider = db.get(User, assignment.user_id)
+    return AppointmentAssignmentRead.model_validate(
+        {
+            "id": assignment.id,
+            "appointment_id": assignment.appointment_id,
+            "company_user_id": assignment.user_id,
+            "assigned_at": assignment.assigned_at,
+            "unassigned_at": assignment.unassigned_at,
+            "is_active": assignment.is_active,
+            "provider_name": _provider_display_name(provider),
+        },
+        from_attributes=True,
+    )
+
+@router.get(
     "/{appointment_id}/assignment",
     response_model=AppointmentAssignmentRead,
 )
 def read_assignment(
     appointment_id: UUID,
-    current_customer=Depends(get_current_customer),
+    current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
-) -> AppointmentAssignmentRead:
+) -> AppointmentAssignmentRead:    
     appointment = db.get(Appointment, appointment_id)
     if appointment is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")       
 
-    _ensure_customer_access(appointment, current_customer)
+    if current_user.role == "customer":
+        _ensure_customer_access(appointment, current_user)
+    else:
+        _ensure_company_access(appointment, current_user, db)   
 
     assignment = (
         db.query(AppointmentAssignment)
@@ -312,12 +361,12 @@ def read_assignment(
     if assignment is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No provider assigned")
 
-    provider = db.get(User, assignment.company_user_id)
+    provider = db.get(User, assignment.user_id)
     return AppointmentAssignmentRead.model_validate(
         {
             "id": assignment.id,
             "appointment_id": assignment.appointment_id,
-            "company_user_id": assignment.company_user_id,
+            "company_user_id": assignment.user_id,
             "assigned_at": assignment.assigned_at,
             "unassigned_at": assignment.unassigned_at,
             "is_active": assignment.is_active,

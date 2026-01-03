@@ -20,6 +20,15 @@ from app.routers import (
     push,
 )
 from app.workers.payment_sync import payment_sync_worker
+import logging
+import sys
+
+logging.basicConfig(
+    level=logging.INFO,
+    stream=sys.stdout,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    force=True,  # <- IMPORTANT: overrides existing handlers/config
+)
 
 app = FastAPI(title="ShoeInn API")
 

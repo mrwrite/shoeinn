@@ -12,7 +12,8 @@ class AppointmentAssignment(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     appointment_id = Column(UUID(as_uuid=True), ForeignKey("appointments.id"), nullable=False)
-    company_user_id = Column(
+    company_id = Column(UUID(as_uuid=True), ForeignKey("companies.id"), nullable=False)
+    user_id = Column(
         UUID(as_uuid=True), ForeignKey("company_users.user_id"), nullable=False
     )
     assigned_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
