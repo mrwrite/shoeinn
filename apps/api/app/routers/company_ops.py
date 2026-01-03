@@ -145,11 +145,50 @@ def open_appointments(current=Depends(get_current_company_user), db: Session = D
                 "id": appt.id,
                 "customer_city": appt.city,
                 "customer_state": appt.state,
+                "customer_name": appt.customer_name,
+                "address_line1": appt.address_line1,
+                "city": appt.city,
+                "state": appt.state,
+                "postal_code": appt.postal_code,
                 "service_name": service_name,
                 "start_time": appt.start_time,
                 "status": appt.status.value,
                 "is_assigned": False,
                 "assigned_to_me": False,
+            }
+        )
+    return items
+
+
+@router.get("/appointments/claimed")
+def claimed_appointments(current=Depends(get_current_company_user), db: Session = Depends(get_db)):
+    current_user, company_id = current
+
+    q = (
+        db.query(Appointment, AppointmentAssignment)
+        .join(AppointmentAssignment, AppointmentAssignment.appointment_id == Appointment.id)
+        .filter(AppointmentAssignment.company_id == company_id)
+        .filter(AppointmentAssignment.user_id == current_user.id)
+        .filter(AppointmentAssignment.is_active.is_(True))
+        .order_by(Appointment.start_time.asc())
+    )
+    items = []
+    for appt, assignment in q.all():
+        service_name = None
+        if appt.service_id:
+            svc = db.get(Service, appt.service_id)
+            service_name = svc.name if svc else None
+        items.append(
+            {
+                "id": appt.id,
+                "customer_city": appt.city,
+                "customer_state": appt.state,
+                "service_name": service_name,
+                "start_time": appt.start_time,
+                "status": appt.status.value,
+                "is_assigned": True,
+                "assigned_to_me": True,
+                "assignment_id": assignment.id,
             }
         )
     return items
@@ -194,17 +233,17 @@ def claim_appointment(
     db.add(assignment)
     try:
         db.commit()
-    except IntegrityError as e:
+    except IntegrityError:
         db.rollback()
         logger.exception("IntegrityError when claiming appointment %s", appointment_id)
-        raise HTTPException(status_code=400, detail=f"IntegrityError: {str(e.orig)}")
+        raise HTTPException(status_code=400, detail="Appointment already assigned")
     db.refresh(assignment)
 
     return AppointmentAssignmentRead.model_validate(
         {
             "id": assignment.id,
             "appointment_id": assignment.appointment_id,
-            "company_user_id": assignment.user_id,
+            "user_id": assignment.user_id,
             "assigned_at": assignment.assigned_at,
             "unassigned_at": assignment.unassigned_at,
             "is_active": assignment.is_active,
@@ -259,7 +298,7 @@ def post_location_update(
         )
         .first()
     )
-    if assignment is None or assignment.company_user_id != current_user.id:
+    if assignment is None or assignment.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not assigned to this appointment")
 
     if appt.status not in TRAVEL_STATUSES:
@@ -267,7 +306,7 @@ def post_location_update(
 
     update = AppointmentLocationUpdate(
         appointment_id=appointment_id,
-        company_user_id=current_user.id,
+        user_id=current_user.id,
         **payload.model_dump(),
     )
     db.add(update)
@@ -275,6 +314,45 @@ def post_location_update(
     db.refresh(update)
 
     return LocationUpdateRead.model_validate(update, from_attributes=True)
+
+
+@router.get("/appointments/all")
+def all_appointments(current=Depends(get_current_company_admin), db: Session = Depends(get_db)):
+    _, company_id = current
+    q = (
+        db.query(Appointment, AppointmentAssignment, User)
+        .outerjoin(
+            AppointmentAssignment,
+            and_(
+                AppointmentAssignment.appointment_id == Appointment.id,
+                AppointmentAssignment.is_active.is_(True),
+            ),
+        )
+        .outerjoin(User, User.id == AppointmentAssignment.user_id)
+        .filter(Appointment.company_id == company_id)
+        .order_by(Appointment.start_time.asc())
+    )
+
+    results = []
+    for appt, assignment, user in q.all():
+        service_name = None
+        if appt.service_id:
+            svc = db.get(Service, appt.service_id)
+            service_name = svc.name if svc else None
+        results.append(
+            {
+                "id": appt.id,
+                "service_name": service_name,
+                "type": appt.type,
+                "start_time": appt.start_time,
+                "status": appt.status.value,
+                "assigned_user_id": assignment.user_id if assignment else None,
+                "assigned_at": assignment.assigned_at if assignment else None,
+                "is_active": assignment.is_active if assignment else False,
+                "assigned_provider_name": user.full_name if user else None,
+            }
+        )
+    return results
 
 
 @router.post("/appointments/{appointment_id}/status")

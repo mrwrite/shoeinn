@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 
-export type UserRole = "customer" | "company" | "provider" | "company_admin" | null;
+export type UserRole = "customer" | "company" | "provider" | "company_admin" | "admin" | null;
 
 interface AuthState {
     token: string | null;
