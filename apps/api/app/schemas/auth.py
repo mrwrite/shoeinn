@@ -1,17 +1,17 @@
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, constr
+from pydantic import BaseModel, constr
 
 
 class RegisterRequest(BaseModel):
-    email: EmailStr
+    email: str
     password: str
     full_name: constr(min_length=1)
     role: str
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    email: str
     password: str
 
 
@@ -26,7 +26,7 @@ class LoginResponse(TokenPair):
     user_id: UUID
     company_id: UUID | None = None
     full_name: str
-    email: EmailStr
+    email: str
 
 
 class RefreshRequest(BaseModel):

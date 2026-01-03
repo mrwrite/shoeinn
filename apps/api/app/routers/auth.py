@@ -39,22 +39,23 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=LoginResponse)
 def login(
-    payload: LoginRequest | None = Body(None),
-    form_data: OAuth2PasswordRequestForm = Depends(),
+    payload: LoginRequest,
     request: Request,
     db: Session = Depends(get_db),
 ):
-    # Accept both JSON payloads and form-encoded requests (e.g., Swagger UI OAuth2 helper)
-    email = payload.email if payload else form_data.username
-    password = payload.password if payload else form_data.password
+    email = payload.email
+    password = payload.password
 
     user = db.query(User).filter_by(email=email).first()
     if not user or not verify_password(password, user.password_hash):
         raise HTTPException(status_code=400, detail="Invalid credentials")
+
     company_link = db.query(CompanyUser).filter(CompanyUser.user_id == user.id).first()
+
     token_payload = {"sub": str(user.id), "role": user.role}
     if company_link and user.role in {"company", "provider", "company_admin"}:
         token_payload["company_id"] = str(company_link.company_id)
+
     access_token = create_access_token(token_payload)
     refresh_token, _ = create_refresh_token(
         db,
@@ -62,6 +63,7 @@ def login(
         user_agent=request.headers.get("user-agent"),
         ip_address=request.client.host if request.client else None,
     )
+
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,

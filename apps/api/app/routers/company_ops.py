@@ -7,7 +7,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr, field_validator
 from app.enums import AppointmentStatus
-from sqlalchemy import exists, and_
+from sqlalchemy import exists, and_, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -101,8 +101,56 @@ def provider_login(payload: ProviderLogin, db: Session = Depends(get_db)):
 @router.get("/appointments/open")
 def open_appointments(current=Depends(get_current_company_user), db: Session = Depends(get_db)):
     user, company_id = current
-    logger.info(f"open_appointments user_id={user.id} email={getattr(user,'email',None)} company_id={company_id}")
-    
+    logger.info(
+        f"open_appointments user_id={user.id} email={getattr(user,'email',None)} "
+        f"role={getattr(user,'role',None)} company_id={company_id}"
+    )
+
+    # Company Admin: return ALL appointments for this company (any status)
+    if user.role == "company_admin":
+        # Join active assignment (if any) and assigned user (provider name)
+        rows = (
+            db.query(Appointment, AppointmentAssignment, User)
+            .outerjoin(
+                AppointmentAssignment,
+                and_(
+                    AppointmentAssignment.appointment_id == Appointment.id,
+                    AppointmentAssignment.is_active.is_(True),
+                ),
+            )
+            .outerjoin(User, User.id == AppointmentAssignment.user_id)
+            .filter(Appointment.company_id == company_id)
+            .order_by(Appointment.start_time.asc())
+            .all()
+        )
+
+        items = []
+        for appt, assignment, assigned_user in rows:
+            svc = db.get(Service, appt.service_id) if appt.service_id else None
+            items.append(
+                {
+                    "id": appt.id,
+                    "customer_city": appt.city,
+                    "customer_state": appt.state,
+                    "customer_name": appt.customer_name,
+                    "address_line1": appt.address_line1,
+                    "city": appt.city,
+                    "state": appt.state,
+                    "postal_code": appt.postal_code,
+                    "service_name": svc.name if svc else None,
+                    "start_time": appt.start_time,
+                    "status": appt.status.value,
+                    # assignment info
+                    "is_assigned": bool(assignment),
+                    "assigned_to_me": bool(assignment and assignment.user_id == user.id),
+                    "assigned_user_id": assignment.user_id if assignment else None,
+                    "assigned_at": assignment.assigned_at if assignment else None,
+                    "provider_name": assigned_user.full_name if assigned_user else None,
+                }
+            )
+        return items
+
+    # Non-admin behavior: return OPEN appointments only (confirmed + unassigned)
     confirmed_count = (
         db.query(Appointment.id)
         .filter(Appointment.company_id == company_id)
@@ -110,15 +158,6 @@ def open_appointments(current=Depends(get_current_company_user), db: Session = D
         .count()
     )
     logger.info(f"confirmed_count for company_id={company_id} => {confirmed_count}")
-    
-    has_active_assignment = (
-        db.query(AppointmentAssignment.id)
-        .filter(
-            AppointmentAssignment.appointment_id == Appointment.id,
-            AppointmentAssignment.is_active.is_(True),
-        )
-        .exists()
-    )
 
     q = (
         db.query(Appointment)
@@ -131,15 +170,13 @@ def open_appointments(current=Depends(get_current_company_user), db: Session = D
         )
         .filter(Appointment.company_id == company_id)
         .filter(Appointment.status == AppointmentStatus.confirmed)
-        .filter(AppointmentAssignment.id.is_(None))  # <-- only unassigned
+        .filter(AppointmentAssignment.id.is_(None))  # only unassigned
         .order_by(Appointment.start_time.asc())
     )
+
     items = []
     for appt in q.all():
-        service_name = None
-        if appt.service_id:
-            svc = db.get(Service, appt.service_id)
-            service_name = svc.name if svc else None
+        svc = db.get(Service, appt.service_id) if appt.service_id else None
         items.append(
             {
                 "id": appt.id,
@@ -150,7 +187,7 @@ def open_appointments(current=Depends(get_current_company_user), db: Session = D
                 "city": appt.city,
                 "state": appt.state,
                 "postal_code": appt.postal_code,
-                "service_name": service_name,
+                "service_name": svc.name if svc else None,
                 "start_time": appt.start_time,
                 "status": appt.status.value,
                 "is_assigned": False,

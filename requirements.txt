@@ -11,3 +11,4 @@ asgi-lifespan
 pytest
 pytest-asyncio
 stripe
+python-multipart
