@@ -25,7 +25,7 @@ export default function AuthGate() {
 
   return (
     <NavigationContainer>
-      {!token || !role ? <AuthStack /> : <AppStack role={role} />}
+      {!token || !role ? <AuthStack /> : <AppStack />}
     </NavigationContainer>
   );
 }

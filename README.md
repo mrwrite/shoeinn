@@ -293,3 +293,9 @@ $env:EXPO_PUBLIC_API_URL="http://192.168.1.131:8000"; npm start -- --tunnel
 ## 📄 License
 
 MIT
+
+## UI Redesign (Peacock Theme)
+- Location: `apps/mobile`
+- Run: `cd apps/mobile && npm install && npm start`
+- Screens included: Customer Home, Service Detail, Booking Date/Time/Confirm, Provider Dashboard, Provider Appointment Detail.
+- Design system: Peacock color palette, reusable components (headers, search, chips, cards, buttons) with safe area support and sticky CTAs.
