@@ -70,26 +70,52 @@ def get_current_customer(current_user=Depends(get_current_user)):
 
 
 def get_current_company_user(
-    db: Session = Depends(get_db), current_user=Depends(get_current_user)
+    db: Session = Depends(get_db), token: str = Depends(oauth2_scheme), current_user=Depends(get_current_user)
 ):
     if current_user.role not in {"company", "provider", "company_admin"}:
         raise HTTPException(status_code=403, detail="Forbidden")
     from app.models.company_user import CompanyUser
 
-    cu = db.query(CompanyUser).filter_by(user_id=current_user.id).first()
+    payload = decode_token(token)
+    company_id = payload.get("company_id")
+    cu = None
+    if company_id:
+        try:
+            cu = (
+                db.query(CompanyUser)
+                .filter(CompanyUser.user_id == current_user.id, CompanyUser.company_id == UUID(company_id))
+                .first()
+            )
+        except ValueError:
+            cu = None
+    if cu is None:
+        cu = db.query(CompanyUser).filter_by(user_id=current_user.id).first()
     if not cu:
         raise HTTPException(status_code=403, detail="No company")
     return current_user, cu.company_id
 
 
 def get_current_company_admin(
-    db: Session = Depends(get_db), current_user=Depends(get_current_user)
+    db: Session = Depends(get_db), token: str = Depends(oauth2_scheme), current_user=Depends(get_current_user)
 ):
     if current_user.role != "company_admin":
         raise HTTPException(status_code=403, detail="Forbidden")
     from app.models.company_user import CompanyUser
 
-    cu = db.query(CompanyUser).filter_by(user_id=current_user.id).first()
+    payload = decode_token(token)
+    company_id = payload.get("company_id")
+    cu = None
+    if company_id:
+        try:
+            cu = (
+                db.query(CompanyUser)
+                .filter(CompanyUser.user_id == current_user.id, CompanyUser.company_id == UUID(company_id))
+                .first()
+            )
+        except ValueError:
+            cu = None
+    if cu is None:
+        cu = db.query(CompanyUser).filter_by(user_id=current_user.id).first()
     if not cu:
         raise HTTPException(status_code=403, detail="No company")
     return current_user, cu.company_id

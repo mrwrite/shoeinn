@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.core.security import hash_password
+from app.enums import AppointmentStatus
+from app.models.appointment import Appointment
 from app.models.available_slot import AvailableSlot
 from app.models.company import Company
 from app.models.company_user import CompanyUser
@@ -134,14 +136,25 @@ def seed(db: Session = Depends(get_db)):
         created["users"] += 1
         return u
 
+    global_admin = get_or_create_user(
+        "admin@shoeinn.test", "admin", full_name="ShoeInn Global Admin"
+    )
     admin = get_or_create_user(
-        "admin@cleankicks.test", "company_admin", full_name="Clean Kicks Admin"
+        "clean-kicks.admin@shoeinn.test", "company_admin", full_name="Clean Kicks Admin"
     )
     provider = get_or_create_user(
-        "provider@cleankicks.test", "provider", full_name="Clean Kicks Provider"
+        "clean-kicks.provider@shoeinn.test", "provider", full_name="Clean Kicks Provider"
     )
-    u2 = get_or_create_user("c2@test.com", "company_admin", full_name="Fresh Soles Admin")
-    u3 = get_or_create_user("c3@test.com", "company_admin", full_name="Sole Spa Admin")
+    u2 = get_or_create_user(
+        "fresh-soles.admin@shoeinn.test", "company_admin", full_name="Fresh Soles Admin"
+    )
+    u2_provider = get_or_create_user(
+        "fresh-soles.provider@shoeinn.test", "provider", full_name="Fresh Soles Provider"
+    )
+    u3 = get_or_create_user("sole-spa.admin@shoeinn.test", "company_admin", full_name="Sole Spa Admin")
+    u3_provider = get_or_create_user(
+        "sole-spa.provider@shoeinn.test", "provider", full_name="Sole Spa Provider"
+    )
     customer = get_or_create_user("customer@test.com", "customer", full_name="Demo Customer")
 
 
@@ -160,7 +173,32 @@ def seed(db: Session = Depends(get_db)):
     ensure_company_user(admin.id, c1.id)
     ensure_company_user(provider.id, c1.id)
     ensure_company_user(u2.id, c2.id)
+    ensure_company_user(u2_provider.id, c2.id)
     ensure_company_user(u3.id, c3.id)
+    ensure_company_user(u3_provider.id, c3.id)
+
+    # ---- Appointments ----
+    def create_demo_appointment(company: Company, service: Service, days_out: int, status: AppointmentStatus):
+        start_time = datetime.now(timezone.utc) + timedelta(days=days_out)
+        appt = Appointment(
+            company_id=company.id,
+            service_id=service.id,
+            customer_name="Demo Customer",
+            customer_phone="555-1234",
+            customer_email="customer@test.com",
+            start_time=start_time,
+            confirmed_time=start_time - timedelta(hours=1),
+            status=status,
+            type="pickup",
+        )
+        db.add(appt)
+        created.setdefault("appointments", 0)
+        created["appointments"] = created["appointments"] + 1
+
+    create_demo_appointment(c1, s1, 1, AppointmentStatus.confirmed)
+    create_demo_appointment(c1, s2, -2, AppointmentStatus.completed)
+    create_demo_appointment(c2, s3, 1, AppointmentStatus.confirmed)
+    create_demo_appointment(c3, s5, 2, AppointmentStatus.confirmed)
 
     db.commit()
 
@@ -170,11 +208,26 @@ def seed(db: Session = Depends(get_db)):
         "status": status,
         "created": created,
         "demo_logins": {
+            "global_admin": {"email": "admin@shoeinn.test", "password": "Password1!", "role": "admin"},
             "companies": [
-                {"email": "admin@cleankicks.test", "password": "Password1!", "company": "Clean Kicks", "role": "company_admin"},
-                {"email": "provider@cleankicks.test", "password": "Password1!", "company": "Clean Kicks", "role": "provider"},
-                {"email": "c2@test.com", "password": "Password1!", "company": "Fresh Soles", "role": "company_admin"},
-                {"email": "c3@test.com", "password": "Password1!", "company": "Sole Spa", "role": "company_admin"},
+                {
+                    "company": "Clean Kicks",
+                    "company_id": str(c1.id),
+                    "admin": {"email": "clean-kicks.admin@shoeinn.test", "password": "Password1!"},
+                    "provider": {"email": "clean-kicks.provider@shoeinn.test", "password": "Password1!"},
+                },
+                {
+                    "company": "Fresh Soles",
+                    "company_id": str(c2.id),
+                    "admin": {"email": "fresh-soles.admin@shoeinn.test", "password": "Password1!"},
+                    "provider": {"email": "fresh-soles.provider@shoeinn.test", "password": "Password1!"},
+                },
+                {
+                    "company": "Sole Spa",
+                    "company_id": str(c3.id),
+                    "admin": {"email": "sole-spa.admin@shoeinn.test", "password": "Password1!"},
+                    "provider": {"email": "sole-spa.provider@shoeinn.test", "password": "Password1!"},
+                },
             ],
             "customer": {"email": "customer@test.com", "password": "Password1!"},
         },
