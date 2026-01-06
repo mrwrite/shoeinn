@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Alert, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { Alert, StyleSheet, TextInput, View } from "react-native";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useMutation } from "@tanstack/react-query";
 
 import { confirmAppointment, createHold } from "../../api/http";
+import { ScreenContainer } from "../../components/ScreenContainer";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { Text } from "../../components/ui/Text";
@@ -72,8 +73,21 @@ export default function BookingConfirmScreen() {
   const disabled = !name || !phone || confirmMutation.isPending || !holdId;
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.surfaceLight }}>
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 120, gap: 12 }}>
+    <ScreenContainer
+      scrollable
+      stickyFooter={
+        <View style={styles.footerContent}>
+          <Button
+            label={confirmMutation.isPending ? "Confirming..." : "Confirm appointment"}
+            onPress={() => confirmMutation.mutate()}
+            disabled={disabled}
+            loading={confirmMutation.isPending}
+            style={{ flex: 1 }}
+          />
+        </View>
+      }
+    >
+      <View style={styles.content}>
         <Text variant="title" weight="bold">
           Review & confirm
         </Text>
@@ -143,28 +157,21 @@ export default function BookingConfirmScreen() {
             Payment is processed after confirmation.
           </Text>
         </Card>
-      </ScrollView>
-      <View style={styles.footer}>
-        <Button
-          label={confirmMutation.isPending ? "Confirming..." : "Confirm appointment"}
-          onPress={() => confirmMutation.mutate()}
-          disabled={disabled}
-          loading={confirmMutation.isPending}
-          style={{ flex: 1 }}
-        />
       </View>
-    </View>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  footer: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
+  content: {
     padding: 16,
+    paddingBottom: 140,
+    gap: 12,
+  },
+  footerContent: {
     backgroundColor: "#F8F9FA",
+    padding: 8,
+    borderRadius: 16,
   },
   row: {
     flexDirection: "row",
@@ -179,4 +186,3 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
 });
-

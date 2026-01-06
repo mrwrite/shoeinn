@@ -1,12 +1,16 @@
 import React, { useMemo } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
-import { RouteProp, useRoute } from "@react-navigation/native";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useQuery } from "@tanstack/react-query";
 
 import { getAppointment, getAppointmentAssignment, getAppointmentEvents } from "../../api/http";
+import { ScreenContainer } from "../../components/ScreenContainer";
 import { Card } from "../../components/ui/Card";
+import { Button } from "../../components/ui/Button";
 import { Text } from "../../components/ui/Text";
 import type { AppointmentStackParamList } from "../../navigation/RootTabs";
+import { useAuthStore } from "../../state/authStore";
 import { useTheme } from "../../theme/theme";
 
 const statusPalette: Record<string, string> = {
@@ -22,24 +26,30 @@ const statusPalette: Record<string, string> = {
 
 export default function AppointmentDetailScreen() {
   const theme = useTheme();
+  const navigation = useNavigation<NativeStackNavigationProp<AppointmentStackParamList>>();
   const route = useRoute<RouteProp<AppointmentStackParamList, "AppointmentDetail">>();
   const { appointmentId, summary } = route.params;
+  const role = useAuthStore((s) => s.role);
+  const isCustomer = role === "customer";
 
   const appointmentQuery = useQuery({
     queryKey: ["appointment", appointmentId],
     queryFn: () => getAppointment(appointmentId),
     initialData: summary as any,
+    enabled: isCustomer,
   });
 
   const eventsQuery = useQuery({
     queryKey: ["appointment", appointmentId, "events"],
     queryFn: () => getAppointmentEvents(appointmentId),
+    enabled: isCustomer,
   });
 
   const assignmentQuery = useQuery({
     queryKey: ["appointment", appointmentId, "assignment"],
     queryFn: () => getAppointmentAssignment(appointmentId),
     retry: false,
+    enabled: isCustomer,
   });
 
   const appointment = appointmentQuery.data;
@@ -50,18 +60,36 @@ export default function AppointmentDetailScreen() {
     }));
   }, [eventsQuery.data]);
 
+  if (!isCustomer) {
+    return (
+      <ScreenContainer contentContainerStyle={styles.center}>
+        <Text variant="title" weight="bold">
+          Appointments unavailable
+        </Text>
+        <Text color={theme.colors.mutedText} style={{ marginTop: 6, textAlign: "center" }}>
+          Appointments are only available for customers.
+        </Text>
+        <Button
+          label="Go home"
+          onPress={() => navigation.getParent()?.navigate("HomeTab")}
+          style={{ marginTop: 12 }}
+        />
+      </ScreenContainer>
+    );
+  }
+
   if (appointmentQuery.isLoading || !appointment) {
     return (
-      <View style={styles.center}>
+      <ScreenContainer contentContainerStyle={styles.center}>
         <ActivityIndicator color={theme.colors.peacockPrimary} />
-      </View>
+      </ScreenContainer>
     );
   }
 
   const statusColor = statusPalette[appointment.status] ?? theme.colors.mutedText;
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: theme.colors.surfaceLight }} contentContainerStyle={{ padding: 16, gap: 12 }}>
+    <ScreenContainer scrollable contentContainerStyle={{ padding: 16, gap: 12 }}>
       <Text variant="title" weight="bold">
         {appointment.service_name ?? "Appointment"}
       </Text>
@@ -121,7 +149,7 @@ export default function AppointmentDetailScreen() {
           </View>
         )}
       </Card>
-    </ScrollView>
+    </ScreenContainer>
   );
 }
 

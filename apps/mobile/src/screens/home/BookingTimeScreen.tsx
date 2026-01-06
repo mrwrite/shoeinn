@@ -5,6 +5,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useQuery } from "@tanstack/react-query";
 
 import { getAvailability } from "../../api/http";
+import { ScreenContainer } from "../../components/ScreenContainer";
 import { Button } from "../../components/ui/Button";
 import { Text } from "../../components/ui/Text";
 import type { HomeStackParamList } from "../../navigation/RootTabs";
@@ -36,13 +37,24 @@ export default function BookingTimeScreen() {
   const displaySlots = slots.length > 0 ? slots : fallbackSlots;
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.surfaceLight }}>
+    <ScreenContainer
+      stickyFooter={
+        <View style={styles.footerContent}>
+          <Button
+            label="Review"
+            disabled={!selected}
+            onPress={() => selected && navigation.navigate("BookingConfirm", { service, date, time: selected })}
+            style={{ flex: 1 }}
+          />
+        </View>
+      }
+    >
       <FlatList
         data={displaySlots}
         keyExtractor={(item) => item}
         numColumns={2}
         columnWrapperStyle={{ paddingHorizontal: 16, justifyContent: "space-between" }}
-        contentContainerStyle={{ paddingVertical: 20, paddingBottom: 120, gap: 12 }}
+        contentContainerStyle={{ paddingVertical: 20, paddingBottom: 140, gap: 12 }}
         ListHeaderComponent={
           <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
             <Text variant="title" weight="bold">
@@ -79,17 +91,7 @@ export default function BookingTimeScreen() {
           </View>
         ) : null}
       />
-      <View style={styles.footer}>
-        <Button
-          label="Review"
-          disabled={!selected}
-          onPress={() =>
-            selected && navigation.navigate("BookingConfirm", { service, date, time: selected })
-          }
-          style={{ flex: 1 }}
-        />
-      </View>
-    </View>
+    </ScreenContainer>
   );
 }
 
@@ -103,13 +105,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     alignItems: "center",
   },
-  footer: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 16,
+  footerContent: {
     backgroundColor: "#F8F9FA",
+    padding: 8,
+    borderRadius: 16,
   },
 });
-

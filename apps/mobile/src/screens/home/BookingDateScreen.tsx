@@ -3,6 +3,7 @@ import { FlatList, Pressable, StyleSheet, View } from "react-native";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
+import { ScreenContainer } from "../../components/ScreenContainer";
 import { Button } from "../../components/ui/Button";
 import { Text } from "../../components/ui/Text";
 import type { HomeStackParamList } from "../../navigation/RootTabs";
@@ -27,13 +28,24 @@ export default function BookingDateScreen() {
   const dates = useMemo(() => generateDates(14), []);
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.surfaceLight }}>
+    <ScreenContainer
+      stickyFooter={
+        <View style={styles.footerContent}>
+          <Button
+            label="Continue"
+            disabled={!selected}
+            onPress={() => selected && navigation.navigate("BookingTime", { service, date: selected })}
+            style={{ flex: 1 }}
+          />
+        </View>
+      }
+    >
       <FlatList
         data={dates}
         keyExtractor={(item) => item.toISOString()}
         numColumns={2}
         columnWrapperStyle={{ paddingHorizontal: 16, justifyContent: "space-between" }}
-        contentContainerStyle={{ paddingVertical: 20, paddingBottom: 120, gap: 12 }}
+        contentContainerStyle={{ paddingVertical: 20, paddingBottom: 140, gap: 12 }}
         ListHeaderComponent={
           <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
             <Text variant="title" weight="bold">
@@ -62,17 +74,7 @@ export default function BookingDateScreen() {
           );
         }}
       />
-      <View style={styles.footer}>
-        <Button
-          label="Continue"
-          disabled={!selected}
-          onPress={() =>
-            selected && navigation.navigate("BookingTime", { service, date: selected })
-          }
-          style={{ flex: 1 }}
-        />
-      </View>
-    </View>
+    </ScreenContainer>
   );
 }
 
@@ -86,13 +88,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     gap: 4,
   },
-  footer: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 16,
+  footerContent: {
     backgroundColor: "#F8F9FA",
+    padding: 8,
+    borderRadius: 16,
   },
 });
-

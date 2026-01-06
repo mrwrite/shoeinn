@@ -6,18 +6,23 @@ import { useQuery } from "@tanstack/react-query";
 
 import { getMyAppointments } from "../../api/http";
 import { AppointmentCard } from "../../components/AppointmentCard";
+import { ScreenContainer } from "../../components/ScreenContainer";
 import { Button } from "../../components/ui/Button";
 import { Text } from "../../components/ui/Text";
 import type { AppointmentStackParamList } from "../../navigation/RootTabs";
+import { useAuthStore } from "../../state/authStore";
 import { useTheme } from "../../theme/theme";
 import type { AppointmentSummary } from "../../types/booking";
 
 export default function AppointmentListScreen() {
   const theme = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<AppointmentStackParamList>>();
+  const role = useAuthStore((s) => s.role);
+  const isCustomer = role === "customer";
   const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ["appointments", "mine"],
     queryFn: getMyAppointments,
+    enabled: isCustomer,
   });
 
   const renderItem = ({ item }: { item: AppointmentSummary }) => (
@@ -27,8 +32,22 @@ export default function AppointmentListScreen() {
     />
   );
 
+  if (!isCustomer) {
+    return (
+      <ScreenContainer contentContainerStyle={styles.center}>
+        <Text variant="title" weight="bold">
+          Appointments unavailable
+        </Text>
+        <Text color={theme.colors.mutedText} style={{ marginTop: 6, textAlign: "center" }}>
+          Appointments are only available for customers.
+        </Text>
+        <Button label="Go home" onPress={() => navigation.getParent()?.navigate("HomeTab")} style={{ marginTop: 12 }} />
+      </ScreenContainer>
+    );
+  }
+
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.surfaceLight }}>
+    <ScreenContainer>
       <View style={styles.header}>
         <Text variant="title" weight="bold">
           Appointments
@@ -38,7 +57,7 @@ export default function AppointmentListScreen() {
         </Text>
       </View>
       {isLoading ? (
-        <View style={styles.center}> 
+        <View style={styles.center}>
           <ActivityIndicator color={theme.colors.peacockPrimary} />
         </View>
       ) : isError ? (
@@ -65,7 +84,7 @@ export default function AppointmentListScreen() {
           }
         />
       )}
-    </View>
+    </ScreenContainer>
   );
 }
 
@@ -75,6 +94,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   center: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 40,
