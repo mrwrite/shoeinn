@@ -367,7 +367,7 @@ def read_assignment(
         {
             "id": assignment.id,
             "appointment_id": assignment.appointment_id,
-            "company_user_id": assignment.user_id,
+            "user_id": assignment.user_id,
             "assigned_at": assignment.assigned_at,
             "unassigned_at": assignment.unassigned_at,
             "is_active": assignment.is_active,
