@@ -2,6 +2,7 @@ import React from "react";
 import { StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
+import { ScreenContainer } from "../../components/ScreenContainer";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { Text } from "../../components/ui/Text";
@@ -13,12 +14,12 @@ export default function ProfileScreen() {
   const { fullName, email, role, logout } = useAuthStore();
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.surfaceLight, padding: 16, gap: 12 }}>
+    <ScreenContainer contentContainerStyle={{ padding: 16, gap: 12 }}>
       <Text variant="title" weight="bold">
         Profile
       </Text>
       <Card style={styles.row}>
-        <View style={styles.avatar}> 
+        <View style={styles.avatar}>
           <Ionicons name="person" size={22} color={theme.colors.surfaceLight} />
         </View>
         <View style={{ flex: 1 }}>
@@ -38,7 +39,7 @@ export default function ProfileScreen() {
         </Text>
       </Card>
       <Button label="Logout" variant="secondary" onPress={logout} />
-    </View>
+    </ScreenContainer>
   );
 }
 

@@ -10,6 +10,7 @@ import BookingConfirmScreen from "../screens/home/BookingConfirmScreen";
 import BookingDateScreen from "../screens/home/BookingDateScreen";
 import BookingTimeScreen from "../screens/home/BookingTimeScreen";
 import HomeScreen from "../screens/home/HomeScreen";
+import ProviderMenuScreen from "../screens/home/ProviderMenuScreen";
 import ServiceDetailScreen from "../screens/home/ServiceDetailScreen";
 import ProfileScreen from "../screens/profile/ProfileScreen";
 import ProviderAppointmentDetailScreen from "../screens/provider/ProviderAppointmentDetailScreen";
@@ -18,9 +19,11 @@ import { useAuthStore } from "../state/authStore";
 import { useTheme } from "../theme/theme";
 import type { AppointmentSummary, Service } from "../types/booking";
 import type { ProviderAppointment } from "../types/company";
+import type { Company } from "../types/company";
 
 export type HomeStackParamList = {
   Home: undefined;
+  ProviderMenu: { company: Company };
   ServiceDetail: { service: Service };
   BookingDate: { service: Service };
   BookingTime: { service: Service; date: string };
@@ -58,6 +61,7 @@ function HomeNavigator() {
   return (
     <HomeStack.Navigator screenOptions={{ headerShown: false }}>
       <HomeStack.Screen name="Home" component={HomeScreen} />
+      <HomeStack.Screen name="ProviderMenu" component={ProviderMenuScreen} />
       <HomeStack.Screen name="ServiceDetail" component={ServiceDetailScreen} />
       <HomeStack.Screen name="BookingDate" component={BookingDateScreen} />
       <HomeStack.Screen name="BookingTime" component={BookingTimeScreen} />
@@ -128,11 +132,13 @@ export default function RootTabs() {
       })}
     >
       <Tab.Screen name="HomeTab" component={HomeNavigator} options={{ title: "Home" }} />
-      <Tab.Screen
-        name="AppointmentsTab"
-        component={AppointmentNavigator}
-        options={{ title: "Appointments" }}
-      />
+      {role === "customer" ? (
+        <Tab.Screen
+          name="AppointmentsTab"
+          component={AppointmentNavigator}
+          options={{ title: "Appointments" }}
+        />
+      ) : null}
       {showProviderTab ? (
         <Tab.Screen name="ProviderTab" component={ProviderNavigator} options={{ title: "Jobs" }} />
       ) : null}

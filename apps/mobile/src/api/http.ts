@@ -92,8 +92,23 @@ export function listServices(companyId?: string): Promise<Service[]> {
   return request<Service[]>("GET", `/services${search}`);
 }
 
-export function listCompanies(): Promise<Company[]> {
-  return request<Company[]>("GET", "/companies");
+interface ListCompaniesParams {
+  query?: string;
+  city?: string | null;
+  state?: string | null;
+}
+
+export function listCompanies(params: ListCompaniesParams = {}): Promise<Company[]> {
+  const search = new URLSearchParams();
+
+  if (params.query) search.set("query", params.query);
+  if (params.city) search.set("city", params.city);
+  if (params.state) search.set("state", params.state);
+
+  const suffix = search.toString();
+  const path = suffix ? `/companies?${suffix}` : "/companies";
+
+  return request<Company[]>("GET", path);
 }
 
 export function getJson<T>(path: string): Promise<T> {

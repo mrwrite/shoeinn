@@ -1,55 +1,50 @@
 import React, { useMemo, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useQuery } from "@tanstack/react-query";
 
-import { listServices } from "../../api/http";
-import { ServiceCard } from "../../components/ServiceCard";
-import { CategoryChip } from "../../components/ui/CategoryChip";
+import { listCompanies } from "../../api/http";
+import { ProviderCard } from "../../components/ProviderCard";
+import { ScreenContainer } from "../../components/ScreenContainer";
 import { SearchBar } from "../../components/ui/SearchBar";
 import { Text } from "../../components/ui/Text";
+import { useCityState } from "../../hooks/useCityState";
 import type { HomeStackParamList } from "../../navigation/RootTabs";
 import { useTheme } from "../../theme/theme";
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import type { Service } from "../../types/booking";
+import type { Company } from "../../types/company";
 
 export default function HomeScreen() {
   const theme = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<HomeStackParamList>>();
   const [search, setSearch] = useState("");
-  const [category, setCategory] = useState<string | null>(null);
-  const { data, isLoading, isError } = useQuery<Service[]>({
-    queryKey: ["services"],
-    queryFn: () => listServices(),
+  const { city, state, loading: locationLoading } = useCityState();
+
+  const companiesQuery = useQuery<Company[]>({
+    queryKey: ["companies", city, state, search],
+    queryFn: () => listCompanies({ city, state, query: search || undefined }),
   });
 
-  const services = data ?? [];
-  const categories = useMemo(() => {
-    const unique = new Set<string>();
-    services.forEach((svc) => {
-      const label = svc.slug?.split("-")[0] ?? svc.name.split(" ")[0];
-      unique.add(label);
-    });
-    return Array.from(unique);
-  }, [services]);
-
+  const companies = companiesQuery.data ?? [];
   const filtered = useMemo(() => {
-    return services.filter((svc) => {
-      const matchesSearch = svc.name.toLowerCase().includes(search.toLowerCase());
-      const matchesCategory = category ? svc.slug?.includes(category) || svc.name.includes(category) : true;
-      return matchesSearch && matchesCategory;
-    });
-  }, [services, search, category]);
+    if (!search) return companies;
+    const term = search.toLowerCase();
+    return companies.filter((company) =>
+      [company.name, company.city ?? "", company.state ?? ""].some((field) =>
+        field.toLowerCase().includes(term),
+      ),
+    );
+  }, [companies, search]);
 
-  const locationLabel = services[0]?.company_id ? "Local provider" : "Your city";
+  const locationLabel = city || state ? [city, state].filter(Boolean).join(", ") : "Nearby";
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: theme.colors.surfaceLight }} contentContainerStyle={styles.container}>
+    <ScreenContainer scrollable contentContainerStyle={styles.container}>
       <View style={styles.headerRow}>
         <View>
           <Text variant="caption" weight="semibold" color={theme.colors.mutedText}>
-            {locationLabel}
+            {locationLoading ? "Locating..." : locationLabel}
           </Text>
           <Text variant="title" weight="bold" style={{ marginTop: 6 }}>
             Book care on demand
@@ -63,49 +58,40 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      <SearchBar value={search} onChangeText={setSearch} />
+      <SearchBar value={search} onChangeText={setSearch} placeholder="Search providers" />
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categories}>
-        <CategoryChip label="All" selected={!category} onPress={() => setCategory(null)} />
-        {categories.map((cat) => (
-          <CategoryChip key={cat} label={cat} selected={category === cat} onPress={() => setCategory(cat)} />
-        ))}
-      </ScrollView>
-
-      {isLoading ? (
-        <View style={styles.center}> 
+      {companiesQuery.isLoading ? (
+        <View style={styles.center}>
           <ActivityIndicator color={theme.colors.peacockPrimary} />
         </View>
-      ) : isError ? (
+      ) : companiesQuery.isError ? (
         <View style={styles.center}>
           <Text color={theme.colors.danger} weight="semibold">
-            Unable to load services
+            Unable to load providers
           </Text>
           <Text color={theme.colors.mutedText} style={{ marginTop: 6 }}>
             Check your connection and try again.
           </Text>
-          <View style={{ height: 12 }} />
         </View>
       ) : filtered.length === 0 ? (
         <View style={styles.empty}>
-          <Text weight="semibold">No services found</Text>
+          <Text weight="semibold">No providers found</Text>
           <Text color={theme.colors.mutedText} style={{ marginTop: 4 }}>
             Adjust filters or try a new search.
           </Text>
         </View>
       ) : (
-        filtered.map((svc) => (
-          <ServiceCard
-            key={svc.id}
-            service={svc}
-            onPress={(service) => navigation.navigate("ServiceDetail", { service })}
-            onBook={(service) => navigation.navigate("BookingDate", { service })}
+        filtered.map((company) => (
+          <ProviderCard
+            key={company.id}
+            company={company}
+            onPress={(selected) => navigation.navigate("ProviderMenu", { company: selected })}
           />
         ))
       )}
 
       <View style={{ height: 36 }} />
-    </ScrollView>
+    </ScreenContainer>
   );
 }
 
@@ -128,9 +114,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-  },
-  categories: {
-    marginVertical: 4,
   },
   center: {
     alignItems: "center",

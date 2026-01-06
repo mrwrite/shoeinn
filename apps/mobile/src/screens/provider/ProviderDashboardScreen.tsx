@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { claimAppointment, fetchOpenAppointments } from "../../api/http";
 import { AppointmentCard } from "../../components/AppointmentCard";
+import { ScreenContainer } from "../../components/ScreenContainer";
 import { Button } from "../../components/ui/Button";
 import { Text } from "../../components/ui/Text";
 import type { ProviderStackParamList } from "../../navigation/RootTabs";
@@ -53,7 +54,7 @@ export default function ProviderDashboardScreen() {
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.surfaceLight }}>
+    <ScreenContainer>
       <View style={styles.header}>
         <Text variant="title" weight="bold">
           Available jobs
@@ -63,7 +64,7 @@ export default function ProviderDashboardScreen() {
         </Text>
       </View>
       {appointmentsQuery.isLoading ? (
-        <View style={styles.center}> 
+        <View style={styles.center}>
           <ActivityIndicator color={theme.colors.peacockPrimary} />
         </View>
       ) : appointmentsQuery.isError ? (
@@ -95,7 +96,7 @@ export default function ProviderDashboardScreen() {
           }
         />
       )}
-    </View>
+    </ScreenContainer>
   );
 }
 
