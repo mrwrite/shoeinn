@@ -108,6 +108,7 @@ export default function RootTabs() {
   const theme = useTheme();
   const role = useAuthStore((s) => s.role);
   const showProviderTab = ["provider", "company", "company_admin"].includes(role ?? "");
+  const showAssignmentsTab = ["provider", "company"].includes(role ?? "");
   const insets = useSafeAreaInsets();
   const bottomPadding = Math.max(insets.bottom, 8);
 
