@@ -197,6 +197,57 @@ def open_appointments(current=Depends(get_current_company_user), db: Session = D
     return items
 
 
+@router.get("/appointments/my")
+def my_appointments(current=Depends(get_current_company_user), db: Session = Depends(get_db)):
+    user, company_id = current
+    logger.info(
+        f"my_appointments user_id={user.id} email={getattr(user,'email',None)} "
+        f"role={getattr(user,'role',None)} company_id={company_id}"
+    )
+
+    # Join active assignment (if any) and assigned user (provider name)
+    rows = (    
+        db.query(Appointment, AppointmentAssignment)
+        .join(
+            AppointmentAssignment,
+            and_(
+                AppointmentAssignment.appointment_id == Appointment.id,
+                AppointmentAssignment.is_active.is_(True),
+                AppointmentAssignment.user_id == user.id,
+            ),
+        )        
+        .filter(Appointment.company_id == company_id)
+        .order_by(Appointment.start_time.asc())
+        .all()
+    )
+
+    items = []
+    for appt, assignment in rows:
+        svc = db.get(Service, appt.service_id) if appt.service_id else None
+        items.append(
+            {
+                "id": appt.id,
+                "customer_city": appt.city,
+                "customer_state": appt.state,
+                "customer_name": appt.customer_name,
+                "address_line1": appt.address_line1,
+                "city": appt.city,
+                "state": appt.state,
+                "postal_code": appt.postal_code,
+                "service_name": svc.name if svc else None,
+                "start_time": appt.start_time,
+                "status": appt.status.value,
+                # assignment info
+                "is_assigned": True,
+                "assigned_to_me": True,
+                "assigned_user_id": assignment.user_id if assignment else None,
+                "assigned_at": assignment.assigned_at if assignment else None,
+                "provider_name": getattr(user, 'full_name', None),
+            }
+        )
+    return items
+
+
 @router.get("/appointments/claimed")
 def claimed_appointments(current=Depends(get_current_company_user), db: Session = Depends(get_db)):
     current_user, company_id = current

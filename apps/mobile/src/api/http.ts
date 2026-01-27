@@ -175,6 +175,10 @@ export function fetchOpenAppointments(): Promise<ProviderAppointment[]> {
   return request<ProviderAppointment[]>("GET", "/company/appointments/open", undefined, { auth: true });
 }
 
+export function fetchMyAppointments(): Promise<ProviderAppointment[]> {
+  return request<ProviderAppointment[]>("GET", "/company/appointments/my", undefined, { auth: true });
+}
+
 export function updateAppointmentStatus(
   id: string,
   payload: StatusUpdatePayload,
