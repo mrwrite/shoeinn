@@ -6,8 +6,10 @@ import type {
   AppointmentAssignment,
   AppointmentEvent,
   AppointmentLocationUpdate,
+  AppointmentLocationUpdatePayload,
   AppointmentSummary,
   AppointmentHold,
+  AppointmentTracking,
   ConfirmAppointmentPayload,
   HoldCreatePayload,
   Service,
@@ -153,6 +155,10 @@ export function getAppointmentLatestLocation(id: string): Promise<AppointmentLoc
   return request<AppointmentLocationUpdate>("GET", `/appointments/${id}/location/latest`, undefined, { auth: true });
 }
 
+export function getAppointmentTracking(id: string): Promise<AppointmentTracking> {
+  return request<AppointmentTracking>("GET", `/company/appointments/${id}/tracking`, undefined, { auth: true });
+}
+
 export function getAppointmentAssignment(id: string): Promise<AppointmentAssignment> {
   return request<AppointmentAssignment>("GET", `/appointments/${id}/assignment`, undefined, { auth: true });
 }
@@ -184,6 +190,15 @@ export function updateAppointmentStatus(
   payload: StatusUpdatePayload,
 ): Promise<{ id: string; status: string }> {
   return request<{ id: string; status: string }>("POST", `/company/appointments/${id}/status`, payload, {
+    auth: true,
+  });
+}
+
+export function postAppointmentLocation(
+  id: string,
+  payload: AppointmentLocationUpdatePayload,
+): Promise<AppointmentLocationUpdate> {
+  return request<AppointmentLocationUpdate>("POST", `/company/appointments/${id}/location`, payload, {
     auth: true,
   });
 }

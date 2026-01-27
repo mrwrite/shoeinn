@@ -11,6 +11,7 @@ import {
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { Text } from "../../components/ui/Text";
+import { TravelMapCard } from "../../components/TravelMapCard";
 import type { ProviderStackParamList } from "../../navigation/RootTabs";
 import { useAuthStore } from "../../state/authStore";
 import { useTheme } from "../../theme/theme";
@@ -67,6 +68,8 @@ export default function ProviderAppointmentDetailScreen() {
   const assignment = assignmentQuery.data;
   const isUnassigned = !assignment && (!assignmentQuery.error || `${assignmentQuery.error}`.includes("404"));
   const assignedToMe = assignment?.user_id === userId;
+  const showTravelCard =
+    assignedToMe && (status === "en_route_pickup" || status === "out_for_delivery");
 
   const info = useMemo(
     () => [
@@ -85,6 +88,8 @@ export default function ProviderAppointmentDetailScreen() {
       <Text variant="title" weight="bold">
         {appointment.service_name ?? "Appointment"}
       </Text>
+
+      {showTravelCard ? <TravelMapCard appointment={{ ...appointment, status }} /> : null}
 
       <Card>
         <Text variant="subtitle" weight="semibold">
@@ -165,4 +170,3 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 });
-
