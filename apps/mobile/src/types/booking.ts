@@ -108,6 +108,22 @@ export interface AppointmentLocationUpdate {
   recorded_at: string;
 }
 
+export interface AppointmentLocationUpdatePayload {
+  lat: number;
+  lng: number;
+  heading?: number | null;
+  speed?: number | null;
+  accuracy?: number | null;
+}
+
+export interface AppointmentTracking {
+  appointment_id: string;
+  status: AppointmentStatus;
+  is_travel_state: boolean;
+  latest_location: AppointmentLocationUpdate | null;
+  recent_locations: AppointmentLocationUpdate[];
+}
+
 export interface HoldCreatePayload {
   service_id: string;
   start_time: string;

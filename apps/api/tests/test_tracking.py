@@ -50,7 +50,9 @@ def _make_service(db: Session, company: Company) -> Service:
     return svc
 
 
-def _make_appointment(db: Session, *, company: Company, service: Service, status: AppointmentStatus, email: str) -> Appointment:
+def _make_appointment(
+    db: Session, *, company: Company, service: Service, status: AppointmentStatus, email: str
+) -> Appointment:
     now = datetime.now(timezone.utc)
     appt = Appointment(
         company_id=company.id,
@@ -66,6 +68,18 @@ def _make_appointment(db: Session, *, company: Company, service: Service, status
     db.add(appt)
     db.flush()
     return appt
+
+
+def _assign_appointment(db: Session, *, appointment: Appointment, company: Company, provider: User) -> AppointmentAssignment:
+    assignment = AppointmentAssignment(
+        appointment_id=appointment.id,
+        company_id=company.id,
+        user_id=provider.id,
+        is_active=True,
+    )
+    db.add(assignment)
+    db.flush()
+    return assignment
 
 
 def test_location_requires_assignment(db_session: Session, client: TestClient) -> None:
@@ -87,7 +101,7 @@ def test_location_requires_assignment(db_session: Session, client: TestClient) -
         status=AppointmentStatus.en_route_pickup,
         email="customer@example.com",
     )
-    db_session.add(AppointmentAssignment(appointment_id=appointment.id, company_user_id=provider_one.id))
+    _assign_appointment(db_session, appointment=appointment, company=company, provider=provider_one)
     db_session.commit()
 
     res = client.post(
@@ -110,7 +124,7 @@ def test_location_blocked_outside_travel(db_session: Session, client: TestClient
         status=AppointmentStatus.confirmed,
         email="customer@example.com",
     )
-    db_session.add(AppointmentAssignment(appointment_id=appointment.id, company_user_id=provider.id))
+    _assign_appointment(db_session, appointment=appointment, company=company, provider=provider)
     db_session.commit()
 
     res = client.post(
@@ -133,11 +147,11 @@ def test_customer_cannot_view_other_location(db_session: Session, client: TestCl
         status=AppointmentStatus.en_route_pickup,
         email="owner@example.com",
     )
-    db_session.add(AppointmentAssignment(appointment_id=appointment.id, company_user_id=provider.id))
+    _assign_appointment(db_session, appointment=appointment, company=company, provider=provider)
     db_session.add(
         AppointmentLocationUpdate(
             appointment_id=appointment.id,
-            company_user_id=provider.id,
+            user_id=provider.id,
             lat=1,
             lng=2,
             recorded_at=datetime.now(timezone.utc),
@@ -167,19 +181,19 @@ def test_latest_location_ordering(db_session: Session, client: TestClient) -> No
         status=AppointmentStatus.en_route_pickup,
         email=customer.email,
     )
-    db_session.add(AppointmentAssignment(appointment_id=appointment.id, company_user_id=provider.id))
+    _assign_appointment(db_session, appointment=appointment, company=company, provider=provider)
     db_session.add_all(
         [
             AppointmentLocationUpdate(
                 appointment_id=appointment.id,
-                company_user_id=provider.id,
+                user_id=provider.id,
                 lat=1,
                 lng=1,
                 recorded_at=datetime.now(timezone.utc) - timedelta(minutes=5),
             ),
             AppointmentLocationUpdate(
                 appointment_id=appointment.id,
-                company_user_id=provider.id,
+                user_id=provider.id,
                 lat=5,
                 lng=6,
                 recorded_at=datetime.now(timezone.utc),
@@ -196,3 +210,102 @@ def test_latest_location_ordering(db_session: Session, client: TestClient) -> No
     data = res.json()
     assert data["lat"] == 5
     assert data["lng"] == 6
+
+
+def test_tracking_requires_assignment(db_session: Session, client: TestClient) -> None:
+    company = _make_company(db_session)
+    service = _make_service(db_session, company)
+    provider_one = _make_user(db_session, email="one@example.com", role="provider", full_name="One")
+    provider_two = _make_user(db_session, email="two@example.com", role="provider", full_name="Two")
+    db_session.add_all(
+        [
+            CompanyUser(user_id=provider_one.id, company_id=company.id),
+            CompanyUser(user_id=provider_two.id, company_id=company.id),
+        ]
+    )
+    appointment = _make_appointment(
+        db_session,
+        company=company,
+        service=service,
+        status=AppointmentStatus.en_route_pickup,
+        email="customer@example.com",
+    )
+    _assign_appointment(db_session, appointment=appointment, company=company, provider=provider_one)
+    db_session.commit()
+
+    res = client.get(
+        f"/company/appointments/{appointment.id}/tracking",
+        headers=_auth_header(provider_two),
+    )
+    assert res.status_code == 403
+
+
+def test_tracking_allows_company_admin(db_session: Session, client: TestClient) -> None:
+    company = _make_company(db_session)
+    service = _make_service(db_session, company)
+    provider = _make_user(db_session, email="provider@example.com", role="provider", full_name="Provider")
+    admin = _make_user(db_session, email="admin@example.com", role="company_admin", full_name="Admin")
+    db_session.add_all(
+        [
+            CompanyUser(user_id=provider.id, company_id=company.id),
+            CompanyUser(user_id=admin.id, company_id=company.id),
+        ]
+    )
+    appointment = _make_appointment(
+        db_session,
+        company=company,
+        service=service,
+        status=AppointmentStatus.out_for_delivery,
+        email="customer@example.com",
+    )
+    _assign_appointment(db_session, appointment=appointment, company=company, provider=provider)
+    db_session.commit()
+
+    res = client.get(
+        f"/company/appointments/{appointment.id}/tracking",
+        headers=_auth_header(admin),
+    )
+    assert res.status_code == 200
+    payload = res.json()
+    assert payload["appointment_id"] == str(appointment.id)
+
+
+def test_tracking_returns_latest_and_recent(db_session: Session, client: TestClient) -> None:
+    company = _make_company(db_session)
+    service = _make_service(db_session, company)
+    provider = _make_user(db_session, email="provider@example.com", role="provider", full_name="Provider")
+    db_session.add(CompanyUser(user_id=provider.id, company_id=company.id))
+    appointment = _make_appointment(
+        db_session,
+        company=company,
+        service=service,
+        status=AppointmentStatus.en_route_pickup,
+        email="customer@example.com",
+    )
+    _assign_appointment(db_session, appointment=appointment, company=company, provider=provider)
+    db_session.commit()
+
+    first = client.post(
+        f"/company/appointments/{appointment.id}/location",
+        json={"lat": 1, "lng": 2},
+        headers=_auth_header(provider),
+    )
+    assert first.status_code == 201
+    second = client.post(
+        f"/company/appointments/{appointment.id}/location",
+        json={"lat": 3, "lng": 4},
+        headers=_auth_header(provider),
+    )
+    assert second.status_code == 201
+
+    res = client.get(
+        f"/company/appointments/{appointment.id}/tracking",
+        headers=_auth_header(provider),
+    )
+    assert res.status_code == 200
+    payload = res.json()
+    assert payload["is_travel_state"] is True
+    assert payload["latest_location"]["lat"] == 3
+    assert payload["latest_location"]["lng"] == 4
+    assert payload["recent_locations"][0]["lat"] == 1
+    assert payload["recent_locations"][1]["lat"] == 3
