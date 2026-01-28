@@ -6,8 +6,10 @@ import type {
   AppointmentAssignment,
   AppointmentEvent,
   AppointmentLocationUpdate,
+  AppointmentLocationUpdatePayload,
   AppointmentSummary,
   AppointmentHold,
+  AppointmentTracking,
   ConfirmAppointmentPayload,
   HoldCreatePayload,
   Service,
@@ -92,8 +94,23 @@ export function listServices(companyId?: string): Promise<Service[]> {
   return request<Service[]>("GET", `/services${search}`);
 }
 
-export function listCompanies(): Promise<Company[]> {
-  return request<Company[]>("GET", "/companies");
+interface ListCompaniesParams {
+  query?: string;
+  city?: string | null;
+  state?: string | null;
+}
+
+export function listCompanies(params: ListCompaniesParams = {}): Promise<Company[]> {
+  const search = new URLSearchParams();
+
+  if (params.query) search.set("query", params.query);
+  if (params.city) search.set("city", params.city);
+  if (params.state) search.set("state", params.state);
+
+  const suffix = search.toString();
+  const path = suffix ? `/companies?${suffix}` : "/companies";
+
+  return request<Company[]>("GET", path);
 }
 
 export function getJson<T>(path: string): Promise<T> {
@@ -138,6 +155,10 @@ export function getAppointmentLatestLocation(id: string): Promise<AppointmentLoc
   return request<AppointmentLocationUpdate>("GET", `/appointments/${id}/location/latest`, undefined, { auth: true });
 }
 
+export function getAppointmentTracking(id: string): Promise<AppointmentTracking> {
+  return request<AppointmentTracking>("GET", `/company/appointments/${id}/tracking`, undefined, { auth: true });
+}
+
 export function getAppointmentAssignment(id: string): Promise<AppointmentAssignment> {
   return request<AppointmentAssignment>("GET", `/appointments/${id}/assignment`, undefined, { auth: true });
 }
@@ -160,11 +181,24 @@ export function fetchOpenAppointments(): Promise<ProviderAppointment[]> {
   return request<ProviderAppointment[]>("GET", "/company/appointments/open", undefined, { auth: true });
 }
 
+export function fetchMyAppointments(): Promise<ProviderAppointment[]> {
+  return request<ProviderAppointment[]>("GET", "/company/appointments/my", undefined, { auth: true });
+}
+
 export function updateAppointmentStatus(
   id: string,
   payload: StatusUpdatePayload,
 ): Promise<{ id: string; status: string }> {
   return request<{ id: string; status: string }>("POST", `/company/appointments/${id}/status`, payload, {
+    auth: true,
+  });
+}
+
+export function postAppointmentLocation(
+  id: string,
+  payload: AppointmentLocationUpdatePayload,
+): Promise<AppointmentLocationUpdate> {
+  return request<AppointmentLocationUpdate>("POST", `/company/appointments/${id}/location`, payload, {
     auth: true,
   });
 }

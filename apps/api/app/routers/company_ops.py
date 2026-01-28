@@ -30,7 +30,12 @@ from app.models import (
 from app.models.company_user import CompanyUser
 from app.models.user import User
 from app.schemas.notification import NotificationRead
-from app.schemas.appointment import AppointmentAssignmentRead, LocationUpdateCreate, LocationUpdateRead
+from app.schemas.appointment import (
+    AppointmentAssignmentRead,
+    AppointmentTrackingRead,
+    LocationUpdateCreate,
+    LocationUpdateRead,
+)
 from app.schemas.user import UserOut
 from app.services.notifications import (
     APPOINTMENT_CONFIRMED,
@@ -46,7 +51,6 @@ logger = logging.getLogger(__name__)
 
 TRAVEL_STATUSES = {
     AppointmentStatus.en_route_pickup,
-    AppointmentStatus.picked_up,
     AppointmentStatus.out_for_delivery,
 }
 
@@ -192,6 +196,57 @@ def open_appointments(current=Depends(get_current_company_user), db: Session = D
                 "status": appt.status.value,
                 "is_assigned": False,
                 "assigned_to_me": False,
+            }
+        )
+    return items
+
+
+@router.get("/appointments/my")
+def my_appointments(current=Depends(get_current_company_user), db: Session = Depends(get_db)):
+    user, company_id = current
+    logger.info(
+        f"my_appointments user_id={user.id} email={getattr(user,'email',None)} "
+        f"role={getattr(user,'role',None)} company_id={company_id}"
+    )
+
+    # Join active assignment (if any) and assigned user (provider name)
+    rows = (    
+        db.query(Appointment, AppointmentAssignment)
+        .join(
+            AppointmentAssignment,
+            and_(
+                AppointmentAssignment.appointment_id == Appointment.id,
+                AppointmentAssignment.is_active.is_(True),
+                AppointmentAssignment.user_id == user.id,
+            ),
+        )        
+        .filter(Appointment.company_id == company_id)
+        .order_by(Appointment.start_time.asc())
+        .all()
+    )
+
+    items = []
+    for appt, assignment in rows:
+        svc = db.get(Service, appt.service_id) if appt.service_id else None
+        items.append(
+            {
+                "id": appt.id,
+                "customer_city": appt.city,
+                "customer_state": appt.state,
+                "customer_name": appt.customer_name,
+                "address_line1": appt.address_line1,
+                "city": appt.city,
+                "state": appt.state,
+                "postal_code": appt.postal_code,
+                "service_name": svc.name if svc else None,
+                "start_time": appt.start_time,
+                "status": appt.status.value,
+                # assignment info
+                "is_assigned": True,
+                "assigned_to_me": True,
+                "assigned_user_id": assignment.user_id if assignment else None,
+                "assigned_at": assignment.assigned_at if assignment else None,
+                "provider_name": getattr(user, 'full_name', None),
             }
         )
     return items
@@ -351,6 +406,53 @@ def post_location_update(
     db.refresh(update)
 
     return LocationUpdateRead.model_validate(update, from_attributes=True)
+
+
+@router.get(
+    "/appointments/{appointment_id}/tracking",
+    response_model=AppointmentTrackingRead,
+)
+def read_tracking(
+    appointment_id: UUID,
+    current=Depends(get_current_company_user),
+    db: Session = Depends(get_db),
+):
+    current_user, company_id = current
+    appt = db.get(Appointment, appointment_id)
+    if not appt or (appt.company_id and appt.company_id != company_id):
+        raise HTTPException(status_code=404, detail="Not found")
+
+    assignment = (
+        db.query(AppointmentAssignment)
+        .filter(
+            AppointmentAssignment.appointment_id == appointment_id,
+            AppointmentAssignment.is_active.is_(True),
+        )
+        .first()
+    )
+    if current_user.role != "company_admin" and (assignment is None or assignment.user_id != current_user.id):
+        raise HTTPException(status_code=403, detail="Not assigned to this appointment")
+
+    recent_updates = (
+        db.query(AppointmentLocationUpdate)
+        .filter(AppointmentLocationUpdate.appointment_id == appointment_id)
+        .order_by(AppointmentLocationUpdate.recorded_at.desc())
+        .limit(50)
+        .all()
+    )
+    latest = recent_updates[0] if recent_updates else None
+    recent_locations = [
+        LocationUpdateRead.model_validate(update, from_attributes=True) for update in reversed(recent_updates)
+    ]
+
+    return AppointmentTrackingRead(
+        appointment_id=appointment_id,
+        status=appt.status,
+        is_travel_state=appt.status
+        in {AppointmentStatus.en_route_pickup, AppointmentStatus.out_for_delivery},
+        latest_location=LocationUpdateRead.model_validate(latest, from_attributes=True) if latest else None,
+        recent_locations=recent_locations,
+    )
 
 
 @router.get("/appointments/all")

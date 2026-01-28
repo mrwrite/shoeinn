@@ -2,8 +2,14 @@ import type { AppointmentStatus } from "./booking";
 
 export interface ProviderAppointment {
   id: string;
+  customer_name?: string | null;
   customer_city?: string | null;
   customer_state?: string | null;
+  address_line1?: string | null;
+  address_line2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postal_code?: string | null;
   service_name?: string | null;
   start_time: string;
   status: AppointmentStatus;

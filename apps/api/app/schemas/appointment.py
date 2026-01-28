@@ -151,3 +151,11 @@ class LocationUpdateRead(BaseModel):
     recorded_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class AppointmentTrackingRead(BaseModel):
+    appointment_id: UUID
+    status: AppointmentStatus
+    is_travel_state: bool
+    latest_location: LocationUpdateRead | None
+    recent_locations: list[LocationUpdateRead]
