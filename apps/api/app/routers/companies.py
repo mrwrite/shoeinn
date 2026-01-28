@@ -1,3 +1,5 @@
+import re
+from sqlalchemy import func
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -11,18 +13,57 @@ from app.schemas.service import ServiceOut
 
 router = APIRouter(prefix="/companies", tags=["companies"])
 
+_CITY_ABBREV = [
+    (r"\bmt\.?\b", "mount"),
+    (r"\bst\.?\b", "saint"),
+    (r"\bft\.?\b", "fort"),
+]
+
+def normalize_city(city: str) -> str:
+    s = (city or "").strip().lower()
+    # remove punctuation like '.' and commas
+    s = re.sub(r"[^a-z0-9\s]", " ", s)
+    # collapse whitespace
+    s = re.sub(r"\s+", " ", s).strip()
+    for pattern, repl in _CITY_ABBREV:
+        s = re.sub(pattern, repl, s)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
 
 @router.get("", response_model=list[CompanyOut])
-def list_companies(query: str = "", city: str | None = None, state: str | None = None, db: Session = Depends(get_db)):
+def list_companies(
+    query: str = "",
+    city: str | None = None,
+    state: str | None = None,
+    db: Session = Depends(get_db),
+):
     q = db.query(Company).filter(Company.is_active.is_(True))
+
     if query:
         like = f"%{query.lower()}%"
         q = q.filter(Company.name.ilike(like))
+
     if city:
-        q = q.filter(Company.city == city)
+        norm_city = normalize_city(city)
+
+        # Normalize DB city in SQL (Postgres)
+        db_city = func.lower(func.trim(Company.city))
+        db_city = func.regexp_replace(db_city, r"[^a-z0-9\s]", "", "g")  # remove punctuation
+        db_city = func.regexp_replace(db_city, r"\s+", " ", "g")         # collapse spaces
+
+        # IMPORTANT: Postgres word boundaries are \m and \M (NOT \b)
+        db_city = func.regexp_replace(db_city, r"\mmt\M", "mount", "g")
+        db_city = func.regexp_replace(db_city, r"\mst\M", "saint", "g")
+        db_city = func.regexp_replace(db_city, r"\mft\M", "fort", "g")
+
+        q = q.filter(db_city == norm_city)
+
     if state:
-        q = q.filter(Company.state == state)
+        q = q.filter(func.upper(func.trim(Company.state)) == state.strip().upper())
+
     return q.all()
+
 
 
 @router.get("/{company_id}", response_model=CompanyOut)

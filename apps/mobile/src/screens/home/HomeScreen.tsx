@@ -46,9 +46,9 @@ export default function HomeScreen() {
           <Text variant="caption" weight="semibold" color={theme.colors.mutedText}>
             {locationLoading ? "Locating..." : locationLabel}
           </Text>
-          <Text variant="title" weight="bold" style={{ marginTop: 6 }}>
+         {/*  <Text variant="title" weight="bold" style={{ marginTop: 6 }}>
             Book care on demand
-          </Text>
+          </Text> */}
         </View>
         <View style={styles.locationPill}>
           <Ionicons name="location" size={16} color={theme.colors.surfaceLight} />
