@@ -379,8 +379,10 @@ def post_location_update(
 ):
     current_user, company_id = current
     appt = db.get(Appointment, appointment_id)
-    if not appt or (appt.company_id and appt.company_id != company_id):
+    if not appt:
         raise HTTPException(status_code=404, detail="Not found")
+    if appt.company_id != company_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
 
     assignment = (
         db.query(AppointmentAssignment)
@@ -398,11 +400,17 @@ def post_location_update(
 
     update = AppointmentLocationUpdate(
         appointment_id=appointment_id,
+        company_id=appt.company_id,
         user_id=current_user.id,
         **payload.model_dump(),
     )
     db.add(update)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        logger.exception("IntegrityError when posting location update for appointment %s", appointment_id)
+        raise HTTPException(status_code=400, detail="Invalid location update data")
     db.refresh(update)
 
     return LocationUpdateRead.model_validate(update, from_attributes=True)

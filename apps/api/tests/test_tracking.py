@@ -82,6 +82,78 @@ def _assign_appointment(db: Session, *, appointment: Appointment, company: Compa
     return assignment
 
 
+def test_location_update_persists_company_id(db_session: Session, client: TestClient) -> None:
+    company = _make_company(db_session)
+    service = _make_service(db_session, company)
+    provider = _make_user(db_session, email="provider-happy@example.com", role="provider", full_name="Provider")
+    db_session.add(CompanyUser(user_id=provider.id, company_id=company.id))
+    appointment = _make_appointment(
+        db_session,
+        company=company,
+        service=service,
+        status=AppointmentStatus.en_route_pickup,
+        email="customer@example.com",
+    )
+    _assign_appointment(db_session, appointment=appointment, company=company, provider=provider)
+    db_session.commit()
+
+    res = client.post(
+        f"/company/appointments/{appointment.id}/location",
+        json={"lat": 10, "lng": 20},
+        headers=_auth_header(provider),
+    )
+    assert res.status_code == 201
+
+    location_update = (
+        db_session.query(AppointmentLocationUpdate)
+        .filter(AppointmentLocationUpdate.appointment_id == appointment.id)
+        .one()
+    )
+    assert location_update.company_id == appointment.company_id
+
+
+def test_location_forbidden_for_provider_in_other_company(db_session: Session, client: TestClient) -> None:
+    company = _make_company(db_session)
+    other_company = Company(id=uuid4(), name="Other Co", city="LA", state="CA")
+    db_session.add(other_company)
+    service = _make_service(db_session, company)
+
+    assigned_provider = _make_user(
+        db_session,
+        email="assigned@example.com",
+        role="provider",
+        full_name="Assigned Provider",
+    )
+    outside_provider = _make_user(
+        db_session,
+        email="outside@example.com",
+        role="provider",
+        full_name="Outside Provider",
+    )
+    db_session.add_all(
+        [
+            CompanyUser(user_id=assigned_provider.id, company_id=company.id),
+            CompanyUser(user_id=outside_provider.id, company_id=other_company.id),
+        ]
+    )
+
+    appointment = _make_appointment(
+        db_session,
+        company=company,
+        service=service,
+        status=AppointmentStatus.en_route_pickup,
+        email="customer@example.com",
+    )
+    _assign_appointment(db_session, appointment=appointment, company=company, provider=assigned_provider)
+    db_session.commit()
+
+    res = client.post(
+        f"/company/appointments/{appointment.id}/location",
+        json={"lat": 10, "lng": 20},
+        headers=_auth_header(outside_provider),
+    )
+    assert res.status_code == 403
+
 def test_location_requires_assignment(db_session: Session, client: TestClient) -> None:
     company = _make_company(db_session)
     service = _make_service(db_session, company)
@@ -151,6 +223,7 @@ def test_customer_cannot_view_other_location(db_session: Session, client: TestCl
     db_session.add(
         AppointmentLocationUpdate(
             appointment_id=appointment.id,
+            company_id=company.id,
             user_id=provider.id,
             lat=1,
             lng=2,
@@ -186,6 +259,7 @@ def test_latest_location_ordering(db_session: Session, client: TestClient) -> No
         [
             AppointmentLocationUpdate(
                 appointment_id=appointment.id,
+                company_id=company.id,
                 user_id=provider.id,
                 lat=1,
                 lng=1,
@@ -193,6 +267,7 @@ def test_latest_location_ordering(db_session: Session, client: TestClient) -> No
             ),
             AppointmentLocationUpdate(
                 appointment_id=appointment.id,
+                company_id=company.id,
                 user_id=provider.id,
                 lat=5,
                 lng=6,
