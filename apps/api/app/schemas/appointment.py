@@ -44,6 +44,11 @@ class HoldRead(BaseModel):
     customer_name: str | None
     customer_phone: str | None
     customer_email: str | None
+    address_line1: str | None = None
+    address_line2: str | None = None
+    city: str | None = None
+    state: str | None = None
+    postal_code: str | None = None
     start_time: datetime
     end_time: datetime
     ttl_expires_at: datetime

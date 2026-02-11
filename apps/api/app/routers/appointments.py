@@ -93,6 +93,11 @@ def _serialize_hold(hold: AppointmentHold) -> HoldRead:
             "customer_name": hold.customer_name,
             "customer_phone": hold.customer_phone,
             "customer_email": hold.customer_email,
+            "address_line1": hold.address_line1,
+            "address_line2": hold.address_line2,
+            "city": hold.city,
+            "state": hold.state,
+            "postal_code": hold.postal_code,
             "start_time": _ensure_utc(hold.start_time),
             "end_time": _ensure_utc(hold.end_time),
             "ttl_expires_at": _ensure_utc(hold.ttl_expires_at),
@@ -225,6 +230,11 @@ def create_hold(payload: HoldCreate, db: Session = Depends(get_db)) -> HoldRead:
         customer_name=payload.customer_name,
         customer_phone=payload.customer_phone,
         customer_email=payload.customer_email,
+        address_line1=payload.address_line1,
+        address_line2=payload.address_line2,
+        city=payload.city,
+        state=payload.state,
+        postal_code=payload.postal_code,
         start_time=start_time,
         end_time=end_time,
         ttl_expires_at=_utcnow() + _HOLD_TTL,
@@ -441,6 +451,11 @@ def confirm_hold(
     hold.customer_name = payload.customer_name
     hold.customer_phone = payload.customer_phone
     hold.customer_email = payload.customer_email
+    hold.address_line1 = payload.address_line1 or hold.address_line1
+    hold.address_line2 = payload.address_line2 or hold.address_line2
+    hold.city = payload.city or hold.city
+    hold.state = payload.state or hold.state
+    hold.postal_code = payload.postal_code or hold.postal_code
     hold.start_time = hold_start
     hold.end_time = hold_end
     hold.ttl_expires_at = expires_at
@@ -472,11 +487,11 @@ def confirm_hold(
         customer_name=payload.customer_name,
         customer_phone=payload.customer_phone,
         customer_email=payload.customer_email,
-        address_line1=payload.address_line1,
-        address_line2=payload.address_line2,
-        city=payload.city,
-        state=payload.state,
-        postal_code=payload.postal_code,
+        address_line1=payload.address_line1 or hold.address_line1,
+        address_line2=payload.address_line2 or hold.address_line2,
+        city=payload.city or hold.city,
+        state=payload.state or hold.state,
+        postal_code=payload.postal_code or hold.postal_code,
         start_time=hold_start,
         end_time=hold_end,
         status=AppointmentStatus.requested,
@@ -511,6 +526,11 @@ def confirm_hold(
     hold.customer_name = payload.customer_name
     hold.customer_phone = payload.customer_phone
     hold.customer_email = payload.customer_email
+    hold.address_line1 = payload.address_line1 or hold.address_line1
+    hold.address_line2 = payload.address_line2 or hold.address_line2
+    hold.city = payload.city or hold.city
+    hold.state = payload.state or hold.state
+    hold.postal_code = payload.postal_code or hold.postal_code
 
     appointment.payment_id = checkout.payment_id
 
