@@ -142,6 +142,53 @@ def _serialize_appointment(appointment: Appointment) -> AppointmentRead:
     )
 
 
+def _normalize_optional(value: str | None) -> str | None:
+    if value is None:
+        return None
+    cleaned = value.strip()
+    return cleaned or None
+
+
+def _resolve_customer_address(
+    *,
+    db: Session,
+    customer_email: str | None,
+    address_line1: str | None,
+    address_line2: str | None,
+    city: str | None,
+    state: str | None,
+    postal_code: str | None,
+) -> dict[str, str | None]:
+    resolved = {
+        "address_line1": _normalize_optional(address_line1),
+        "address_line2": _normalize_optional(address_line2),
+        "city": _normalize_optional(city),
+        "state": _normalize_optional(state),
+        "postal_code": _normalize_optional(postal_code),
+    }
+
+    required_present = all(
+        [resolved["address_line1"], resolved["city"], resolved["state"], resolved["postal_code"]]
+    )
+    if required_present:
+        return resolved
+
+    if not customer_email:
+        return resolved
+
+    user = db.query(User).filter(User.email == customer_email).one_or_none()
+    if user is None:
+        return resolved
+
+    return {
+        "address_line1": resolved["address_line1"] or user.address_line1,
+        "address_line2": resolved["address_line2"] or user.address_line2,
+        "city": resolved["city"] or user.city,
+        "state": resolved["state"] or user.state,
+        "postal_code": resolved["postal_code"] or user.postal_code,
+    }
+
+
 @router.get("/mine", response_model=list[AppointmentListItem])
 def list_my_appointments(
     current_customer=Depends(get_current_customer), db: Session = Depends(get_db)
@@ -165,6 +212,13 @@ def list_my_appointments(
                     "id": appt.id,
                     "company_id": appt.company_id,
                     "service_name": service_name,
+                    "customer_name": appt.customer_name,
+                    "customer_phone": appt.customer_phone,
+                    "address_line1": appt.address_line1,
+                    "address_line2": appt.address_line2,
+                    "city": appt.city,
+                    "state": appt.state,
+                    "postal_code": appt.postal_code,
                     "start_time": _ensure_utc(appt.start_time),
                     "status": appt.status,
                 }
@@ -225,16 +279,26 @@ def create_hold(payload: HoldCreate, db: Session = Depends(get_db)) -> HoldRead:
     if conflict:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Time slot already booked")
 
-    hold = AppointmentHold(
-        service_id=service.id,
-        customer_name=payload.customer_name,
-        customer_phone=payload.customer_phone,
+    resolved_address = _resolve_customer_address(
+        db=db,
         customer_email=payload.customer_email,
         address_line1=payload.address_line1,
         address_line2=payload.address_line2,
         city=payload.city,
         state=payload.state,
         postal_code=payload.postal_code,
+    )
+
+    hold = AppointmentHold(
+        service_id=service.id,
+        customer_name=payload.customer_name,
+        customer_phone=payload.customer_phone,
+        customer_email=payload.customer_email,
+        address_line1=resolved_address["address_line1"],
+        address_line2=resolved_address["address_line2"],
+        city=resolved_address["city"],
+        state=resolved_address["state"],
+        postal_code=resolved_address["postal_code"],
         start_time=start_time,
         end_time=end_time,
         ttl_expires_at=_utcnow() + _HOLD_TTL,
@@ -448,14 +512,24 @@ def confirm_hold(
     if conflict:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Time slot already booked")
 
+    resolved_address = _resolve_customer_address(
+        db=db,
+        customer_email=payload.customer_email or hold.customer_email,
+        address_line1=payload.address_line1 or hold.address_line1,
+        address_line2=payload.address_line2 or hold.address_line2,
+        city=payload.city or hold.city,
+        state=payload.state or hold.state,
+        postal_code=payload.postal_code or hold.postal_code,
+    )
+
     hold.customer_name = payload.customer_name
     hold.customer_phone = payload.customer_phone
     hold.customer_email = payload.customer_email
-    hold.address_line1 = payload.address_line1 or hold.address_line1
-    hold.address_line2 = payload.address_line2 or hold.address_line2
-    hold.city = payload.city or hold.city
-    hold.state = payload.state or hold.state
-    hold.postal_code = payload.postal_code or hold.postal_code
+    hold.address_line1 = resolved_address["address_line1"]
+    hold.address_line2 = resolved_address["address_line2"]
+    hold.city = resolved_address["city"]
+    hold.state = resolved_address["state"]
+    hold.postal_code = resolved_address["postal_code"]
     hold.start_time = hold_start
     hold.end_time = hold_end
     hold.ttl_expires_at = expires_at
@@ -487,11 +561,11 @@ def confirm_hold(
         customer_name=payload.customer_name,
         customer_phone=payload.customer_phone,
         customer_email=payload.customer_email,
-        address_line1=payload.address_line1 or hold.address_line1,
-        address_line2=payload.address_line2 or hold.address_line2,
-        city=payload.city or hold.city,
-        state=payload.state or hold.state,
-        postal_code=payload.postal_code or hold.postal_code,
+        address_line1=resolved_address["address_line1"],
+        address_line2=resolved_address["address_line2"],
+        city=resolved_address["city"],
+        state=resolved_address["state"],
+        postal_code=resolved_address["postal_code"],
         start_time=hold_start,
         end_time=hold_end,
         status=AppointmentStatus.requested,

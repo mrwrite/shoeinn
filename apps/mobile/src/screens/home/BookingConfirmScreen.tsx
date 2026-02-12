@@ -4,7 +4,7 @@ import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useMutation } from "@tanstack/react-query";
 
-import { confirmAppointment, createHold } from "../../api/http";
+import { confirmAppointment, createHold, getMe } from "../../api/http";
 import { useCityState } from "../../hooks/useCityState";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { Button } from "../../components/ui/Button";
@@ -30,6 +30,29 @@ export default function BookingConfirmScreen() {
   const [postalCode, setPostalCode] = useState("");
   const [holdId, setHoldId] = useState<string | null>(null);
   const { city: detectedCity, state: detectedState } = useCityState();
+
+  useEffect(() => {
+    let mounted = true;
+    const loadProfile = async () => {
+      try {
+        const me = await getMe();
+        if (!mounted) return;
+        if (!name && me.full_name) setName(me.full_name);
+        if (!customerEmail && me.email) setCustomerEmail(me.email);
+        if (!addressLine1 && me.address_line1) setAddressLine1(me.address_line1);
+        if (!addressLine2 && me.address_line2) setAddressLine2(me.address_line2);
+        if (!city && me.city) setCity(me.city);
+        if (!state && me.state) setState(me.state);
+        if (!postalCode && me.postal_code) setPostalCode(me.postal_code);
+      } catch (err) {
+        // non-blocking prefill
+      }
+    };
+    loadProfile();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!city && detectedCity) {

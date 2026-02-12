@@ -17,6 +17,11 @@ export interface AppointmentHold {
   customer_name?: string | null;
   customer_phone?: string | null;
   customer_email?: string | null;
+  address_line1?: string | null;
+  address_line2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postal_code?: string | null;
   start_time: string;
   end_time: string;
   ttl_expires_at: string;

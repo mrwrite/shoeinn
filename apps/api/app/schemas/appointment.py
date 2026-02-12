@@ -109,6 +109,13 @@ class AppointmentListItem(BaseModel):
     id: UUID
     company_id: UUID | None = None
     service_name: str | None = None
+    customer_name: str | None = None
+    customer_phone: str | None = None
+    address_line1: str | None = None
+    address_line2: str | None = None
+    city: str | None = None
+    state: str | None = None
+    postal_code: str | None = None
     start_time: datetime
     status: AppointmentStatus
 
