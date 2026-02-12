@@ -43,6 +43,8 @@ from app.schemas.appointment import (
     HoldCreate,
     HoldRead,
     LocationUpdateRead,
+    AppointmentProviderLocationRead,
+    AppointmentProviderLocationResponse,
 )
 
 router = APIRouter(prefix="/appointments", tags=["appointments"])
@@ -337,14 +339,14 @@ def read_appointment_events(appointment_id: UUID, db: Session = Depends(get_db))
 
 
 @router.get(
-    "/{appointment_id}/location/latest",
-    response_model=LocationUpdateRead,
+    "/{appointment_id}/provider-location",
+    response_model=AppointmentProviderLocationResponse,
 )
-def read_latest_location(
+def read_provider_location(
     appointment_id: UUID,
     current_customer=Depends(get_current_customer),
     db: Session = Depends(get_db),
-) -> LocationUpdateRead:
+) -> AppointmentProviderLocationResponse:
     appointment = db.get(Appointment, appointment_id)
     if appointment is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
@@ -358,8 +360,11 @@ def read_latest_location(
         .first()
     )
     if update is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Location not available")
-    return LocationUpdateRead.model_validate(update, from_attributes=True)
+        return AppointmentProviderLocationResponse(location=None)
+
+    return AppointmentProviderLocationResponse(
+        location=AppointmentProviderLocationRead.model_validate(update, from_attributes=True)
+    )
 
 
 @router.get(

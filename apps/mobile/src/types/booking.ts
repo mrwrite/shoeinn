@@ -113,6 +113,17 @@ export interface AppointmentLocationUpdate {
   recorded_at: string;
 }
 
+export interface AppointmentProviderLocationResponse {
+  location: {
+    lat: number;
+    lng: number;
+    heading?: number | null;
+    speed?: number | null;
+    accuracy?: number | null;
+    recorded_at: string;
+  } | null;
+}
+
 export interface AppointmentLocationUpdatePayload {
   lat: number;
   lng: number;
