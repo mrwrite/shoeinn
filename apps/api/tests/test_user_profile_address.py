@@ -105,3 +105,18 @@ def test_hold_and_confirm_can_fallback_to_saved_customer_address(client, db_sess
     assert appointment["city"] == "Macon"
     assert appointment["state"] == "GA"
     assert appointment["postal_code"] == "31201"
+
+
+def test_get_me_returns_clear_500_for_invalid_seeded_email(client, db_session):
+    user = User(
+        email="invalid@shoeinn.test",
+        password_hash=hash_password("pass"),
+        full_name="Broken Seed User",
+        role="customer",
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    me_res = client.get("/me", headers=_auth_header_for(user))
+    assert me_res.status_code == 500
+    assert me_res.json()["detail"] == "Current user record is invalid. Please contact support."

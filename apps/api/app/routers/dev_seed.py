@@ -137,25 +137,25 @@ def seed(db: Session = Depends(get_db)):
         return u
 
     global_admin = get_or_create_user(
-        "admin@shoeinn.test", "admin", full_name="ShoeInn Global Admin"
+        "admin@example.com", "admin", full_name="ShoeInn Global Admin"
     )
     admin = get_or_create_user(
-        "clean-kicks.admin@shoeinn.test", "company_admin", full_name="Clean Kicks Admin"
+        "clean-kicks.admin@example.com", "company_admin", full_name="Clean Kicks Admin"
     )
     provider = get_or_create_user(
-        "clean-kicks.provider@shoeinn.test", "provider", full_name="Clean Kicks Provider"
+        "clean-kicks.provider@example.com", "provider", full_name="Clean Kicks Provider"
     )
     u2 = get_or_create_user(
-        "fresh-soles.admin@shoeinn.test", "company_admin", full_name="Fresh Soles Admin"
+        "fresh-soles.admin@example.com", "company_admin", full_name="Fresh Soles Admin"
     )
     u2_provider = get_or_create_user(
-        "fresh-soles.provider@shoeinn.test", "provider", full_name="Fresh Soles Provider"
+        "fresh-soles.provider@example.com", "provider", full_name="Fresh Soles Provider"
     )
-    u3 = get_or_create_user("sole-spa.admin@shoeinn.test", "company_admin", full_name="Sole Spa Admin")
+    u3 = get_or_create_user("sole-spa.admin@example.com", "company_admin", full_name="Sole Spa Admin")
     u3_provider = get_or_create_user(
-        "sole-spa.provider@shoeinn.test", "provider", full_name="Sole Spa Provider"
+        "sole-spa.provider@example.com", "provider", full_name="Sole Spa Provider"
     )
-    customer = get_or_create_user("customer@test.com", "customer", full_name="Demo Customer")
+    customer = get_or_create_user("customer@example.com", "customer", full_name="Demo Customer")
 
 
     # ---- CompanyUser links (upsert) ----
@@ -185,7 +185,7 @@ def seed(db: Session = Depends(get_db)):
             service_id=service.id,
             customer_name="Demo Customer",
             customer_phone="555-1234",
-            customer_email="customer@test.com",
+            customer_email="customer@example.com",
             start_time=start_time,
             confirmed_time=start_time - timedelta(hours=1),
             status=status,
@@ -208,28 +208,27 @@ def seed(db: Session = Depends(get_db)):
         "status": status,
         "created": created,
         "demo_logins": {
-            "global_admin": {"email": "admin@shoeinn.test", "password": "Password1!", "role": "admin"},
+            "global_admin": {"email": "admin@example.com", "password": "Password1!", "role": "admin"},
             "companies": [
                 {
                     "company": "Clean Kicks",
                     "company_id": str(c1.id),
-                    "admin": {"email": "clean-kicks.admin@shoeinn.test", "password": "Password1!"},
-                    "provider": {"email": "clean-kicks.provider@shoeinn.test", "password": "Password1!"},
+                    "admin": {"email": "clean-kicks.admin@example.com", "password": "Password1!"},
+                    "provider": {"email": "clean-kicks.provider@example.com", "password": "Password1!"},
                 },
                 {
                     "company": "Fresh Soles",
                     "company_id": str(c2.id),
-                    "admin": {"email": "fresh-soles.admin@shoeinn.test", "password": "Password1!"},
-                    "provider": {"email": "fresh-soles.provider@shoeinn.test", "password": "Password1!"},
+                    "admin": {"email": "fresh-soles.admin@example.com", "password": "Password1!"},
+                    "provider": {"email": "fresh-soles.provider@example.com", "password": "Password1!"},
                 },
                 {
                     "company": "Sole Spa",
                     "company_id": str(c3.id),
-                    "admin": {"email": "sole-spa.admin@shoeinn.test", "password": "Password1!"},
-                    "provider": {"email": "sole-spa.provider@shoeinn.test", "password": "Password1!"},
+                    "admin": {"email": "sole-spa.admin@example.com", "password": "Password1!"},
+                    "provider": {"email": "sole-spa.provider@example.com", "password": "Password1!"},
                 },
             ],
-            "customer": {"email": "customer@test.com", "password": "Password1!"},
+            "customer": {"email": "customer@example.com", "password": "Password1!"},
         },
     }
-
