@@ -329,7 +329,7 @@ export function TravelMapCard({ appointment, onOpenFullScreenMap }: Props) {
           </Text>
         </View>
         {onOpenFullScreenMap ? (
-          <Button label="Open" variant="ghost" onPress={onOpenFullScreenMap} />
+          <Button label="Appointment details" variant="ghost" onPress={onOpenFullScreenMap} />
         ) : null}
       </View>
 
@@ -348,7 +348,10 @@ export function TravelMapCard({ appointment, onOpenFullScreenMap }: Props) {
 
       {!hasDestinationAddress ? (
         <View style={styles.messageBox}>
-          <Text color={theme.colors.mutedText}>Customer address not provided. Ask customer to update address.</Text>
+          <Text color={theme.colors.mutedText}>Customer address missing. Ask customer to update address.</Text>
+          {onOpenFullScreenMap ? (
+            <Button label="Open appointment details" variant="secondary" onPress={onOpenFullScreenMap} style={{ marginTop: 12 }} />
+          ) : null}
         </View>
       ) : locationError ? (
         <View style={styles.messageBox}>

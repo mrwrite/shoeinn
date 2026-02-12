@@ -18,6 +18,7 @@ from app.routers import (
     slots,
     webhooks,
     push,
+    users,
 )
 from app.workers.payment_sync import payment_sync_worker
 import logging
@@ -51,6 +52,7 @@ app.include_router(dev_seed.router)
 app.include_router(slots.router)
 app.include_router(webhooks.router)
 app.include_router(push.router)
+app.include_router(users.router)
 
 
 @app.on_event("startup")

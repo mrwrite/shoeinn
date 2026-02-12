@@ -20,6 +20,7 @@ import type { ProviderAppointment, StatusUpdatePayload } from "../types/company"
 import { getAuthToken } from "../state/authStore";
 import type { Notification } from "../types/notification";
 import type { PushRegisterRequest, PushUnregisterRequest } from "../types/push";
+import type { CustomerAddressUpdatePayload, UserProfile } from "../types/user";
 
 export const API_URL: string =
   (Constants.expoConfig?.extra as any)?.API_URL ??
@@ -27,7 +28,7 @@ export const API_URL: string =
   (process.env.EXPO_PUBLIC_API_URL as string) ??
   "http://CHANGE_ME:8000";
 
-type HttpMethod = "GET" | "POST";
+type HttpMethod = "GET" | "POST" | "PATCH";
 
 interface RequestOptions extends RequestInit {
   auth?: boolean;
@@ -230,4 +231,12 @@ export function registerPushToken(payload: PushRegisterRequest): Promise<void> {
 
 export function unregisterPushToken(payload: PushUnregisterRequest): Promise<void> {
   return request<void>("POST", "/push/unregister", payload, { auth: true });
+}
+
+export function getMe(): Promise<UserProfile> {
+  return request<UserProfile>("GET", "/me", undefined, { auth: true });
+}
+
+export function updateMyAddress(payload: CustomerAddressUpdatePayload): Promise<UserProfile> {
+  return request<UserProfile>("PATCH", "/me/address", payload, { auth: true });
 }
