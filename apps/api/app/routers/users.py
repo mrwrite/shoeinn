@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
@@ -11,7 +12,13 @@ router = APIRouter(tags=["users"])
 
 @router.get("/me", response_model=UserRead)
 def read_me(current_user: User = Depends(get_current_user)) -> UserRead:
-    return UserRead.model_validate(current_user, from_attributes=True)
+    try:
+        return UserRead.model_validate(current_user, from_attributes=True)
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail="Current user record is invalid. Please contact support.",
+        ) from exc
 
 
 @router.patch("/me/address", response_model=UserRead)
