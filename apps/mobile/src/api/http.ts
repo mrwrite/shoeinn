@@ -7,6 +7,7 @@ import type {
   AppointmentEvent,
   AppointmentLocationUpdate,
   AppointmentLocationUpdatePayload,
+  AppointmentProviderLocationResponse,
   AppointmentSummary,
   AppointmentHold,
   AppointmentTracking,
@@ -152,8 +153,8 @@ export function getAppointmentEvents(id: string): Promise<AppointmentEvent[]> {
   return request<AppointmentEvent[]>("GET", `/appointments/${id}/events`, undefined, { auth: true });
 }
 
-export function getAppointmentLatestLocation(id: string): Promise<AppointmentLocationUpdate> {
-  return request<AppointmentLocationUpdate>("GET", `/appointments/${id}/location/latest`, undefined, { auth: true });
+export function getAppointmentProviderLocation(id: string): Promise<AppointmentProviderLocationResponse> {
+  return request<AppointmentProviderLocationResponse>("GET", `/appointments/${id}/provider-location`, undefined, { auth: true });
 }
 
 export function getAppointmentTracking(id: string): Promise<AppointmentTracking> {

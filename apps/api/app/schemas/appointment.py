@@ -171,3 +171,18 @@ class AppointmentTrackingRead(BaseModel):
     is_travel_state: bool
     latest_location: LocationUpdateRead | None
     recent_locations: list[LocationUpdateRead]
+
+
+class AppointmentProviderLocationRead(BaseModel):
+    lat: float
+    lng: float
+    heading: float | None = None
+    speed: float | None = None
+    accuracy: float | None = None
+    recorded_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AppointmentProviderLocationResponse(BaseModel):
+    location: AppointmentProviderLocationRead | None

@@ -235,7 +235,7 @@ def test_customer_cannot_view_other_location(db_session: Session, client: TestCl
     db_session.commit()
 
     res = client.get(
-        f"/appointments/{appointment.id}/location/latest",
+        f"/appointments/{appointment.id}/provider-location",
         headers=_auth_header(customer),
     )
     assert res.status_code == 403
@@ -278,13 +278,34 @@ def test_latest_location_ordering(db_session: Session, client: TestClient) -> No
     db_session.commit()
 
     res = client.get(
-        f"/appointments/{appointment.id}/location/latest",
+        f"/appointments/{appointment.id}/provider-location",
         headers=_auth_header(customer),
     )
     assert res.status_code == 200
     data = res.json()
-    assert data["lat"] == 5
-    assert data["lng"] == 6
+    assert data["location"]["lat"] == 5
+    assert data["location"]["lng"] == 6
+
+
+def test_provider_location_empty_when_no_updates(db_session: Session, client: TestClient) -> None:
+    company = _make_company(db_session)
+    service = _make_service(db_session, company)
+    customer = _make_user(db_session, email="customer@example.com", role="customer", full_name="Customer")
+    appointment = _make_appointment(
+        db_session,
+        company=company,
+        service=service,
+        status=AppointmentStatus.en_route_pickup,
+        email=customer.email,
+    )
+    db_session.commit()
+
+    res = client.get(
+        f"/appointments/{appointment.id}/provider-location",
+        headers=_auth_header(customer),
+    )
+    assert res.status_code == 200
+    assert res.json() == {"location": None}
 
 
 def test_tracking_requires_assignment(db_session: Session, client: TestClient) -> None:
