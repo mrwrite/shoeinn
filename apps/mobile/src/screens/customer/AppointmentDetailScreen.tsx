@@ -140,6 +140,19 @@ export default function AppointmentDetailScreen({ route }: Props) {
           </View>
         ) : (
           <>
+            {shouldShowTravelMap ? (
+              <CustomerTravelMapCard
+                appointment={{
+                  id: appointment.id,
+                  status: appointment.status,
+                  address_line1: appointment.address_line1,
+                  address_line2: appointment.address_line2,
+                  city: appointment.city,
+                  state: appointment.state,
+                  postal_code: appointment.postal_code,
+                }}
+              />
+            ) : null}
             <View style={styles.card}>
               <Text style={styles.title}>
                 {appointment?.service_name ?? "Appointment"}
@@ -202,20 +215,6 @@ export default function AppointmentDetailScreen({ route }: Props) {
                 <Text style={styles.sectionTitle}>Provider</Text>
                 <Text style={styles.meta}>Not yet assigned</Text>
               </View>
-            ) : null}
-
-            {shouldShowTravelMap ? (
-              <CustomerTravelMapCard
-                appointment={{
-                  id: appointment.id,
-                  status: appointment.status,
-                  address_line1: appointment.address_line1,
-                  address_line2: appointment.address_line2,
-                  city: appointment.city,
-                  state: appointment.state,
-                  postal_code: appointment.postal_code,
-                }}
-              />
             ) : null}
           </>
         )}
