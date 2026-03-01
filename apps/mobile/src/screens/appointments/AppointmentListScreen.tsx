@@ -9,7 +9,7 @@ import { AppointmentCard } from "../../components/AppointmentCard";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { Button } from "../../components/ui/Button";
 import { Text } from "../../components/ui/Text";
-import type { AppointmentStackParamList } from "../../navigation/RootTabs";
+import type { AppointmentStackParamList } from "../../navigation/types";
 import { useAuthStore } from "../../state/authStore";
 import { useTheme } from "../../theme/theme";
 import type { AppointmentSummary } from "../../types/booking";

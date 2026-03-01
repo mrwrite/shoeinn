@@ -10,7 +10,7 @@ import { ScreenContainer } from "../../components/ScreenContainer";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { Text } from "../../components/ui/Text";
-import type { HomeStackParamList } from "../../navigation/RootTabs";
+import type { HomeStackParamList } from "../../navigation/types";
 import { useAuthStore } from "../../state/authStore";
 import { useTheme } from "../../theme/theme";
 

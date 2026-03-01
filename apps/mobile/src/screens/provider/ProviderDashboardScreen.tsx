@@ -20,7 +20,7 @@ import { AppointmentCard } from "../../components/AppointmentCard";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { Button } from "../../components/ui/Button";
 import { Text } from "../../components/ui/Text";
-import type { ProviderStackParamList } from "../../navigation/RootTabs";
+import type { ProviderStackParamList } from "../../navigation/types";
 import { useTheme } from "../../theme/theme";
 import type { ProviderAppointment } from "../../types/company";
 

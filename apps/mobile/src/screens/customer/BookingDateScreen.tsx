@@ -1,10 +1,12 @@
 import React, { useMemo, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
-import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
+import type { RouteProp } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import { PrimaryButton } from "../../components/PrimaryButton";
 import { ScreenContainer } from "../../components/ScreenContainer";
-import type { CustomerStackParamList } from "../../navigation/RootTabs";
+import type { HomeStackParamList } from "../../navigation/types";
 
 function generateNextDays(count: number) {
   const today = new Date();
@@ -16,8 +18,8 @@ function generateNextDays(count: number) {
 }
 
 export default function BookingDateScreen() {
-  const route = useRoute<RouteProp<CustomerStackParamList, "BookingDate">>();
-  const navigation = useNavigation();
+  const route = useRoute<RouteProp<HomeStackParamList, "BookingDate">>();
+  const navigation = useNavigation<NativeStackNavigationProp<HomeStackParamList>>();
   const { service } = route.params;
   const [selected, setSelected] = useState<string | null>(null);
 

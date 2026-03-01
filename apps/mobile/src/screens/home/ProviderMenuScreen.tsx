@@ -8,7 +8,7 @@ import { listServices } from "../../api/http";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { ServiceCard } from "../../components/ServiceCard";
 import { Text } from "../../components/ui/Text";
-import type { HomeStackParamList } from "../../navigation/RootTabs";
+import type { HomeStackParamList } from "../../navigation/types";
 import { useTheme } from "../../theme/theme";
 import type { Service } from "../../types/booking";
 
