@@ -1,6 +1,9 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
+  Modal,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,6 +14,7 @@ import { useQuery } from "@tanstack/react-query";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
+  API_URL,
   getAppointment,
   getAppointmentAssignment,
   getAppointmentEvents,
@@ -23,6 +27,7 @@ import type {
 import { CustomerTravelMapCard } from "../../components/CustomerTravelMapCard";
 
 const travelStatuses = new Set(["en_route_pickup", "out_for_delivery"]);
+const photoVisibleStatuses = new Set(["ready", "out_for_delivery", "delivered", "completed"]);
 
 const statusLabels: Record<string, string> = {
   requested: "Requested",
@@ -45,7 +50,7 @@ const statusOrder = [
   "cleaning",
   "ready",
   "out_for_delivery",
-  "delivered",  
+  "delivered",
   "completed",
   "cancelled",
 ];
@@ -97,8 +102,17 @@ const buildStatusHistory = (
   return statusOrder.map((status) => ({ status, active: reached.has(status) }));
 };
 
+const resolvePhotoUrl = (url?: string | null) => {
+  if (!url) return null;
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    return url;
+  }
+  return `${API_URL.replace(/\/$/, "")}${url.startsWith("/") ? "" : "/"}${url}`;
+};
+
 export default function AppointmentDetailScreen({ route }: Props) {
   const { appointmentId, summary } = route.params;
+  const [expandedPhotoUrl, setExpandedPhotoUrl] = useState<string | null>(null);
 
   const appointmentQuery = useQuery({
     queryKey: ["appointment", appointmentId],
@@ -126,6 +140,9 @@ export default function AppointmentDetailScreen({ route }: Props) {
     () => buildStatusHistory(eventsQuery.data ?? [], appointment?.status),
     [eventsQuery.data, appointment?.status]
   );
+
+  const finishedPhotoUrl = resolvePhotoUrl(appointmentQuery.data?.ready_photo_url);
+  const shouldShowFinishedPhotoSection = appointment ? photoVisibleStatuses.has(appointment.status) : false;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -194,6 +211,20 @@ export default function AppointmentDetailScreen({ route }: Props) {
               ) : null}
             </View>
 
+            {shouldShowFinishedPhotoSection ? (
+              <View style={styles.card}>
+                <Text style={styles.sectionTitle}>Finished Photo</Text>
+                {finishedPhotoUrl ? (
+                  <Pressable onPress={() => setExpandedPhotoUrl(finishedPhotoUrl)}>
+                    <Image source={{ uri: finishedPhotoUrl }} style={styles.finishedPhoto} />
+                    <Text style={styles.meta}>Tap to expand</Text>
+                  </Pressable>
+                ) : (
+                  <Text style={styles.meta}>Photo pending</Text>
+                )}
+              </View>
+            ) : null}
+
             <View style={styles.card}>
               <Text style={styles.sectionTitle}>Status timeline</Text>
               {statusHistory.map((item) => (
@@ -219,6 +250,12 @@ export default function AppointmentDetailScreen({ route }: Props) {
           </>
         )}
       </ScrollView>
+
+      <Modal visible={!!expandedPhotoUrl} transparent animationType="fade">
+        <Pressable style={styles.photoModalBackdrop} onPress={() => setExpandedPhotoUrl(null)}>
+          {expandedPhotoUrl ? <Image source={{ uri: expandedPhotoUrl }} style={styles.photoModalImage} /> : null}
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -268,5 +305,23 @@ const styles = StyleSheet.create({
   },
   statusDotActive: { backgroundColor: "#22c55e" },
   statusLabel: { color: "#6b7280" },
-  statusLabelActive: { color: "#111827", fontWeight: "700" },  
+  statusLabelActive: { color: "#111827", fontWeight: "700" },
+  finishedPhoto: {
+    width: "100%",
+    height: 220,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  photoModalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.85)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 12,
+  },
+  photoModalImage: {
+    width: "100%",
+    height: "85%",
+    resizeMode: "contain",
+  },
 });

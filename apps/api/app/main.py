@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.routers import (
@@ -21,6 +22,7 @@ from app.routers import (
     users,
 )
 from app.workers.payment_sync import payment_sync_worker
+from pathlib import Path
 import logging
 import sys
 
@@ -32,6 +34,10 @@ logging.basicConfig(
 )
 
 app = FastAPI(title="ShoeInn API")
+
+static_dir = Path(__file__).resolve().parent / "static"
+static_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 app.add_middleware(
     CORSMiddleware,

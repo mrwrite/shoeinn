@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from asyncio.log import logger
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from threading import Lock
 from typing import Dict, Tuple
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, File, Header, HTTPException, Request, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -17,6 +18,7 @@ from app.core.security import get_current_customer, get_current_user, get_curren
 from app.models import (
     Appointment,
     AppointmentAssignment,
+    CompanyUser,
     AppointmentEvent,
     AppointmentLocationUpdate,
     AppointmentHold,
@@ -54,6 +56,8 @@ _CACHE_LOCK = Lock()
 _IDEMPOTENCY_TTL = timedelta(minutes=10)
 _HOLD_TTL = timedelta(minutes=15)
 CANCELLED_STATUS = AppointmentStatus.cancelled
+READY_UPLOAD_MAX_BYTES = 10 * 1024 * 1024
+ALLOWED_READY_MIME_TYPES = {"image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"}
 
 
 def _utcnow() -> datetime:
@@ -137,6 +141,11 @@ def _serialize_appointment(appointment: Appointment) -> AppointmentRead:
             "payment_amount_expected": appointment.payment_amount_expected,
             "payment_amount_received": appointment.payment_amount_received,
             "payment_currency": appointment.payment_currency,
+            "ready_photo_url": appointment.ready_photo_url,
+            "ready_photo_uploaded_at": _ensure_utc(appointment.ready_photo_uploaded_at)
+            if appointment.ready_photo_uploaded_at
+            else None,
+            "ready_photo_uploaded_by_user_id": appointment.ready_photo_uploaded_by_user_id,
             "created_at": _ensure_utc(appointment.created_at),
             "updated_at": _ensure_utc(appointment.updated_at),
         },
@@ -249,6 +258,23 @@ def _provider_display_name(user: User | None) -> str | None:
     return "".join(p[0].upper() for p in parts[:2])
 
 
+def _ensure_appointment_read_access(appointment: Appointment, current_user, company_id: UUID | None) -> None:
+    if current_user.role == "customer":
+        _ensure_customer_access(appointment, current_user)
+        return
+
+    if current_user.role in {"company", "provider", "company_admin"}:
+        if company_id is None or appointment.company_id != company_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+        return
+
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
+
+def _ready_upload_dir() -> Path:
+    return Path(__file__).resolve().parent.parent / "static" / "uploads" / "appointments"
+
+
 @router.post("/holds", response_model=HoldRead, status_code=status.HTTP_201_CREATED)
 def create_hold(payload: HoldCreate, db: Session = Depends(get_db)) -> HoldRead:
     """Create a new appointment hold for the given service and start time."""
@@ -320,10 +346,21 @@ def get_payment_gateway() -> PaymentGateway:
 
 
 @router.get("/{appointment_id}", response_model=AppointmentRead)
-def read_appointment(appointment_id: UUID, db: Session = Depends(get_db)) -> AppointmentRead:
+def read_appointment(
+    appointment_id: UUID,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AppointmentRead:
     appointment = db.get(Appointment, appointment_id)
     if appointment is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
+
+    company_id: UUID | None = None
+    if current_user.role in {"company", "provider", "company_admin"}:
+        company_user = db.query(CompanyUser).filter(CompanyUser.user_id == current_user.id).first()
+        company_id = company_user.company_id if company_user else None
+
+    _ensure_appointment_read_access(appointment, current_user, company_id)
     return _serialize_appointment(appointment)
 
 

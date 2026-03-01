@@ -99,6 +99,9 @@ class AppointmentRead(BaseModel):
     payment_amount_expected: int | None = None
     payment_amount_received: int | None = None
     payment_currency: str | None = None
+    ready_photo_url: str | None = None
+    ready_photo_uploaded_at: datetime | None = None
+    ready_photo_uploaded_by_user_id: UUID | None = None
     created_at: datetime
     updated_at: datetime
 

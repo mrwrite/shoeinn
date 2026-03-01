@@ -64,6 +64,9 @@ export interface Appointment {
   payment_amount_expected?: number | null;
   payment_amount_received?: number | null;
   payment_currency?: string | null;
+  ready_photo_url?: string | null;
+  ready_photo_uploaded_at?: string | null;
+  ready_photo_uploaded_by_user_id?: string | null;
   created_at: string;
   updated_at?: string;
   service_name?: string | null;
@@ -72,11 +75,11 @@ export interface Appointment {
 export interface AppointmentSummary {
   customer_name: string;
   customer_phone: string;
-  address_line1: any;
-  address_line2: any;
-  city: any;
-  state: any;
-  postal_code: any;
+  address_line1?: string | null;
+  address_line2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postal_code?: string | null;
   id: string;
   company_id?: string | null;
   service_name?: string | null;
@@ -88,7 +91,7 @@ export interface AppointmentEvent {
   id: string;
   appointment_id: string;
   kind: string;
-  payload?: Record<string, any> | null;
+  payload?: Record<string, unknown> | null;
   created_at: string;
 }
 
