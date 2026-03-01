@@ -1,15 +1,17 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
+import type { RouteProp } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import { PrimaryButton } from "../../components/PrimaryButton";
 import { ScreenContainer } from "../../components/ScreenContainer";
-import type { CustomerStackParamList } from "../../navigation/RootTabs";
+import type { HomeStackParamList } from "../../navigation/types";
 
 export default function ServiceDetailScreen() {
-  const navigation = useNavigation();
-  const route = useRoute<RouteProp<CustomerStackParamList, "ServiceDetail">>();
+  const navigation = useNavigation<NativeStackNavigationProp<HomeStackParamList, "ServiceDetail">>();
+  const route = useRoute<RouteProp<HomeStackParamList, "ServiceDetail">>();
   const { service } = route.params;
 
   const stickyCTA = (
@@ -25,7 +27,7 @@ export default function ServiceDetailScreen() {
         end={{ x: 1, y: 1 }}
       >
         <Text style={styles.heroTitle}>{service.name}</Text>
-        <Text style={styles.heroSubtitle}>${service.price.toFixed(2)} · {service.durationMins} mins</Text>
+        <Text style={styles.heroSubtitle}>${(service.price_cents / 100).toFixed(2)} · {service.duration_minutes} mins</Text>
       </LinearGradient>
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>What's included</Text>

@@ -1,21 +1,23 @@
 import React from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
-import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
+import type { RouteProp } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import { PrimaryButton, SecondaryButton } from "../../components/PrimaryButton";
 import { ScreenContainer } from "../../components/ScreenContainer";
-import type { CustomerStackParamList } from "../../navigation/RootTabs";
+import type { HomeStackParamList } from "../../navigation/types";
 
 export default function BookingConfirmScreen() {
-  const navigation = useNavigation();
-  const route = useRoute<RouteProp<CustomerStackParamList, "BookingConfirm">>();
+  const navigation = useNavigation<NativeStackNavigationProp<HomeStackParamList>>();
+  const route = useRoute<RouteProp<HomeStackParamList, "BookingConfirm">>();
   const { service, date, time } = route.params;
 
   const onConfirm = () => {
     Alert.alert("Appointment confirmed", "Your booking is scheduled!", [
       {
         text: "Back to home",
-        onPress: () => navigation.navigate("CustomerHome"),
+        onPress: () => navigation.navigate("Home"),
       },
     ]);
   };
@@ -26,7 +28,7 @@ export default function BookingConfirmScreen() {
         <Text style={styles.title}>Review & Confirm</Text>
         <View style={styles.summaryCard}>
           <Text style={styles.summaryTitle}>{service.name}</Text>
-          <Text style={styles.summaryText}>${service.price.toFixed(2)} · {service.durationMins} mins</Text>
+          <Text style={styles.summaryText}>${(service.price_cents / 100).toFixed(2)} · {service.duration_minutes} mins</Text>
           <Text style={styles.summaryText}>{new Date(date).toDateString()} at {time}</Text>
         </View>
         <View style={styles.summaryCard}>

@@ -11,7 +11,7 @@ import { ScreenContainer } from "../../components/ScreenContainer";
 import { SearchBar } from "../../components/ui/SearchBar";
 import { Text } from "../../components/ui/Text";
 import { useCityState } from "../../hooks/useCityState";
-import type { HomeStackParamList } from "../../navigation/RootTabs";
+import type { HomeStackParamList } from "../../navigation/types";
 import { useTheme } from "../../theme/theme";
 import type { Company } from "../../types/company";
 

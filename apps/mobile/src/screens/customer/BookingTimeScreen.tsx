@@ -1,16 +1,18 @@
 import React, { useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
-import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
+import type { RouteProp } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import { PrimaryButton } from "../../components/PrimaryButton";
 import { ScreenContainer } from "../../components/ScreenContainer";
-import type { CustomerStackParamList } from "../../navigation/RootTabs";
+import type { HomeStackParamList } from "../../navigation/types";
 
 const timeSlots = ["9:00 AM", "10:30 AM", "12:00 PM", "1:30 PM", "3:00 PM", "4:30 PM", "6:00 PM"];
 
 export default function BookingTimeScreen() {
-  const navigation = useNavigation();
-  const route = useRoute<RouteProp<CustomerStackParamList, "BookingTime">>();
+  const navigation = useNavigation<NativeStackNavigationProp<HomeStackParamList>>();
+  const route = useRoute<RouteProp<HomeStackParamList, "BookingTime">>();
   const { service, date } = route.params;
   const [selected, setSelected] = useState<string | null>(null);
 

@@ -4,7 +4,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import AppointmentDetailScreen from "../screens/appointments/AppointmentDetailScreen";
+import AppointmentDetailScreen from "../screens/customer/AppointmentDetailScreen";
 import AppointmentListScreen from "../screens/appointments/AppointmentListScreen";
 import BookingConfirmScreen from "../screens/home/BookingConfirmScreen";
 import BookingDateScreen from "../screens/home/BookingDateScreen";
@@ -15,45 +15,20 @@ import ServiceDetailScreen from "../screens/home/ServiceDetailScreen";
 import ProfileScreen from "../screens/profile/ProfileScreen";
 import ProviderAppointmentDetailScreen from "../screens/provider/ProviderAppointmentDetailScreen";
 import ProviderDashboardScreen from "../screens/provider/ProviderDashboardScreen";
+import type {
+  AppointmentStackParamList,
+  HomeStackParamList,
+  ProfileStackParamList,
+  ProviderStackParamList,
+  RootTabParamList,
+} from "./types";
 import { useAuthStore } from "../state/authStore";
 import { useTheme } from "../theme/theme";
-import type { AppointmentSummary, Service } from "../types/booking";
-import type { ProviderAppointment } from "../types/company";
-import type { Company } from "../types/company";
-
-export type HomeStackParamList = {
-  Home: undefined;
-  ProviderMenu: { company: Company };
-  ServiceDetail: { service: Service };
-  BookingDate: { service: Service };
-  BookingTime: { service: Service; date: string };
-  BookingConfirm: { service: Service; date: string; time: string };
-};
-
-export type AppointmentStackParamList = {
-  AppointmentList: undefined;
-  AppointmentDetail: { appointmentId: string; summary?: AppointmentSummary };
-};
-
-export type ProviderStackParamList = {
-  ProviderDashboard: undefined;
-  ProviderAppointmentDetail: { appointment: ProviderAppointment };
-};
-
-export type ProfileStackParamList = {
-  ProfileHome: undefined;
-};
 
 const HomeStack = createNativeStackNavigator<HomeStackParamList>();
 const AppointmentStack = createNativeStackNavigator<AppointmentStackParamList>();
 const ProviderStack = createNativeStackNavigator<ProviderStackParamList>();
 const ProfileStack = createNativeStackNavigator<ProfileStackParamList>();
-type RootTabParamList = {
-  HomeTab: undefined;
-  AppointmentsTab: undefined;
-  ProviderTab: undefined;
-  ProfileTab: undefined;
-};
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
 

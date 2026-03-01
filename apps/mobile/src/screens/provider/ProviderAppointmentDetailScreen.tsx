@@ -12,7 +12,7 @@ import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { Text } from "../../components/ui/Text";
 import { TravelMapCard } from "../../components/TravelMapCard";
-import type { ProviderStackParamList } from "../../navigation/RootTabs";
+import type { ProviderStackParamList } from "../../navigation/types";
 import { useAuthStore } from "../../state/authStore";
 import { useTheme } from "../../theme/theme";
 import type { AppointmentStatus } from "../../types/booking";
