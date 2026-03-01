@@ -24,6 +24,7 @@
     "expo": "~54.0.30",
     "expo-constants": "~18.0.12",
     "expo-dev-client": "~6.0.20",
+    "expo-image-picker": "~16.0.6",
     "expo-linear-gradient": "~13.0.2",
     "expo-location": "~19.0.8",
     "expo-notifications": "~0.28.17",

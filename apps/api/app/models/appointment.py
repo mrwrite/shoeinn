@@ -57,6 +57,9 @@ class Appointment(Base):
     payment_amount_expected = Column(Integer, nullable=True)
     payment_amount_received = Column(Integer, nullable=True)
     payment_currency = Column(String(3), nullable=True)
+    ready_photo_url = Column(String(2048), nullable=True)
+    ready_photo_uploaded_at = Column(DateTime(timezone=True), nullable=True)
+    ready_photo_uploaded_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(
         DateTime(timezone=True),

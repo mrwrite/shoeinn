@@ -1,11 +1,13 @@
 import React, { useMemo, useState } from "react";
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Alert, Image, Modal, ScrollView, StyleSheet, View } from "react-native";
 import { RouteProp, useRoute } from "@react-navigation/native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import * as ImagePicker from "expo-image-picker";
 
 import {
   claimAppointment,
   getProviderAppointmentAssignment,
+  setAppointmentReadyWithPhoto,
   updateAppointmentStatus,
 } from "../../api/http";
 import { Button } from "../../components/ui/Button";
@@ -34,6 +36,7 @@ export default function ProviderAppointmentDetailScreen() {
   const route = useRoute<RouteProp<ProviderStackParamList, "ProviderAppointmentDetail">>();
   const { appointment } = route.params;
   const [status, setStatus] = useState<AppointmentStatus>(appointment.status);
+  const [pendingReadyPhotoUri, setPendingReadyPhotoUri] = useState<string | null>(null);
   const userId = useAuthStore((s) => s.userId);
   const queryClient = useQueryClient();
 
@@ -52,8 +55,22 @@ export default function ProviderAppointmentDetailScreen() {
     onSuccess: (_, next) => {
       setStatus(next);
       queryClient.invalidateQueries({ queryKey: ["provider", "open"] });
+      queryClient.invalidateQueries({ queryKey: ["provider", "my"] });
+      queryClient.invalidateQueries({ queryKey: ["appointment", appointment.id] });
     },
     onError: (err: Error) => Alert.alert("Update failed", err.message),
+  });
+
+  const readyMutation = useMutation({
+    mutationFn: (uri: string) => setAppointmentReadyWithPhoto(appointment.id, uri),
+    onSuccess: () => {
+      setStatus("ready");
+      setPendingReadyPhotoUri(null);
+      queryClient.invalidateQueries({ queryKey: ["provider", "open"] });
+      queryClient.invalidateQueries({ queryKey: ["provider", "my"] });
+      queryClient.invalidateQueries({ queryKey: ["appointment", appointment.id] });
+    },
+    onError: (err: Error) => Alert.alert("Upload failed", err.message),
   });
 
   const claimMutation = useMutation({
@@ -83,73 +100,133 @@ export default function ProviderAppointmentDetailScreen() {
     [appointment],
   );
 
+  const openReadyCaptureFlow = async () => {
+    const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
+
+    if (!cameraPermission.granted) {
+      const mediaPermission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!mediaPermission.granted) {
+        Alert.alert("Permission needed", "Camera permission is required to mark as ready.");
+        return;
+      }
+      const picked = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.8,
+      });
+      if (!picked.canceled && picked.assets.length > 0) {
+        setPendingReadyPhotoUri(picked.assets[0].uri);
+      }
+      return;
+    }
+
+    const captured = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+      cameraType: ImagePicker.CameraType.back,
+    });
+
+    if (!captured.canceled && captured.assets.length > 0) {
+      setPendingReadyPhotoUri(captured.assets[0].uri);
+    }
+  };
+
+  const handleStatusPress = async (next: AppointmentStatus) => {
+    if (next === "ready") {
+      await openReadyCaptureFlow();
+      return;
+    }
+    statusMutation.mutate(next);
+  };
+
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: theme.colors.surfaceLight }} contentContainerStyle={{ padding: 16, gap: 12 }}>
-      <Text variant="title" weight="bold">
-        {appointment.service_name ?? "Appointment"}
-      </Text>
-
-      {showTravelCard ? <TravelMapCard appointment={{ ...appointment, status }} /> : null}
-
-      <Card>
-        <Text variant="subtitle" weight="semibold">
-          Details
+    <>
+      <ScrollView style={{ flex: 1, backgroundColor: theme.colors.surfaceLight }} contentContainerStyle={{ padding: 16, gap: 12 }}>
+        <Text variant="title" weight="bold">
+          {appointment.service_name ?? "Appointment"}
         </Text>
-        <View style={{ marginTop: 10, gap: 8 }}>
-          {info.map((item) => (
-            <Row key={item.label} label={item.label} value={item.value} />
-          ))}
-          <Row label="Status" value={status.replace(/_/g, " ")} />
-        </View>
-      </Card>
 
-      <Card>
-        <Text variant="subtitle" weight="semibold">
-          Assignment
-        </Text>
-        {assignmentQuery.isFetching ? (
-          <ActivityIndicator color={theme.colors.peacockPrimary} style={{ marginTop: 10 }} />
-        ) : assignment ? (
-          <Text style={{ marginTop: 8 }}>
-            Assigned {assignment.provider_name ? `to ${assignment.provider_name}` : ""}
-            {assignedToMe ? " (you)" : ""}
+        {showTravelCard ? <TravelMapCard appointment={{ ...appointment, status }} /> : null}
+
+        <Card>
+          <Text variant="subtitle" weight="semibold">
+            Details
           </Text>
-        ) : (
-          <Text style={{ marginTop: 8 }} color={theme.colors.mutedText}>
-            No provider assigned yet.
-          </Text>
-        )}
-        {isUnassigned ? (
-          <Button
-            label={claimMutation.isPending ? "Claiming..." : "Claim appointment"}
-            onPress={() => claimMutation.mutate()}
-            loading={claimMutation.isPending}
-            style={{ marginTop: 12 }}
-          />
-        ) : null}
-      </Card>
+          <View style={{ marginTop: 10, gap: 8 }}>
+            {info.map((item) => (
+              <Row key={item.label} label={item.label} value={item.value} />
+            ))}
+            <Row label="Status" value={status.replace(/_/g, " ")} />
+          </View>
+        </Card>
 
-      <Card>
-        <Text variant="subtitle" weight="semibold">
-          Status updates
-        </Text>
-        <View style={{ marginTop: 10, gap: 8 }}>
-          {statusOptions.map((opt) => (
+        <Card>
+          <Text variant="subtitle" weight="semibold">
+            Assignment
+          </Text>
+          {assignmentQuery.isFetching ? (
+            <ActivityIndicator color={theme.colors.peacockPrimary} style={{ marginTop: 10 }} />
+          ) : assignment ? (
+            <Text style={{ marginTop: 8 }}>
+              Assigned {assignment.provider_name ? `to ${assignment.provider_name}` : ""}
+              {assignedToMe ? " (you)" : ""}
+            </Text>
+          ) : (
+            <Text style={{ marginTop: 8 }} color={theme.colors.mutedText}>
+              No provider assigned yet.
+            </Text>
+          )}
+          {isUnassigned ? (
             <Button
-              key={opt}
-              label={opt.replace(/_/g, " ")}
-              variant={status === opt ? "primary" : "secondary"}
-              onPress={() => statusMutation.mutate(opt)}
-              disabled={statusMutation.isPending}
-              style={{ marginBottom: 8 }}
+              label={claimMutation.isPending ? "Claiming..." : "Claim appointment"}
+              onPress={() => claimMutation.mutate()}
+              loading={claimMutation.isPending}
+              style={{ marginTop: 12 }}
             />
-          ))}
-          <Text variant="caption" color={theme.colors.mutedText}>
-            Tap a status to update progress.
+          ) : null}
+        </Card>
+
+        <Card>
+          <Text variant="subtitle" weight="semibold">
+            Status updates
           </Text>
+          <View style={{ marginTop: 10, gap: 8 }}>
+            {statusOptions.map((opt) => (
+              <Button
+                key={opt}
+                label={opt.replace(/_/g, " ")}
+                variant={status === opt ? "primary" : "secondary"}
+                onPress={() => {
+                  void handleStatusPress(opt);
+                }}
+                disabled={statusMutation.isPending || readyMutation.isPending}
+                style={{ marginBottom: 8 }}
+              />
+            ))}
+            <Text variant="caption" color={theme.colors.mutedText}>
+              Marking an appointment as ready requires a finished-shoes photo.
+            </Text>
+          </View>
+        </Card>
+      </ScrollView>
+
+      <Modal visible={!!pendingReadyPhotoUri} transparent animationType="slide">
+        <View style={styles.modalBackdrop}>
+          <Card style={styles.modalCard}>
+            <Text variant="subtitle" weight="semibold">Preview finished photo</Text>
+            {pendingReadyPhotoUri ? <Image source={{ uri: pendingReadyPhotoUri }} style={styles.previewImage} /> : null}
+            <View style={styles.modalActions}>
+              <Button label="Retake" variant="secondary" onPress={() => void openReadyCaptureFlow()} disabled={readyMutation.isPending} />
+              <Button
+                label={readyMutation.isPending ? "Uploading..." : "Confirm"}
+                onPress={() => pendingReadyPhotoUri && readyMutation.mutate(pendingReadyPhotoUri)}
+                loading={readyMutation.isPending}
+              />
+            </View>
+            <Button label="Cancel" variant="ghost" onPress={() => setPendingReadyPhotoUri(null)} disabled={readyMutation.isPending} />
+          </Card>
         </View>
-      </Card>
-    </ScrollView>
+      </Modal>
+    </>
   );
 }
 
@@ -168,5 +245,24 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    padding: 16,
+  },
+  modalCard: {
+    gap: 12,
+  },
+  previewImage: {
+    width: "100%",
+    height: 280,
+    borderRadius: 12,
+  },
+  modalActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 8,
   },
 });

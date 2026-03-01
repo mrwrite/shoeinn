@@ -29,7 +29,7 @@ export const API_URL: string =
   (process.env.EXPO_PUBLIC_API_URL as string) ??
   "http://CHANGE_ME:8000";
 
-type HttpMethod = "GET" | "POST" | "PATCH";
+type HttpMethod = "GET" | "POST" | "PATCH" | "PUT";
 
 interface RequestOptions extends RequestInit {
   auth?: boolean;
@@ -49,12 +49,13 @@ async function request<T>(
   console.log(`[HTTP] ${method}`, url);
 
   try {
+    const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
     const response = await fetch(url, {
       ...init,
       method,
-      body: body ? JSON.stringify(body) : undefined,
+      body: body ? (isFormData ? (body as FormData) : JSON.stringify(body)) : undefined,
       headers: {
-        "Content-Type": "application/json",
+        ...(isFormData ? {} : { "Content-Type": "application/json" }),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(init.headers ?? {}),
       },
@@ -142,7 +143,7 @@ export function confirmAppointment(payload: ConfirmAppointmentPayload): Promise<
 }
 
 export function getAppointment(id: string): Promise<Appointment> {
-  return request<Appointment>("GET", `/appointments/${id}`);
+  return request<Appointment>("GET", `/appointments/${id}`, undefined, { auth: true });
 }
 
 export function getMyAppointments(): Promise<AppointmentSummary[]> {
@@ -193,6 +194,21 @@ export function updateAppointmentStatus(
 ): Promise<{ id: string; status: string }> {
   return request<{ id: string; status: string }>("POST", `/company/appointments/${id}/status`, payload, {
     auth: true,
+  });
+}
+
+
+export function setAppointmentReadyWithPhoto(id: string, fileUri: string): Promise<{ id: string; status: string; ready_photo_url?: string | null }> {
+  const form = new FormData();
+  form.append("file", {
+    uri: fileUri,
+    name: `ready-${Date.now()}.jpg`,
+    type: "image/jpeg",
+  } as unknown as Blob);
+
+  return request<{ id: string; status: string; ready_photo_url?: string | null }>("PUT", `/company/appointments/${id}/ready`, form, {
+    auth: true,
+    timeoutMs: 20000,
   });
 }
 

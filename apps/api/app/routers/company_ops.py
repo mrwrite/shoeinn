@@ -1,10 +1,11 @@
 from datetime import datetime, timezone
+from pathlib import Path
 import json
 import secrets
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from pydantic import BaseModel, EmailStr, field_validator
 from app.enums import AppointmentStatus
 from sqlalchemy import exists, and_, or_
@@ -53,6 +54,8 @@ TRAVEL_STATUSES = {
     AppointmentStatus.en_route_pickup,
     AppointmentStatus.out_for_delivery,
 }
+READY_UPLOAD_MAX_BYTES = 10 * 1024 * 1024
+ALLOWED_READY_MIME_TYPES = {"image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"}
 
 
 class StatusUpdate(BaseModel):
@@ -87,6 +90,10 @@ class CompanyUserCreated(BaseModel):
 
 def _generate_temp_password() -> str:
     return secrets.token_urlsafe(8)
+
+
+def _ready_upload_dir() -> Path:
+    return Path(__file__).resolve().parent.parent / "static" / "uploads" / "appointments"
 
 
 @router.post("/auth/login")
@@ -511,6 +518,95 @@ def all_appointments(current=Depends(get_current_company_admin), db: Session = D
     return results
 
 
+@router.put("/appointments/{appointment_id}/ready")
+async def set_ready_with_photo(
+    appointment_id: UUID,
+    request: Request,
+    file: UploadFile = File(...),
+    current=Depends(get_current_company_user),
+    db: Session = Depends(get_db),
+):
+    current_user, company_id = current
+    appt = db.get(Appointment, appointment_id)
+    if not appt:
+        raise HTTPException(status_code=404, detail="Not found")
+    if appt.company_id and appt.company_id != company_id:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    assignment = (
+        db.query(AppointmentAssignment)
+        .filter(
+            AppointmentAssignment.appointment_id == appointment_id,
+            AppointmentAssignment.user_id == current_user.id,
+            AppointmentAssignment.is_active.is_(True),
+        )
+        .first()
+    )
+    if assignment is None:
+        raise HTTPException(status_code=403, detail="Only assigned provider can mark as ready")
+
+    content_type = (file.content_type or "").lower()
+    if content_type not in ALLOWED_READY_MIME_TYPES:
+        raise HTTPException(status_code=400, detail="Only image uploads are supported")
+
+    payload = await file.read()
+    if not payload:
+        raise HTTPException(status_code=400, detail="Photo is required")
+    if len(payload) > READY_UPLOAD_MAX_BYTES:
+        raise HTTPException(status_code=400, detail="Photo exceeds 10MB limit")
+
+    extension = Path(file.filename or "").suffix.lower()
+    if extension not in {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"}:
+        extension = ".jpg"
+
+    upload_dir = _ready_upload_dir() / str(appointment_id)
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    filename = f"ready_{int(datetime.now(timezone.utc).timestamp())}{extension}"
+    target = upload_dir / filename
+    target.write_bytes(payload)
+
+    previous_status = appt.status
+    appt.status = AppointmentStatus.ready
+    appt.ready_photo_url = f"/static/uploads/appointments/{appointment_id}/{filename}"
+    appt.ready_photo_uploaded_at = datetime.now(timezone.utc)
+    appt.ready_photo_uploaded_by_user_id = current_user.id
+
+    db.add(
+        AppointmentEvent(
+            appointment_id=appt.id,
+            kind="status_change",
+            payload={"status": appt.status.value},
+        )
+    )
+    db.add(appt)
+    enqueue_customer_notification(
+        db,
+        appt,
+        APPOINTMENT_STATUS_CHANGED,
+        payload={"old_status": previous_status.value, "new_status": appt.status.value},
+    )
+    if appt.company_id:
+        enqueue_company_user_notifications(
+            db,
+            appt.company_id,
+            appt,
+            APPOINTMENT_STATUS_CHANGED,
+            payload={"old_status": previous_status.value, "new_status": appt.status.value},
+        )
+    db.commit()
+    db.refresh(appt)
+
+    ready_photo_url = appt.ready_photo_url
+    if ready_photo_url and ready_photo_url.startswith("/"):
+        ready_photo_url = str(request.base_url).rstrip("/") + ready_photo_url
+
+    return {
+        "id": str(appt.id),
+        "status": appt.status,
+        "ready_photo_url": ready_photo_url,
+    }
+
+
 @router.post("/appointments/{appointment_id}/status")
 def update_status(
     appointment_id: UUID,
@@ -527,6 +623,9 @@ def update_status(
 
     if appt.company_id is None:
         appt.company_id = company_id
+
+    if payload.status == AppointmentStatus.ready:
+        raise HTTPException(status_code=400, detail="Ready status requires a finished photo")
 
     previous_status = appt.status
     appt.status = payload.status
