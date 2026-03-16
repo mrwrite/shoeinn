@@ -1,7 +1,6 @@
 import React from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   RefreshControl,
   StyleSheet,
@@ -25,6 +24,32 @@ import { useTheme } from "../../theme/theme";
 import type { ProviderAppointment } from "../../types/company";
 
 type TabKey = "available" | "my";
+type FeedbackTone = "success" | "warning" | "danger";
+
+type FeedbackState = {
+  tone: FeedbackTone;
+  message: string;
+} | null;
+
+function getClaimFeedback(error: Error): FeedbackState {
+  const message = error.message.toLowerCase();
+  if (
+    message.includes("already assigned") ||
+    message.includes("conflict") ||
+    message.includes("no longer available") ||
+    message.includes("409")
+  ) {
+    return {
+      tone: "warning",
+      message: "This job is no longer available. Refresh to see the latest list.",
+    };
+  }
+
+  return {
+    tone: "danger",
+    message: "Unable to claim this job right now. Try again or refresh the list.",
+  };
+}
 
 function Tabs({
   active,
@@ -86,6 +111,7 @@ export default function ProviderDashboardScreen() {
   const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = React.useState<TabKey>("available");
+  const [feedback, setFeedback] = React.useState<FeedbackState>(null);
 
   const openAppointmentsQuery = useQuery({
     queryKey: ["provider", "open"],
@@ -101,11 +127,21 @@ export default function ProviderDashboardScreen() {
   const claimMutation = useMutation({
     mutationFn: (id: string) => claimAppointment(id),
     onSuccess: () => {
+      setFeedback({
+        tone: "success",
+        message: "Job claimed. It now appears in My Jobs.",
+      });
       queryClient.invalidateQueries({ queryKey: ["provider", "open"] });
       queryClient.invalidateQueries({ queryKey: ["provider", "my"] });
     },
-    onError: (err: Error) => Alert.alert("Claim failed", err.message),
+    onError: (err: Error) => {
+      setFeedback(getClaimFeedback(err));
+    },
   });
+
+  React.useEffect(() => {
+    setFeedback(null);
+  }, [activeTab]);
 
   const activeQuery = activeTab === "available" ? openAppointmentsQuery : myAppointmentsQuery;
 
@@ -130,6 +166,11 @@ export default function ProviderDashboardScreen() {
         activeTab === "available" ? () => claimMutation.mutate(item.id) : undefined
       }
       claimable={activeTab === "available"}
+      helperText={
+        activeTab === "available"
+          ? "Review the job details before claiming. Claiming assigns the job to you."
+          : undefined
+      }
     />
   );
 
@@ -157,6 +198,28 @@ export default function ProviderDashboardScreen() {
       </View>
 
       <Tabs active={activeTab} onChange={setActiveTab} />
+
+      {feedback ? (
+        <View
+          style={[
+            styles.feedback,
+            feedback.tone === "success" && styles.feedbackSuccess,
+            feedback.tone === "warning" && styles.feedbackWarning,
+            feedback.tone === "danger" && styles.feedbackDanger,
+          ]}
+        >
+          <Text
+            weight="semibold"
+            color={
+              feedback.tone === "danger"
+                ? theme.colors.danger
+                : theme.colors.textCharcoal
+            }
+          >
+            {feedback.message}
+          </Text>
+        </View>
+      ) : null}
 
       {activeQuery.isLoading ? (
         <View style={styles.center}>
@@ -203,6 +266,25 @@ const styles = StyleSheet.create({
   header: {
     padding: 16,
     gap: 4,
+  },
+  feedback: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+  },
+  feedbackSuccess: {
+    backgroundColor: "#ecfdf5",
+    borderColor: "#86efac",
+  },
+  feedbackWarning: {
+    backgroundColor: "#fffbeb",
+    borderColor: "#fcd34d",
+  },
+  feedbackDanger: {
+    backgroundColor: "#fef2f2",
+    borderColor: "#fecaca",
   },
   center: {
     alignItems: "center",

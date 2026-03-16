@@ -31,12 +31,58 @@ const statusOptions: AppointmentStatus[] = [
   "cancelled",
 ];
 
+type ProviderAssignmentState =
+  | { kind: "assigned_to_me"; message: string }
+  | { kind: "assigned_to_other"; message: string }
+  | { kind: "unassigned"; message: string }
+  | { kind: "assignment_unavailable"; message: string };
+
+type FeedbackTone = "success" | "warning" | "danger";
+
+function getRecommendedNextStatus(status: AppointmentStatus): AppointmentStatus | null {
+  const nextStatusMap: Partial<Record<AppointmentStatus, AppointmentStatus>> = {
+    confirmed: "en_route_pickup",
+    en_route_pickup: "picked_up",
+    picked_up: "cleaning",
+    cleaning: "ready",
+    ready: "out_for_delivery",
+    out_for_delivery: "delivered",
+    delivered: "completed",
+  };
+
+  return nextStatusMap[status] ?? null;
+}
+
+function getClaimFeedback(error: Error): { tone: FeedbackTone; message: string } {
+  const message = error.message.toLowerCase();
+  if (
+    message.includes("already assigned") ||
+    message.includes("conflict") ||
+    message.includes("no longer available") ||
+    message.includes("409")
+  ) {
+    return {
+      tone: "warning",
+      message: "This appointment is no longer available to claim.",
+    };
+  }
+
+  return {
+    tone: "danger",
+    message: "Unable to claim this appointment right now. Try again shortly.",
+  };
+}
+
 export default function ProviderAppointmentDetailScreen() {
   const theme = useTheme();
   const route = useRoute<RouteProp<ProviderStackParamList, "ProviderAppointmentDetail">>();
   const { appointment } = route.params;
   const [status, setStatus] = useState<AppointmentStatus>(appointment.status);
   const [pendingReadyPhotoUri, setPendingReadyPhotoUri] = useState<string | null>(null);
+  const [claimFeedback, setClaimFeedback] = useState<{
+    tone: FeedbackTone;
+    message: string;
+  } | null>(null);
   const userId = useAuthStore((s) => s.userId);
   const queryClient = useQueryClient();
 
@@ -76,17 +122,55 @@ export default function ProviderAppointmentDetailScreen() {
   const claimMutation = useMutation({
     mutationFn: () => claimAppointment(appointment.id),
     onSuccess: (data) => {
+      setClaimFeedback({
+        tone: "success",
+        message: "Appointment claimed. You can continue the job from this screen.",
+      });
       queryClient.setQueryData(["appointment", appointment.id, "assignment"], data);
       queryClient.invalidateQueries({ queryKey: ["provider", "open"] });
     },
-    onError: (err: Error) => Alert.alert("Claim failed", err.message),
+    onError: (err: Error) => {
+      setClaimFeedback(getClaimFeedback(err));
+    },
   });
 
   const assignment = assignmentQuery.data;
-  const isUnassigned = !assignment && (!assignmentQuery.error || `${assignmentQuery.error}`.includes("404"));
+  const assignmentErrorText = assignmentQuery.error ? `${assignmentQuery.error}`.toLowerCase() : "";
+  const assignmentState: ProviderAssignmentState = assignment
+    ? assignment.user_id === userId
+      ? {
+          kind: "assigned_to_me",
+          message: `Assigned${assignment.provider_name ? ` to ${assignment.provider_name}` : ""} (you).`,
+        }
+      : {
+          kind: "assigned_to_other",
+          message: assignment.provider_name
+            ? `Assigned to ${assignment.provider_name}.`
+            : "Assigned to another provider.",
+        }
+    : assignmentQuery.isError
+      ? assignmentErrorText.includes("404")
+        ? {
+            kind: "unassigned",
+            message: "No provider has claimed this appointment yet.",
+          }
+        : {
+            kind: "assignment_unavailable",
+            message: "Assignment status is temporarily unavailable.",
+          }
+      : {
+          kind: "unassigned",
+          message: "No provider has claimed this appointment yet.",
+        };
+  const isUnassigned = assignmentState.kind === "unassigned";
   const assignedToMe = assignment?.user_id === userId;
   const showTravelCard =
     assignedToMe && (status === "en_route_pickup" || status === "out_for_delivery");
+  const recommendedNextStatus = getRecommendedNextStatus(status);
+  const secondaryStatuses = statusOptions.filter(
+    (opt) => opt !== status && opt !== recommendedNextStatus,
+  );
+  const currentStateLabel = status.replace(/_/g, " ");
 
   const info = useMemo(
     () => [
@@ -141,9 +225,123 @@ export default function ProviderAppointmentDetailScreen() {
   return (
     <>
       <ScrollView style={{ flex: 1, backgroundColor: theme.colors.surfaceLight }} contentContainerStyle={{ padding: 16, gap: 12 }}>
-        <Text variant="title" weight="bold">
-          {appointment.service_name ?? "Appointment"}
-        </Text>
+        <Card>
+          <Text variant="title" weight="bold">
+            {appointment.service_name ?? "Appointment"}
+          </Text>
+          <View style={{ marginTop: 12, gap: 12 }}>
+            <View style={styles.stateHeader}>
+              <View style={styles.stateBadge}>
+                <Text variant="overline" weight="semibold" color={theme.colors.peacockPrimary}>
+                  Current state
+                </Text>
+              </View>
+              <Text variant="subtitle" weight="semibold">
+                {currentStateLabel}
+              </Text>
+              <Text color={theme.colors.mutedText}>
+                {recommendedNextStatus
+                  ? `Next recommended update: ${recommendedNextStatus.replace(/_/g, " ")}.`
+                  : "This appointment is in a terminal or manually managed state."}
+              </Text>
+            </View>
+
+            {recommendedNextStatus ? (
+              <View style={styles.primaryActionBlock}>
+                <Text variant="subtitle" weight="semibold">
+                  Primary next action
+                </Text>
+                {recommendedNextStatus === "ready" ? (
+                  <Text variant="caption" color={theme.colors.mutedText} style={{ marginTop: 4 }}>
+                    Marking this appointment as ready requires a finished-shoes photo.
+                  </Text>
+                ) : null}
+                <Button
+                  label={recommendedNextStatus.replace(/_/g, " ")}
+                  onPress={() => {
+                    void handleStatusPress(recommendedNextStatus);
+                  }}
+                  disabled={statusMutation.isPending || readyMutation.isPending}
+                  loading={statusMutation.isPending || readyMutation.isPending}
+                  style={{ marginTop: 12 }}
+                />
+              </View>
+            ) : null}
+          </View>
+        </Card>
+
+        <Card>
+          <Text variant="subtitle" weight="semibold">
+            Assignment
+          </Text>
+          {assignmentQuery.isFetching ? (
+            <ActivityIndicator color={theme.colors.peacockPrimary} style={{ marginTop: 10 }} />
+          ) : (
+            <Text style={{ marginTop: 8 }} color={theme.colors.mutedText}>
+              {assignmentState.message}
+            </Text>
+          )}
+          {assignmentState.kind === "assigned_to_other" ? (
+            <Text variant="caption" color={theme.colors.mutedText} style={{ marginTop: 8 }}>
+              Reassignment is handled separately from normal job progress updates.
+            </Text>
+          ) : null}
+          {assignmentState.kind === "assignment_unavailable" ? (
+            <Text variant="caption" color={theme.colors.mutedText} style={{ marginTop: 8 }}>
+              Pull to refresh later if you need the latest assignment information.
+            </Text>
+          ) : null}
+          {isUnassigned ? (
+            <Button
+              label={claimMutation.isPending ? "Claiming..." : "Claim appointment"}
+              onPress={() => claimMutation.mutate()}
+              loading={claimMutation.isPending}
+              style={{ marginTop: 12 }}
+            />
+          ) : null}
+          {claimFeedback ? (
+            <View
+              style={[
+                styles.feedback,
+                claimFeedback.tone === "success" && styles.feedbackSuccess,
+                claimFeedback.tone === "warning" && styles.feedbackWarning,
+                claimFeedback.tone === "danger" && styles.feedbackDanger,
+              ]}
+            >
+              <Text
+                variant="caption"
+                weight="semibold"
+                color={
+                  claimFeedback.tone === "danger"
+                    ? theme.colors.danger
+                    : theme.colors.textCharcoal
+                }
+              >
+                {claimFeedback.message}
+              </Text>
+            </View>
+          ) : null}
+        </Card>
+
+        <Card>
+          <Text variant="subtitle" weight="semibold">
+            Other updates
+          </Text>
+          <View style={{ marginTop: 10, gap: 8 }}>
+            {secondaryStatuses.map((opt) => (
+              <Button
+                key={opt}
+                label={opt.replace(/_/g, " ")}
+                variant="secondary"
+                onPress={() => {
+                  void handleStatusPress(opt);
+                }}
+                disabled={statusMutation.isPending || readyMutation.isPending}
+                style={{ marginBottom: 8 }}
+              />
+            ))}
+          </View>
+        </Card>
 
         {showTravelCard ? <TravelMapCard appointment={{ ...appointment, status }} /> : null}
 
@@ -155,56 +353,6 @@ export default function ProviderAppointmentDetailScreen() {
             {info.map((item) => (
               <Row key={item.label} label={item.label} value={item.value} />
             ))}
-            <Row label="Status" value={status.replace(/_/g, " ")} />
-          </View>
-        </Card>
-
-        <Card>
-          <Text variant="subtitle" weight="semibold">
-            Assignment
-          </Text>
-          {assignmentQuery.isFetching ? (
-            <ActivityIndicator color={theme.colors.peacockPrimary} style={{ marginTop: 10 }} />
-          ) : assignment ? (
-            <Text style={{ marginTop: 8 }}>
-              Assigned {assignment.provider_name ? `to ${assignment.provider_name}` : ""}
-              {assignedToMe ? " (you)" : ""}
-            </Text>
-          ) : (
-            <Text style={{ marginTop: 8 }} color={theme.colors.mutedText}>
-              No provider assigned yet.
-            </Text>
-          )}
-          {isUnassigned ? (
-            <Button
-              label={claimMutation.isPending ? "Claiming..." : "Claim appointment"}
-              onPress={() => claimMutation.mutate()}
-              loading={claimMutation.isPending}
-              style={{ marginTop: 12 }}
-            />
-          ) : null}
-        </Card>
-
-        <Card>
-          <Text variant="subtitle" weight="semibold">
-            Status updates
-          </Text>
-          <View style={{ marginTop: 10, gap: 8 }}>
-            {statusOptions.map((opt) => (
-              <Button
-                key={opt}
-                label={opt.replace(/_/g, " ")}
-                variant={status === opt ? "primary" : "secondary"}
-                onPress={() => {
-                  void handleStatusPress(opt);
-                }}
-                disabled={statusMutation.isPending || readyMutation.isPending}
-                style={{ marginBottom: 8 }}
-              />
-            ))}
-            <Text variant="caption" color={theme.colors.mutedText}>
-              Marking an appointment as ready requires a finished-shoes photo.
-            </Text>
           </View>
         </Card>
       </ScrollView>
@@ -245,6 +393,40 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    gap: 12,
+  },
+  stateHeader: {
+    gap: 6,
+  },
+  stateBadge: {
+    alignSelf: "flex-start",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: "#e0f2fe",
+  },
+  primaryActionBlock: {
+    borderRadius: 14,
+    padding: 14,
+    backgroundColor: "#eefbf8",
+  },
+  feedback: {
+    marginTop: 12,
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+  },
+  feedbackSuccess: {
+    backgroundColor: "#ecfdf5",
+    borderColor: "#86efac",
+  },
+  feedbackWarning: {
+    backgroundColor: "#fffbeb",
+    borderColor: "#fcd34d",
+  },
+  feedbackDanger: {
+    backgroundColor: "#fef2f2",
+    borderColor: "#fecaca",
   },
   modalBackdrop: {
     flex: 1,

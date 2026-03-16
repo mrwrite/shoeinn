@@ -19,7 +19,7 @@ import {
   getAppointmentAssignment,
   getAppointmentEvents,
 } from "../../api/http";
-import type { CustomerStackParamList } from "../../navigation/CustomerStack";
+import type { AppointmentStackParamList } from "../../navigation/types";
 import type {
   AppointmentEvent,
   AppointmentSummary,
@@ -56,9 +56,14 @@ const statusOrder = [
 ];
 
 type Props = NativeStackScreenProps<
-  CustomerStackParamList,
+  AppointmentStackParamList,
   "AppointmentDetail"
 >;
+
+type CustomerAssignmentState =
+  | { kind: "assigned"; title: string; detail?: string }
+  | { kind: "unassigned"; title: string; detail?: string }
+  | { kind: "assignment_unavailable"; title: string; detail?: string };
 
 const formatDateTime = (value?: string | null) =>
   value ? new Date(value).toLocaleString() : "-";
@@ -69,20 +74,6 @@ const StatusRow = ({ label, active }: { label: string; active: boolean }) => (
     <Text style={[styles.statusLabel, active && styles.statusLabelActive]}>
       {label}
     </Text>
-  </View>
-);
-
-const ProviderCard = ({
-  providerName,
-  assignedAt,
-}: {
-  providerName: string;
-  assignedAt: string;
-}) => (
-  <View style={styles.card}>
-    <Text style={styles.sectionTitle}>Assigned provider</Text>
-    <Text style={styles.value}>{providerName}</Text>
-    <Text style={styles.meta}>Assigned at {formatDateTime(assignedAt)}</Text>
   </View>
 );
 
@@ -143,6 +134,45 @@ export default function AppointmentDetailScreen({ route }: Props) {
 
   const finishedPhotoUrl = resolvePhotoUrl(appointmentQuery.data?.ready_photo_url);
   const shouldShowFinishedPhotoSection = appointment ? photoVisibleStatuses.has(appointment.status) : false;
+  const assignmentErrorText = assignmentQuery.error ? `${assignmentQuery.error}`.toLowerCase() : "";
+  const assignmentState: CustomerAssignmentState = assignmentQuery.data
+    ? {
+        kind: "assigned",
+        title: assignmentQuery.data.provider_name ?? "Provider assigned",
+        detail: `Assigned at ${formatDateTime(assignmentQuery.data.assigned_at)}`,
+      }
+    : assignmentQuery.isError
+      ? assignmentErrorText.includes("404")
+        ? {
+            kind: "unassigned",
+            title: "No provider assigned yet",
+            detail: "We are still working on assigning your appointment.",
+          }
+        : {
+            kind: "assignment_unavailable",
+            title: "Provider status unavailable",
+            detail: "We could not load provider assignment right now.",
+          }
+      : {
+          kind: "unassigned",
+          title: "Checking provider assignment",
+          detail: "Assignment information is loading.",
+        };
+  const currentStatusLabel = appointment
+    ? statusLabels[appointment.status] ?? appointment.status
+    : "Appointment";
+  const nextStepCopy: Record<string, string> = {
+    requested: "Your appointment request has been received.",
+    confirmed: "A provider can now prepare for pickup.",
+    en_route_pickup: "Your provider is on the way to pick up your order.",
+    picked_up: "Your items are with the provider.",
+    cleaning: "Your items are currently being cleaned.",
+    ready: "Your order is ready for delivery.",
+    out_for_delivery: "Your provider is bringing your order back to you.",
+    delivered: "Your order has been delivered.",
+    completed: "This appointment is complete.",
+    cancelled: "This appointment was cancelled.",
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -182,6 +212,33 @@ export default function AppointmentDetailScreen({ route }: Props) {
                   {statusLabels[appointment.status] ?? appointment.status}
                 </Text>
               </View>
+              <View style={styles.summaryBlock}>
+                <Text style={styles.sectionTitle}>Current status</Text>
+                <Text style={styles.value}>{currentStatusLabel}</Text>
+                <Text style={styles.meta}>
+                  {nextStepCopy[appointment.status] ?? "We will keep this status updated as your appointment moves forward."}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.card}>
+              <Text style={styles.sectionTitle}>Provider</Text>
+              <Text style={styles.value}>{assignmentState.title}</Text>
+              {assignmentState.detail ? (
+                <Text style={styles.meta}>{assignmentState.detail}</Text>
+              ) : null}
+            </View>
+
+            <View style={styles.card}>
+              <Text style={styles.sectionTitle}>Status timeline</Text>
+              {eventsQuery.isLoading ? <ActivityIndicator style={{ marginTop: 8, marginBottom: 8 }} /> : null}
+              {statusHistory.map((item) => (
+                <StatusRow
+                  key={item.status}
+                  label={statusLabels[item.status] ?? item.status}
+                  active={item.active}
+                />
+              ))}
             </View>
 
             {shouldShowFinishedPhotoSection ? (
@@ -229,30 +286,6 @@ export default function AppointmentDetailScreen({ route }: Props) {
                 </>
               ) : null}
             </View>
-
-            <View style={styles.card}>
-              <Text style={styles.sectionTitle}>Status timeline</Text>
-              {eventsQuery.isLoading ? <ActivityIndicator style={{ marginTop: 8, marginBottom: 8 }} /> : null}
-              {statusHistory.map((item) => (
-                <StatusRow
-                  key={item.status}
-                  label={statusLabels[item.status] ?? item.status}
-                  active={item.active}
-                />
-              ))}
-            </View>
-
-            {assignmentQuery.data ? (
-              <ProviderCard
-                providerName={assignmentQuery.data.provider_name ?? "Provider"}
-                assignedAt={assignmentQuery.data.assigned_at}
-              />
-            ) : assignmentQuery.isError ? (
-              <View style={styles.card}>
-                <Text style={styles.sectionTitle}>Provider</Text>
-                <Text style={styles.meta}>Not yet assigned</Text>
-              </View>
-            ) : null}
           </>
         )}
       </ScrollView>
@@ -302,6 +335,10 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   chipText: { fontWeight: "700", textTransform: "capitalize" },
+  summaryBlock: {
+    marginTop: 8,
+    gap: 4,
+  },
   sectionTitle: { fontSize: 16, fontWeight: "700" },
   label: { color: "#6b7280", marginTop: 4 },
   value: { fontSize: 16, fontWeight: "600" },

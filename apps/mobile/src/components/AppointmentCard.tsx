@@ -13,6 +13,7 @@ type Props = {
   onPress?: (appointment: AppointmentSummary) => void;
   onClaim?: (appointment: AppointmentSummary) => void;
   claimable?: boolean;
+  helperText?: string;
 };
 
 const statusColors: Record<string, string> = {
@@ -26,7 +27,13 @@ const statusColors: Record<string, string> = {
   cancelled: "#9CA3AF",
 };
 
-export function AppointmentCard({ appointment, onPress, onClaim, claimable }: Props) {
+export function AppointmentCard({
+  appointment,
+  onPress,
+  onClaim,
+  claimable,
+  helperText,
+}: Props) {
   const theme = useTheme();
   const statusColor = statusColors[appointment.status] ?? theme.colors.mutedText;
 
@@ -63,11 +70,18 @@ export function AppointmentCard({ appointment, onPress, onClaim, claimable }: Pr
           ) : null}
         </View>
         {claimable ? (
-          <Button
-            label="Claim appointment"
-            onPress={() => onClaim?.(appointment)}
-            style={{ marginTop: 12 }}
-          />
+          <View style={styles.claimSection}>
+            {helperText ? (
+              <Text variant="caption" color={theme.colors.mutedText}>
+                {helperText}
+              </Text>
+            ) : null}
+            <Button
+              label="Claim appointment"
+              onPress={() => onClaim?.(appointment)}
+              style={{ marginTop: 12 }}
+            />
+          </View>
         ) : null}
       </Card>
     </Pressable>
@@ -96,6 +110,9 @@ const styles = StyleSheet.create({
   metaItem: {
     flexDirection: "row",
     alignItems: "center",
+  },
+  claimSection: {
+    marginTop: 12,
   },
 });
 
