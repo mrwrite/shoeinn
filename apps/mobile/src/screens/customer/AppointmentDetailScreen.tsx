@@ -68,10 +68,10 @@ type CustomerAssignmentState =
 type TimelineState = "current" | "completed" | "upcoming" | "terminal";
 
 const timelineDescriptions: Record<TimelineState, string> = {
-  current: "Current step",
-  completed: "Completed",
-  upcoming: "Upcoming",
-  terminal: "Final state",
+  current: "This is what is happening right now.",
+  completed: "Finished",
+  upcoming: "Coming up next",
+  terminal: "Final outcome",
 };
 
 const formatDateTime = (value?: string | null) =>
@@ -171,17 +171,17 @@ export default function AppointmentDetailScreen({ route }: Props) {
         ? {
             kind: "unassigned",
             title: "No provider assigned yet",
-            detail: "We are still working on assigning your appointment.",
+            detail: "We’re still matching your appointment with a provider.",
           }
         : {
             kind: "assignment_unavailable",
-            title: "Provider status unavailable",
-            detail: "We could not load provider assignment right now.",
+            title: "Provider status temporarily unavailable",
+            detail: "Your appointment is still active, but we could not load provider assignment right now.",
           }
       : {
           kind: "unassigned",
           title: "Checking provider assignment",
-          detail: "Assignment information is loading.",
+          detail: "We’re loading the latest assignment details.",
         };
   const currentStatusLabel = appointment
     ? statusLabels[appointment.status] ?? appointment.status
@@ -195,7 +195,7 @@ export default function AppointmentDetailScreen({ route }: Props) {
     ready: "Your order is ready for delivery.",
     out_for_delivery: "Your provider is bringing your order back to you.",
     delivered: "Your order has been delivered.",
-    completed: "This appointment is complete.",
+    completed: "Everything for this appointment is complete.",
     cancelled: "This appointment was cancelled.",
   };
   const isAppointmentLoading = appointmentQuery.isLoading && !appointment;
@@ -207,30 +207,17 @@ export default function AppointmentDetailScreen({ route }: Props) {
           <View style={styles.stateCard}>
             {isAppointmentLoading ? <ActivityIndicator /> : null}
             <Text style={styles.sectionTitle}>
-              {isAppointmentLoading ? "Loading appointment" : "Appointment not found"}
+              {isAppointmentLoading ? "Loading your appointment" : "Appointment not found"}
             </Text>
             <Text style={styles.meta}>
               {isAppointmentLoading
-                ? "We are loading the latest appointment details."
-                : "We could not find this appointment in the active customer flow."}
+                ? "We’re pulling together the latest appointment details for you."
+                : "We couldn’t find this appointment in the active customer flow."}
             </Text>
           </View>
         ) : (
           <>
-            {shouldShowTravelMap ? (
-              <CustomerTravelMapCard
-                appointment={{
-                  id: appointment.id,
-                  status: appointment.status,
-                  address_line1: appointment.address_line1,
-                  address_line2: appointment.address_line2,
-                  city: appointment.city,
-                  state: appointment.state,
-                  postal_code: appointment.postal_code,
-                }}
-              />
-            ) : null}
-            <View style={styles.card}>
+            <View style={styles.heroCard}>
               <Text style={styles.title}>
                 {appointment.service_name ?? "Appointment"}
               </Text>
@@ -246,7 +233,7 @@ export default function AppointmentDetailScreen({ route }: Props) {
                 <Text style={styles.sectionTitle}>Current status</Text>
                 <Text style={styles.value}>{currentStatusLabel}</Text>
                 <Text style={styles.meta}>
-                  {nextStepCopy[appointment.status] ?? "We will keep this status updated as your appointment moves forward."}
+                  {nextStepCopy[appointment.status] ?? "We’ll keep this status updated as your appointment moves forward."}
                 </Text>
               </View>
             </View>
@@ -259,63 +246,90 @@ export default function AppointmentDetailScreen({ route }: Props) {
               ) : null}
             </View>
 
+            {shouldShowTravelMap ? (
+              <CustomerTravelMapCard
+                appointment={{
+                  id: appointment.id,
+                  status: appointment.status,
+                  address_line1: appointment.address_line1,
+                  address_line2: appointment.address_line2,
+                  city: appointment.city,
+                  state: appointment.state,
+                  postal_code: appointment.postal_code,
+                }}
+              />
+            ) : null}
+
             <View style={styles.card}>
-              <Text style={styles.sectionTitle}>Status timeline</Text>
+              <Text style={styles.sectionTitle}>Progress</Text>
+              <Text style={styles.meta}>Follow what has already happened, what is active now, and what comes next.</Text>
               {eventsQuery.isLoading ? (
                 <View style={styles.timelineState}>
                   <ActivityIndicator />
-                  <Text style={styles.meta}>Loading the latest progress history.</Text>
+                  <Text style={styles.meta}>We’re loading the latest progress history.</Text>
                 </View>
               ) : eventsQuery.isError ? (
                 <View style={styles.timelineState}>
                   <Text style={styles.meta}>
-                    Progress history is temporarily unavailable. Your current status summary is still up to date.
+                    Progress history is temporarily unavailable. Your current status summary above is still up to date.
                   </Text>
                 </View>
               ) : (
-                statusHistory.map((item) => (
-                  <View
-                    key={item.status}
-                    style={[
-                      styles.statusRow,
-                      item.state === "current" && styles.statusRowCurrent,
-                      item.state === "completed" && styles.statusRowCompleted,
-                      item.state === "upcoming" && styles.statusRowUpcoming,
-                      item.state === "terminal" && styles.statusRowTerminal,
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.statusDot,
-                        item.state === "current" && styles.statusDotCurrent,
-                        item.state === "completed" && styles.statusDotCompleted,
-                        item.state === "upcoming" && styles.statusDotUpcoming,
-                        item.state === "terminal" && styles.statusDotTerminal,
-                      ]}
-                    />
-                    <View style={styles.statusContent}>
-                      <Text
+                <View style={styles.timelineList}>
+                  {statusHistory.map((item, index) => (
+                    <View key={item.status} style={styles.timelineEntry}>
+                      <View style={styles.timelineRail}>
+                        <View
+                          style={[
+                            styles.statusDot,
+                            item.state === "current" && styles.statusDotCurrent,
+                            item.state === "completed" && styles.statusDotCompleted,
+                            item.state === "upcoming" && styles.statusDotUpcoming,
+                            item.state === "terminal" && styles.statusDotTerminal,
+                          ]}
+                        />
+                        {index < statusHistory.length - 1 ? (
+                          <View
+                            style={[
+                              styles.timelineLine,
+                              item.state === "completed" && styles.timelineLineCompleted,
+                              item.state === "current" && styles.timelineLineCurrent,
+                            ]}
+                          />
+                        ) : null}
+                      </View>
+                      <View
                         style={[
-                          styles.statusLabel,
-                          item.state === "current" && styles.statusLabelCurrent,
-                          item.state === "completed" && styles.statusLabelCompleted,
-                          item.state === "terminal" && styles.statusLabelTerminal,
+                          styles.statusRow,
+                          item.state === "current" && styles.statusRowCurrent,
+                          item.state === "completed" && styles.statusRowCompleted,
+                          item.state === "upcoming" && styles.statusRowUpcoming,
+                          item.state === "terminal" && styles.statusRowTerminal,
                         ]}
                       >
-                        {statusLabels[item.status] ?? item.status}
-                      </Text>
-                      <Text style={styles.statusMeta}>
-                        {timelineDescriptions[item.state]}
-                      </Text>
+                        <Text
+                          style={[
+                            styles.statusLabel,
+                            item.state === "current" && styles.statusLabelCurrent,
+                            item.state === "completed" && styles.statusLabelCompleted,
+                            item.state === "terminal" && styles.statusLabelTerminal,
+                          ]}
+                        >
+                          {statusLabels[item.status] ?? item.status}
+                        </Text>
+                        <Text style={styles.statusMeta}>
+                          {timelineDescriptions[item.state]}
+                        </Text>
+                      </View>
                     </View>
-                  </View>
-                ))
+                  ))}
+                </View>
               )}
             </View>
 
             {shouldShowFinishedPhotoSection ? (
               <View style={styles.card}>
-                <Text style={styles.sectionTitle}>Finished Photo</Text>
+                <Text style={styles.sectionTitle}>Finished photo</Text>
                 {finishedPhotoUrl ? (
                   <Pressable onPress={() => setExpandedPhotoUrl(finishedPhotoUrl)}>
                     <Image
@@ -325,7 +339,7 @@ export default function AppointmentDetailScreen({ route }: Props) {
                     <Text style={styles.meta}>Tap to expand</Text>
                   </Pressable>
                 ) : (
-                  <Text style={styles.meta}>Photo pending</Text>
+                  <Text style={styles.meta}>A completion photo is expected here once it is available.</Text>
                 )}
               </View>
             ) : null}
@@ -388,10 +402,18 @@ const styles = StyleSheet.create({
     backgroundColor: "#ffffff",
     gap: 8,
   },
+  heroCard: {
+    backgroundColor: "#eff6ff",
+    padding: 18,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#bfdbfe",
+    gap: 8,
+  },
   card: {
     backgroundColor: "#fff",
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     shadowColor: "#000",
     shadowOpacity: 0.05,
     shadowRadius: 6,
@@ -402,26 +424,49 @@ const styles = StyleSheet.create({
   meta: { color: "#6b7280" },
   chip: {
     alignSelf: "flex-start",
-    backgroundColor: "#e5e7eb",
+    backgroundColor: "#dbeafe",
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 999,
   },
-  chipText: { fontWeight: "700", textTransform: "capitalize" },
+  chipText: { fontWeight: "700", textTransform: "capitalize", color: "#1d4ed8" },
   summaryBlock: {
-    marginTop: 8,
+    marginTop: 4,
     gap: 4,
   },
   sectionTitle: { fontSize: 16, fontWeight: "700" },
   label: { color: "#6b7280", marginTop: 4 },
   value: { fontSize: 16, fontWeight: "600" },
-  statusRow: {
+  timelineList: {
+    marginTop: 6,
+    gap: 0,
+  },
+  timelineEntry: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 14,
+    gap: 12,
+  },
+  timelineRail: {
+    width: 16,
+    alignItems: "center",
+  },
+  timelineLine: {
+    flex: 1,
+    width: 2,
+    backgroundColor: "#e5e7eb",
+    marginTop: 4,
+  },
+  timelineLineCompleted: {
+    backgroundColor: "#86efac",
+  },
+  timelineLineCurrent: {
+    backgroundColor: "#93c5fd",
+  },
+  statusRow: {
+    flex: 1,
+    marginBottom: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: "#e5e7eb",
     backgroundColor: "#ffffff",
@@ -430,7 +475,7 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    marginTop: 4,
+    marginTop: 14,
     backgroundColor: "#e5e7eb",
   },
   statusDotCurrent: { backgroundColor: "#0F4C5C" },
@@ -446,27 +491,24 @@ const styles = StyleSheet.create({
     borderColor: "#86efac",
   },
   statusRowUpcoming: {
-    backgroundColor: "#f9fafb",
+    backgroundColor: "#f8fafc",
     borderStyle: "dashed",
   },
   statusRowTerminal: {
     backgroundColor: "#faf5ff",
     borderColor: "#d8b4fe",
   },
-  statusContent: {
-    flex: 1,
-  },
-  statusLabel: { color: "#6b7280" },
+  statusLabel: { color: "#6b7280", fontWeight: "600" },
   statusLabelCurrent: { color: "#111827", fontWeight: "700" },
   statusLabelCompleted: { color: "#166534", fontWeight: "700" },
   statusLabelTerminal: { color: "#5b21b6", fontWeight: "700" },
   statusMeta: {
     color: "#6b7280",
-    marginTop: 2,
+    marginTop: 4,
     fontSize: 12,
   },
   timelineState: {
-    paddingVertical: 10,
+    paddingVertical: 12,
     gap: 8,
   },
   finishedPhoto: {

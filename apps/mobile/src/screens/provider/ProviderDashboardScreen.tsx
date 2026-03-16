@@ -1,18 +1,13 @@
 import React from "react";
-import {
-  FlatList,
-  RefreshControl,
-  StyleSheet,
-  View,
-} from "react-native";
+import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   claimAppointment,
-  fetchOpenAppointments,
   fetchMyAppointments,
+  fetchOpenAppointments,
 } from "../../api/http";
 import { AppointmentCard } from "../../components/AppointmentCard";
 import { ScreenContainer } from "../../components/ScreenContainer";
@@ -75,6 +70,33 @@ function QueryStateCard({ title, message, actionLabel, onAction }: QueryStateCar
   );
 }
 
+function SummaryMetric({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: "primary" | "teal" | "neutral";
+}) {
+  const colors = {
+    primary: { background: "#eff6ff", border: "#93c5fd", text: "#0F4C5C" },
+    teal: { background: "#ecfdf5", border: "#86efac", text: "#166534" },
+    neutral: { background: "#f8fafc", border: "#e2e8f0", text: "#475569" },
+  }[tone];
+
+  return (
+    <View style={[styles.metricCard, { backgroundColor: colors.background, borderColor: colors.border }]}>
+      <Text variant="overline" weight="semibold" style={{ color: colors.text }}>
+        {label}
+      </Text>
+      <Text variant="subtitle" weight="bold" style={{ color: colors.text, marginTop: 4 }}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
 function Tabs({
   active,
   onChange,
@@ -119,6 +141,25 @@ function TabButton({
       style={tabStyles.button}
     />
   );
+}
+
+function formatOperationalCue(appointments: ProviderAppointment[] | undefined, mode: TabKey) {
+  if (!appointments || appointments.length === 0) {
+    return mode === "available"
+      ? "No claimable jobs are waiting right now."
+      : "No active assigned jobs right now.";
+  }
+
+  const byTime = [...appointments].sort(
+    (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime(),
+  );
+  const earliest = byTime[0];
+
+  if (mode === "available") {
+    return `Next pickup window starts ${new Date(earliest.start_time).toLocaleString()}.`;
+  }
+
+  return `${earliest.service_name ?? "Appointment"} is your next active job, currently ${earliest.status.replace(/_/g, " ")}.`;
 }
 
 const tabStyles = StyleSheet.create({
@@ -173,6 +214,10 @@ export default function ProviderDashboardScreen() {
   const activeQuery = activeTab === "available" ? openAppointmentsQuery : myAppointmentsQuery;
   const availableCount = openAppointmentsQuery.data?.length ?? 0;
   const myCount = myAppointmentsQuery.data?.length ?? 0;
+  const dashboardCue = formatOperationalCue(
+    activeTab === "available" ? openAppointmentsQuery.data : myAppointmentsQuery.data,
+    activeTab,
+  );
 
   const renderItem = ({ item }: { item: ProviderAppointment }) => (
     <AppointmentCard
@@ -197,8 +242,8 @@ export default function ProviderDashboardScreen() {
       claimable={activeTab === "available"}
       helperText={
         activeTab === "available"
-          ? "Review the job details before claiming. Claiming assigns the job to you."
-          : undefined
+          ? "Start with the card details. Claim only when this window and route work for you."
+          : "This job is already in your queue. Open it for the current next step and route details."
       }
       actionLabel={activeTab === "available" ? "Available to claim" : "Assigned to you"}
       emphasis={activeTab === "available" ? "actionable" : "owned"}
@@ -222,8 +267,8 @@ export default function ProviderDashboardScreen() {
   const emptyTitle = activeTab === "available" ? "No available jobs" : "No claimed jobs";
   const emptySubtitle =
     activeTab === "available"
-      ? "There are no claimable jobs right now. Pull to refresh or check back soon."
-      : "Claim a job from Available Jobs and it will appear here for follow-through.";
+      ? "Nothing needs a provider right now. Pull to refresh or check back for the next pickup window."
+      : "Your queue is clear. Claim a job from Available Jobs and it will appear here.";
 
   return (
     <ScreenContainer>
@@ -236,21 +281,35 @@ export default function ProviderDashboardScreen() {
         </Text>
       </View>
 
+      <View style={styles.summaryStrip}>
+        <View style={styles.summaryHero}>
+          <Text variant="overline" weight="semibold" color={theme.colors.peacockPrimary}>
+            Dispatch overview
+          </Text>
+          <Text variant="subtitle" weight="bold" style={{ marginTop: 6 }}>
+            {tabSummary}
+          </Text>
+          <Text color={theme.colors.mutedText} style={{ marginTop: 4 }}>
+            {dashboardCue}
+          </Text>
+        </View>
+        <View style={styles.metricRow}>
+          <SummaryMetric label="Available" value={`${availableCount}`} tone="teal" />
+          <SummaryMetric label="My jobs" value={`${myCount}`} tone="primary" />
+          <SummaryMetric
+            label={activeTab === "available" ? "Focus" : "Next up"}
+            value={activeTab === "available" ? "Claimable now" : "Move your queue"}
+            tone="neutral"
+          />
+        </View>
+      </View>
+
       <Tabs
         active={activeTab}
         onChange={setActiveTab}
         availableCount={availableCount}
         myCount={myCount}
       />
-
-      <View style={styles.summaryCard}>
-        <Text weight="semibold">{tabSummary}</Text>
-        <Text color={theme.colors.mutedText} style={{ marginTop: 4 }}>
-          {activeTab === "available"
-            ? "Open a job to inspect the details, then claim it when you are ready."
-            : "Use this list to keep your current workload moving."}
-        </Text>
-      </View>
 
       {feedback ? (
         <View
@@ -261,14 +320,7 @@ export default function ProviderDashboardScreen() {
             feedback.tone === "danger" && styles.feedbackDanger,
           ]}
         >
-          <Text
-            weight="semibold"
-            color={
-              feedback.tone === "danger"
-                ? theme.colors.danger
-                : theme.colors.textCharcoal
-            }
-          >
+          <Text weight="semibold" color={feedback.tone === "danger" ? theme.colors.danger : theme.colors.textCharcoal}>
             {feedback.message}
           </Text>
         </View>
@@ -276,20 +328,20 @@ export default function ProviderDashboardScreen() {
 
       {activeQuery.isLoading ? (
         <QueryStateCard
-          title={activeTab === "available" ? "Loading available jobs" : "Loading your jobs"}
+          title={activeTab === "available" ? "Warming up today’s job board" : "Pulling in your active queue"}
           message={
             activeTab === "available"
-              ? "Fetching the latest claimable jobs for your area."
-              : "Fetching the jobs currently assigned to you."
+              ? "We’re checking the latest claimable work so you can decide what to take next."
+              : "We’re loading the jobs already assigned to you."
           }
         />
       ) : activeQuery.isError ? (
         <QueryStateCard
-          title={activeTab === "available" ? "Available jobs unavailable" : "My jobs unavailable"}
+          title={activeTab === "available" ? "The job board is unavailable right now" : "Your queue is unavailable right now"}
           message={
             activeTab === "available"
-              ? "We could not load claimable jobs right now. Try again to refresh the dashboard."
-              : "We could not load your assigned jobs right now. Try again to refresh this list."
+              ? "We couldn’t refresh the available jobs list. Try again to pull the latest dispatch state."
+              : "We couldn’t refresh your assigned jobs. Try again to pull the latest queue state."
           }
           actionLabel="Retry"
           onAction={() => activeQuery.refetch()}
@@ -310,7 +362,7 @@ export default function ProviderDashboardScreen() {
             <QueryStateCard
               title={emptyTitle}
               message={emptySubtitle}
-              actionLabel={activeTab === "available" ? "Refresh" : undefined}
+              actionLabel={activeTab === "available" ? "Refresh board" : undefined}
               onAction={activeTab === "available" ? () => activeQuery.refetch() : undefined}
             />
           }
@@ -324,6 +376,29 @@ const styles = StyleSheet.create({
   header: {
     padding: 16,
     gap: 4,
+  },
+  summaryStrip: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+    padding: 14,
+    borderRadius: 20,
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#dbeafe",
+    gap: 12,
+  },
+  summaryHero: {
+    gap: 2,
+  },
+  metricRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  metricCard: {
+    flex: 1,
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
   },
   feedback: {
     marginHorizontal: 16,
@@ -344,20 +419,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#fef2f2",
     borderColor: "#fecaca",
   },
-  summaryCard: {
-    marginHorizontal: 16,
-    marginBottom: 8,
-    borderRadius: 16,
-    padding: 12,
-    backgroundColor: "#f8fafc",
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-  },
   stateCard: {
     alignItems: "center",
     justifyContent: "center",
     margin: 16,
-    padding: 20,
+    padding: 22,
     borderRadius: 18,
     borderWidth: 1,
     borderColor: "#e5e7eb",

@@ -41,92 +41,130 @@ export function AppointmentCard({
   const theme = useTheme();
   const statusColor = statusColors[appointment.status] ?? theme.colors.mutedText;
   const actionTone = {
-    actionable: { background: "#ecfdf5", border: "#86efac", text: "#166534" },
-    owned: { background: "#eff6ff", border: "#93c5fd", text: "#1d4ed8" },
-    neutral: { background: "#f3f4f6", border: theme.colors.border, text: theme.colors.mutedText },
+    actionable: { background: "#ecfdf5", border: "#86efac", text: "#166534", accent: "#0f766e" },
+    owned: { background: "#eff6ff", border: "#93c5fd", text: "#1d4ed8", accent: "#1d4ed8" },
+    neutral: {
+      background: "#f8fafc",
+      border: theme.colors.border,
+      text: theme.colors.mutedText,
+      accent: theme.colors.mutedText,
+    },
   }[emphasis];
 
   return (
-    <Pressable onPress={() => onPress?.(appointment)} style={{ marginBottom: 12 }}>
-      <Card>
+    <Pressable onPress={() => onPress?.(appointment)} style={({ pressed }) => [{ marginBottom: 14 }, pressed && { opacity: 0.96 }]}>
+      <Card style={[styles.card, emphasis === "actionable" && styles.cardActionable]}>
         <View style={styles.header}>
           <View style={styles.headerContent}>
-            <Text weight="semibold">{appointment.service_name ?? "Appointment"}</Text>
-            <Text color={theme.colors.mutedText} style={{ marginTop: 4 }}>
-              {new Date(appointment.start_time).toLocaleString()}
+            <View style={styles.labelRow}>
+              {actionLabel ? (
+                <View
+                  style={[
+                    styles.actionPill,
+                    {
+                      backgroundColor: actionTone.background,
+                      borderColor: actionTone.border,
+                    },
+                  ]}
+                >
+                  <Text weight="semibold" style={{ color: actionTone.text }}>
+                    {actionLabel}
+                  </Text>
+                </View>
+              ) : null}
+              <View style={[styles.statusPill, { backgroundColor: `${statusColor}18`, borderColor: `${statusColor}55` }]}>
+                <Text weight="semibold" style={{ color: statusColor }}>
+                  {appointment.status.replace(/_/g, " ")}
+                </Text>
+              </View>
+            </View>
+            <Text variant="subtitle" weight="semibold" style={{ marginTop: 12 }}>
+              {appointment.service_name ?? "Appointment"}
             </Text>
-          </View>
-          <View style={[styles.statusPill, { backgroundColor: `${statusColor}22`, borderColor: statusColor }]}> 
-            <Text weight="semibold" style={{ color: statusColor }}>
-              {appointment.status.replace(/_/g, " ")}
+            <Text color={theme.colors.mutedText} style={{ marginTop: 4 }}>
+              {claimable ? "Review the job details, then claim when you are ready." : "Open the job for current progress, route details, and updates."}
             </Text>
           </View>
         </View>
-        <View style={styles.metaBlock}>
+
+        <View style={styles.infoPanel}>
           <View style={styles.metaItem}>
-            <Ionicons name="calendar-outline" size={16} color={theme.colors.mutedText} />
-            <Text style={styles.metaText} color={theme.colors.mutedText}>
-              {new Date(appointment.start_time).toLocaleString()}
-            </Text>
-          </View>
-          {appointment.city ? (
-            <View style={styles.metaItem}>
-              <Ionicons name="location-outline" size={16} color={theme.colors.mutedText} />
-              <Text style={styles.metaText} color={theme.colors.mutedText}>
-                {[appointment.city, appointment.state].filter(Boolean).join(", ")}
+            <Ionicons name="calendar-outline" size={16} color={actionTone.accent} />
+            <View style={styles.metaCopy}>
+              <Text weight="semibold">When</Text>
+              <Text color={theme.colors.mutedText}>
+                {new Date(appointment.start_time).toLocaleString()}
               </Text>
             </View>
-          ) : null}
+          </View>
           <View style={styles.metaItem}>
-            <Ionicons name="person-outline" size={16} color={theme.colors.mutedText} />
-            <Text style={styles.metaText} color={theme.colors.mutedText}>
-              {appointment.customer_name}
-            </Text>
+            <Ionicons name="location-outline" size={16} color={actionTone.accent} />
+            <View style={styles.metaCopy}>
+              <Text weight="semibold">Where</Text>
+              <Text color={theme.colors.mutedText}>
+                {[appointment.city, appointment.state].filter(Boolean).join(", ") || "Location pending"}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.metaItem}>
+            <Ionicons name="person-outline" size={16} color={actionTone.accent} />
+            <View style={styles.metaCopy}>
+              <Text weight="semibold">Customer</Text>
+              <Text color={theme.colors.mutedText}>
+                {appointment.customer_name}
+              </Text>
+            </View>
           </View>
         </View>
-        {actionLabel ? (
-          <View
-            style={[
-              styles.actionPill,
-              {
-                backgroundColor: actionTone.background,
-                borderColor: actionTone.border,
-              },
-            ]}
-          >
-            <Text weight="semibold" style={{ color: actionTone.text }}>
-              {actionLabel}
+
+        {helperText ? (
+          <View style={styles.helperCard}>
+            <Text variant="caption" color={theme.colors.mutedText}>
+              {helperText}
             </Text>
           </View>
         ) : null}
+
         {claimable ? (
-          <View style={styles.claimSection}>
-            {helperText ? (
-              <Text variant="caption" color={theme.colors.mutedText}>
-                {helperText}
-              </Text>
-            ) : null}
-            <Button
-              label="Claim appointment"
-              onPress={() => onClaim?.(appointment)}
-              style={{ marginTop: 12 }}
-            />
+          <Button
+            label="Claim appointment"
+            onPress={() => onClaim?.(appointment)}
+            style={styles.claimButton}
+          />
+        ) : (
+          <View style={styles.footerHint}>
+            <Ionicons name="arrow-forward-circle-outline" size={16} color={theme.colors.mutedText} />
+            <Text variant="caption" color={theme.colors.mutedText}>
+              Tap anywhere on the card to open job details.
+            </Text>
           </View>
-        ) : null}
+        )}
       </Card>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
+  card: {
+    gap: 12,
+    borderWidth: 1,
+    borderColor: "#eef2f7",
+  },
+  cardActionable: {
+    borderColor: "#b7f3d0",
+  },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    gap: 12,
   },
   headerContent: {
     flex: 1,
+  },
+  labelRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
   },
   statusPill: {
     borderRadius: 999,
@@ -134,27 +172,41 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderWidth: 1,
   },
-  metaBlock: {
-    marginTop: 10,
-    gap: 8,
+  actionPill: {
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+  },
+  infoPanel: {
+    gap: 10,
+    borderRadius: 14,
+    padding: 12,
+    backgroundColor: "#f8fafc",
   },
   metaItem: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
+    gap: 10,
   },
-  metaText: {
-    marginLeft: 6,
+  metaCopy: {
+    flex: 1,
+    gap: 2,
   },
-  actionPill: {
-    alignSelf: "flex-start",
-    marginTop: 12,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+  helperCard: {
+    borderRadius: 12,
+    padding: 10,
+    backgroundColor: "#fffbea",
     borderWidth: 1,
+    borderColor: "#fde68a",
   },
-  claimSection: {
-    marginTop: 12,
+  claimButton: {
+    marginTop: 2,
+  },
+  footerHint: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
 });
 

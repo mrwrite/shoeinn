@@ -20,11 +20,12 @@ export function Button({ label, onPress, disabled, loading, variant = "primary",
   const isDisabled = disabled || loading;
   const background = {
     primary: theme.colors.peacockPrimary,
-    secondary: theme.colors.surfaceLight,
+    secondary: "#f8fafc",
     ghost: "transparent",
   }[variant];
 
-  const borderColor = variant === "secondary" ? theme.colors.border : "transparent";
+  const borderColor =
+    variant === "secondary" ? "#cbd5e1" : variant === "primary" ? "#0b3b48" : "transparent";
   const textColor = variant === "primary" ? theme.colors.surfaceLight : theme.colors.textCharcoal;
 
   return (
@@ -34,6 +35,7 @@ export function Button({ label, onPress, disabled, loading, variant = "primary",
       style={({ pressed }) => [
         styles.base,
         { backgroundColor: background, borderColor, opacity: pressed ? 0.92 : 1 },
+        variant === "primary" && styles.primary,
         variant === "secondary" && { borderWidth: 1 },
         variant === "ghost" && { paddingHorizontal: 0 },
         isDisabled && { opacity: 0.6 },
@@ -60,6 +62,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     flexDirection: "row",
     gap: 8,
+  },
+  primary: {
+    borderWidth: 1,
+    shadowColor: "#0F4C5C",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.16,
+    shadowRadius: 10,
+    elevation: 3,
   },
 });
 
