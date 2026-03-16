@@ -13,10 +13,11 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useQuery } from "@tanstack/react-query";
 
 import { listCompanies } from "../../api/http";
-import type { CustomerStackParamList } from "../../navigation/CustomerStack";
+import type { CustomerFlowStackParamList } from "../../navigation/types";
 import { useAuthStore } from "../../state/authStore";
 import { useCompanyStore } from "../../state/companyStore";
 import { useBooking } from "../../state/bookingStore";
+import type { Company } from "../../types/company";
 
 const CompanyCard: React.FC<{ name: string; city?: string | null; state?: string | null; onPress: () => void }> = ({
   name,
@@ -31,14 +32,14 @@ const CompanyCard: React.FC<{ name: string; city?: string | null; state?: string
 );
 
 export default function CompanyPickerScreen() {
-  const navigation = useNavigation<NativeStackNavigationProp<CustomerStackParamList>>();
+  const navigation = useNavigation<NativeStackNavigationProp<CustomerFlowStackParamList, "CompanyPicker">>();
   const logout = useAuthStore((s) => s.logout);
   const setSelectedCompany = useCompanyStore((s) => s.setSelectedCompany);
   const clearCompany = useCompanyStore((s) => s.clearSelectedCompany);
   const { reset: resetBooking } = useBooking();
 
-  const query = useQuery({ queryKey: ["companies"], queryFn: listCompanies });
-  const companies = query.data ?? [];
+  const query = useQuery<Company[]>({ queryKey: ["companies"], queryFn: () => listCompanies() });
+  const companies: Company[] = query.data ?? [];
 
   useEffect(() => {
     const handleLogout = async () => {
@@ -70,11 +71,9 @@ export default function CompanyPickerScreen() {
     return (
       <View style={styles.center}>
         <Text style={styles.error}>Unable to load providers.</Text>
-        <FlatList
-          data={[]}
-          renderItem={null}
-          refreshControl={<RefreshControl refreshing={query.isFetching} onRefresh={() => query.refetch()} />}
-        />
+        <TouchableOpacity onPress={() => query.refetch()} style={styles.retryButton} accessibilityRole="button">
+          <Text style={styles.retryText}>Try again</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -136,6 +135,17 @@ const styles = StyleSheet.create({
   },
   error: {
     color: "#ef4444",
+  },
+  retryButton: {
+    marginTop: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: "#e5e7eb",
+  },
+  retryText: {
+    color: "#111827",
+    fontWeight: "600",
   },
   headerButton: {
     padding: 6,

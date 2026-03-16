@@ -2,8 +2,9 @@
   "extends": "expo/tsconfig.base.json",
   "compilerOptions": {
     "strict": true,
-    "types": ["react", "react-native", "jest", "node" ],
+    "types": ["react", "react-native", "node"],
     "jsx": "react-native",
-    "esModuleInterop": true,
-  }
+    "esModuleInterop": true
+  },
+  "include": ["**/*.ts", "**/*.tsx", "jest-globals.d.ts"]
 }

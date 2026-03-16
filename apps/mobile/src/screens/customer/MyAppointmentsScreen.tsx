@@ -13,7 +13,7 @@ import { useQuery } from "@tanstack/react-query";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { getMyAppointments } from "../../api/http";
-import type { CustomerStackParamList } from "../../navigation/CustomerStack";
+import type { CustomerFlowStackParamList } from "../../navigation/types";
 import type { AppointmentSummary } from "../../types/booking";
 import { useAuthStore } from "../../state/authStore";
 
@@ -45,7 +45,7 @@ const statusTextColors: Record<string, string> = {
   cancelled: "#b91c1c",
 };
 
-type Props = NativeStackScreenProps<CustomerStackParamList, "MyAppointments">;
+type Props = NativeStackScreenProps<CustomerFlowStackParamList, "MyAppointments">;
 
 export default function MyAppointmentsScreen({ navigation }: Props) {
   const logout = useAuthStore((s) => s.logout);

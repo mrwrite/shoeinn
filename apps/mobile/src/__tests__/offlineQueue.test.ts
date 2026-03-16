@@ -36,7 +36,7 @@ describe('offline queue management', () => {
 
   it('stops processing when a worker throws and returns remaining items', async () => {
     const worker = jest
-      .fn<Promise<void>, [PendingServiceUpdate]>()
+      .fn(async (_update: PendingServiceUpdate) => undefined)
       .mockResolvedValueOnce()
       .mockRejectedValueOnce(new Error('offline'));
 

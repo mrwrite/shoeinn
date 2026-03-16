@@ -7,15 +7,9 @@ import CompanyServicesScreen from "../screens/customer/CompanyServicesScreen";
 import AppointmentDetailScreen from "../screens/customer/AppointmentDetailScreen";
 import MyAppointmentsScreen from "../screens/customer/MyAppointmentsScreen";
 import { BookingProvider } from "../state/bookingStore";
-import type { AppointmentSummary } from "../types/booking";
+import type { CustomerFlowStackParamList } from "./types";
 
-export type CustomerStackParamList = {
-  MyAppointments: undefined;
-  AppointmentDetail: { appointmentId: string; summary?: AppointmentSummary };
-  CompanyPicker: undefined;
-  CompanyServices: undefined;
-  Booking: undefined;
-};
+export type CustomerStackParamList = CustomerFlowStackParamList;
 
 const Stack = createNativeStackNavigator<CustomerStackParamList>();
 

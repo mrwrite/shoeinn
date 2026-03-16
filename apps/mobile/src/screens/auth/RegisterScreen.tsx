@@ -36,7 +36,7 @@ export default function RegisterScreen({ navigation }: Props) {
       }
       await register({ email, password, full_name: trimmedName, role: "customer" });
       const tokens = await login({ email, password });
-      await setAuth(tokens.access_token, tokens.role, tokens.user_id, tokens.full_name, tokens.company_id);
+      await setAuth(tokens.access_token, tokens.role, tokens.user_id, tokens.full_name, tokens.email, tokens.company_id);
     },
     onError: (err: any) => {
       setError(err?.message ?? "Registration failed");

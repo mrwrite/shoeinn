@@ -17,6 +17,14 @@ export type AppointmentStackParamList = {
   AppointmentDetail: { appointmentId: string; summary?: AppointmentSummary };
 };
 
+export type CustomerFlowStackParamList = {
+  MyAppointments: undefined;
+  AppointmentDetail: { appointmentId: string; summary?: AppointmentSummary };
+  CompanyPicker: undefined;
+  CompanyServices: undefined;
+  Booking: undefined;
+};
+
 export type ProviderStackParamList = {
   ProviderDashboard: undefined;
   ProviderAppointmentDetail: { appointment: ProviderAppointment };
