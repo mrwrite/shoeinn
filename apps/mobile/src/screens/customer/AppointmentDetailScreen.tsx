@@ -19,12 +19,12 @@ import {
   getAppointmentAssignment,
   getAppointmentEvents,
 } from "../../api/http";
+import { CustomerTravelMapCard } from "../../components/CustomerTravelMapCard";
 import type { AppointmentStackParamList } from "../../navigation/types";
 import type {
   AppointmentEvent,
   AppointmentSummary,
 } from "../../types/booking";
-import { CustomerTravelMapCard } from "../../components/CustomerTravelMapCard";
 
 const travelStatuses = new Set(["en_route_pickup", "out_for_delivery"]);
 const photoVisibleStatuses = new Set(["ready", "out_for_delivery", "delivered", "completed"]);
@@ -65,17 +65,17 @@ type CustomerAssignmentState =
   | { kind: "unassigned"; title: string; detail?: string }
   | { kind: "assignment_unavailable"; title: string; detail?: string };
 
+type TimelineState = "current" | "completed" | "upcoming" | "terminal";
+
+const timelineDescriptions: Record<TimelineState, string> = {
+  current: "Current step",
+  completed: "Completed",
+  upcoming: "Upcoming",
+  terminal: "Final state",
+};
+
 const formatDateTime = (value?: string | null) =>
   value ? new Date(value).toLocaleString() : "-";
-
-const StatusRow = ({ label, active }: { label: string; active: boolean }) => (
-  <View style={styles.statusRow}>
-    <View style={[styles.statusDot, active && styles.statusDotActive]} />
-    <Text style={[styles.statusLabel, active && styles.statusLabelActive]}>
-      {label}
-    </Text>
-  </View>
-);
 
 const buildStatusHistory = (
   events: AppointmentEvent[],
@@ -90,7 +90,32 @@ const buildStatusHistory = (
   if (currentStatus) {
     reached.add(currentStatus);
   }
-  return statusOrder.map((status) => ({ status, active: reached.has(status) }));
+
+  const currentIndex = currentStatus ? statusOrder.indexOf(currentStatus) : -1;
+  const isTerminal = currentStatus === "completed" || currentStatus === "cancelled";
+
+  return statusOrder
+    .filter((status) => {
+      if (currentStatus === "cancelled") {
+        return reached.has(status) || status === "cancelled";
+      }
+      return status !== "cancelled";
+    })
+    .map((status, index) => {
+      let state: TimelineState = "upcoming";
+
+      if (status === currentStatus && (status === "completed" || status === "cancelled")) {
+        state = "terminal";
+      } else if (status === currentStatus) {
+        state = "current";
+      } else if (reached.has(status) && currentIndex >= 0 && index < currentIndex) {
+        state = "completed";
+      } else if (isTerminal && reached.has(status) && status !== currentStatus) {
+        state = "completed";
+      }
+
+      return { status, state };
+    });
 };
 
 const resolvePhotoUrl = (url?: string | null) => {
@@ -173,17 +198,22 @@ export default function AppointmentDetailScreen({ route }: Props) {
     completed: "This appointment is complete.",
     cancelled: "This appointment was cancelled.",
   };
+  const isAppointmentLoading = appointmentQuery.isLoading && !appointment;
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
         {!appointment ? (
-          <View style={styles.center}>
-            {appointmentQuery.isLoading ? (
-              <ActivityIndicator />
-            ) : (
-              <Text>Appointment not found</Text>
-            )}
+          <View style={styles.stateCard}>
+            {isAppointmentLoading ? <ActivityIndicator /> : null}
+            <Text style={styles.sectionTitle}>
+              {isAppointmentLoading ? "Loading appointment" : "Appointment not found"}
+            </Text>
+            <Text style={styles.meta}>
+              {isAppointmentLoading
+                ? "We are loading the latest appointment details."
+                : "We could not find this appointment in the active customer flow."}
+            </Text>
           </View>
         ) : (
           <>
@@ -202,7 +232,7 @@ export default function AppointmentDetailScreen({ route }: Props) {
             ) : null}
             <View style={styles.card}>
               <Text style={styles.title}>
-                {appointment?.service_name ?? "Appointment"}
+                {appointment.service_name ?? "Appointment"}
               </Text>
               <Text style={styles.meta}>
                 {formatDateTime(appointment.start_time)}
@@ -231,23 +261,63 @@ export default function AppointmentDetailScreen({ route }: Props) {
 
             <View style={styles.card}>
               <Text style={styles.sectionTitle}>Status timeline</Text>
-              {eventsQuery.isLoading ? <ActivityIndicator style={{ marginTop: 8, marginBottom: 8 }} /> : null}
-              {statusHistory.map((item) => (
-                <StatusRow
-                  key={item.status}
-                  label={statusLabels[item.status] ?? item.status}
-                  active={item.active}
-                />
-              ))}
+              {eventsQuery.isLoading ? (
+                <View style={styles.timelineState}>
+                  <ActivityIndicator />
+                  <Text style={styles.meta}>Loading the latest progress history.</Text>
+                </View>
+              ) : eventsQuery.isError ? (
+                <View style={styles.timelineState}>
+                  <Text style={styles.meta}>
+                    Progress history is temporarily unavailable. Your current status summary is still up to date.
+                  </Text>
+                </View>
+              ) : (
+                statusHistory.map((item) => (
+                  <View
+                    key={item.status}
+                    style={[
+                      styles.statusRow,
+                      item.state === "current" && styles.statusRowCurrent,
+                      item.state === "completed" && styles.statusRowCompleted,
+                      item.state === "upcoming" && styles.statusRowUpcoming,
+                      item.state === "terminal" && styles.statusRowTerminal,
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.statusDot,
+                        item.state === "current" && styles.statusDotCurrent,
+                        item.state === "completed" && styles.statusDotCompleted,
+                        item.state === "upcoming" && styles.statusDotUpcoming,
+                        item.state === "terminal" && styles.statusDotTerminal,
+                      ]}
+                    />
+                    <View style={styles.statusContent}>
+                      <Text
+                        style={[
+                          styles.statusLabel,
+                          item.state === "current" && styles.statusLabelCurrent,
+                          item.state === "completed" && styles.statusLabelCompleted,
+                          item.state === "terminal" && styles.statusLabelTerminal,
+                        ]}
+                      >
+                        {statusLabels[item.status] ?? item.status}
+                      </Text>
+                      <Text style={styles.statusMeta}>
+                        {timelineDescriptions[item.state]}
+                      </Text>
+                    </View>
+                  </View>
+                ))
+              )}
             </View>
 
             {shouldShowFinishedPhotoSection ? (
               <View style={styles.card}>
                 <Text style={styles.sectionTitle}>Finished Photo</Text>
                 {finishedPhotoUrl ? (
-                  <Pressable
-                    onPress={() => setExpandedPhotoUrl(finishedPhotoUrl)}
-                  >
+                  <Pressable onPress={() => setExpandedPhotoUrl(finishedPhotoUrl)}>
                     <Image
                       source={{ uri: finishedPhotoUrl }}
                       style={styles.finishedPhoto}
@@ -310,10 +380,13 @@ export default function AppointmentDetailScreen({ route }: Props) {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#f3f4f6" },
   container: { padding: 16, paddingBottom: 40, gap: 12 },
-  center: {
+  stateCard: {
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 30,
+    padding: 24,
+    borderRadius: 16,
+    backgroundColor: "#ffffff",
+    gap: 8,
   },
   card: {
     backgroundColor: "#fff",
@@ -344,19 +417,58 @@ const styles = StyleSheet.create({
   value: { fontSize: 16, fontWeight: "600" },
   statusRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 10,
-    paddingVertical: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    backgroundColor: "#ffffff",
   },
   statusDot: {
     width: 12,
     height: 12,
     borderRadius: 6,
+    marginTop: 4,
     backgroundColor: "#e5e7eb",
   },
-  statusDotActive: { backgroundColor: "#22c55e" },
+  statusDotCurrent: { backgroundColor: "#0F4C5C" },
+  statusDotCompleted: { backgroundColor: "#22c55e" },
+  statusDotUpcoming: { backgroundColor: "#d1d5db" },
+  statusDotTerminal: { backgroundColor: "#7c3aed" },
+  statusRowCurrent: {
+    backgroundColor: "#eff6ff",
+    borderColor: "#93c5fd",
+  },
+  statusRowCompleted: {
+    backgroundColor: "#f0fdf4",
+    borderColor: "#86efac",
+  },
+  statusRowUpcoming: {
+    backgroundColor: "#f9fafb",
+    borderStyle: "dashed",
+  },
+  statusRowTerminal: {
+    backgroundColor: "#faf5ff",
+    borderColor: "#d8b4fe",
+  },
+  statusContent: {
+    flex: 1,
+  },
   statusLabel: { color: "#6b7280" },
-  statusLabelActive: { color: "#111827", fontWeight: "700" },
+  statusLabelCurrent: { color: "#111827", fontWeight: "700" },
+  statusLabelCompleted: { color: "#166534", fontWeight: "700" },
+  statusLabelTerminal: { color: "#5b21b6", fontWeight: "700" },
+  statusMeta: {
+    color: "#6b7280",
+    marginTop: 2,
+    fontSize: 12,
+  },
+  timelineState: {
+    paddingVertical: 10,
+    gap: 8,
+  },
   finishedPhoto: {
     width: "100%",
     height: 220,
