@@ -10,6 +10,7 @@ import {
   setAppointmentReadyWithPhoto,
   updateAppointmentStatus,
 } from "../../api/http";
+import { useFocusedAutoRefresh } from "../../hooks/useFocusedAutoRefresh";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { Text } from "../../components/ui/Text";
@@ -85,6 +86,7 @@ export default function ProviderAppointmentDetailScreen() {
   } | null>(null);
   const userId = useAuthStore((s) => s.userId);
   const queryClient = useQueryClient();
+  const isLiveAppointment = !["completed", "cancelled"].includes(status);
 
   const assignmentQuery = useQuery({
     queryKey: ["appointment", appointment.id, "assignment"],
@@ -103,6 +105,8 @@ export default function ProviderAppointmentDetailScreen() {
       queryClient.invalidateQueries({ queryKey: ["provider", "open"] });
       queryClient.invalidateQueries({ queryKey: ["provider", "my"] });
       queryClient.invalidateQueries({ queryKey: ["appointment", appointment.id] });
+      queryClient.invalidateQueries({ queryKey: ["appointment", appointment.id, "assignment"] });
+      void assignmentQuery.refetch();
     },
     onError: (err: Error) => Alert.alert("Update failed", err.message),
   });
@@ -115,6 +119,8 @@ export default function ProviderAppointmentDetailScreen() {
       queryClient.invalidateQueries({ queryKey: ["provider", "open"] });
       queryClient.invalidateQueries({ queryKey: ["provider", "my"] });
       queryClient.invalidateQueries({ queryKey: ["appointment", appointment.id] });
+      queryClient.invalidateQueries({ queryKey: ["appointment", appointment.id, "assignment"] });
+      void assignmentQuery.refetch();
     },
     onError: (err: Error) => Alert.alert("Upload failed", err.message),
   });
@@ -128,6 +134,9 @@ export default function ProviderAppointmentDetailScreen() {
       });
       queryClient.setQueryData(["appointment", appointment.id, "assignment"], data);
       queryClient.invalidateQueries({ queryKey: ["provider", "open"] });
+      queryClient.invalidateQueries({ queryKey: ["provider", "my"] });
+      queryClient.invalidateQueries({ queryKey: ["appointment", appointment.id, "assignment"] });
+      void assignmentQuery.refetch();
     },
     onError: (err: Error) => {
       setClaimFeedback(getClaimFeedback(err));
@@ -171,6 +180,16 @@ export default function ProviderAppointmentDetailScreen() {
     (opt) => opt !== status && opt !== recommendedNextStatus,
   );
   const currentStateLabel = status.replace(/_/g, " ");
+
+  useFocusedAutoRefresh({
+    enabled: true,
+    intervalMs: isLiveAppointment ? 12000 : null,
+    onRefresh: () => {
+      void assignmentQuery.refetch();
+      void queryClient.refetchQueries({ queryKey: ["provider", "open"], type: "active" });
+      void queryClient.refetchQueries({ queryKey: ["provider", "my"], type: "active" });
+    },
+  });
 
   const info = useMemo(
     () => [

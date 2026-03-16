@@ -20,6 +20,7 @@ import {
   getAppointmentEvents,
 } from "../../api/http";
 import { CustomerTravelMapCard } from "../../components/CustomerTravelMapCard";
+import { useFocusedAutoRefresh } from "../../hooks/useFocusedAutoRefresh";
 import type { AppointmentStackParamList } from "../../navigation/types";
 import type {
   AppointmentEvent,
@@ -199,6 +200,18 @@ export default function AppointmentDetailScreen({ route }: Props) {
     cancelled: "This appointment was cancelled.",
   };
   const isAppointmentLoading = appointmentQuery.isLoading && !appointment;
+  const isLiveAppointment =
+    !!appointment && !["completed", "cancelled"].includes(appointment.status);
+
+  useFocusedAutoRefresh({
+    enabled: !!appointmentId,
+    intervalMs: isLiveAppointment ? 12000 : null,
+    onRefresh: () => {
+      void appointmentQuery.refetch();
+      void assignmentQuery.refetch();
+      void eventsQuery.refetch();
+    },
+  });
 
   return (
     <SafeAreaView style={styles.safeArea}>

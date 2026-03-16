@@ -9,6 +9,7 @@ import {
   fetchMyAppointments,
   fetchOpenAppointments,
 } from "../../api/http";
+import { useFocusedAutoRefresh } from "../../hooks/useFocusedAutoRefresh";
 import { AppointmentCard } from "../../components/AppointmentCard";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { Button } from "../../components/ui/Button";
@@ -201,6 +202,8 @@ export default function ProviderDashboardScreen() {
       });
       queryClient.invalidateQueries({ queryKey: ["provider", "open"] });
       queryClient.invalidateQueries({ queryKey: ["provider", "my"] });
+      void openAppointmentsQuery.refetch();
+      void myAppointmentsQuery.refetch();
     },
     onError: (err: Error) => {
       setFeedback(getClaimFeedback(err));
@@ -210,6 +213,15 @@ export default function ProviderDashboardScreen() {
   React.useEffect(() => {
     setFeedback(null);
   }, [activeTab]);
+
+  useFocusedAutoRefresh({
+    enabled: true,
+    intervalMs: 25000,
+    onRefresh: () => {
+      void openAppointmentsQuery.refetch();
+      void myAppointmentsQuery.refetch();
+    },
+  });
 
   const activeQuery = activeTab === "available" ? openAppointmentsQuery : myAppointmentsQuery;
   const availableCount = openAppointmentsQuery.data?.length ?? 0;
