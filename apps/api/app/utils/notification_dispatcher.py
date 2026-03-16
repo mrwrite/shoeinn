@@ -171,6 +171,22 @@ def _push_text(notification: Notification, payload: dict) -> tuple[str, str]:
     elif kind == "APPOINTMENT_CONFIRMED":
         base_title = "Appointment confirmed"
         base_body = "Your appointment has been confirmed."
+    elif kind == "APPOINTMENT_PROVIDER_ASSIGNED":
+        provider_name = payload.get("new_provider_name") if isinstance(payload, dict) else None
+        base_title = "Provider assigned"
+        base_body = (
+            f"{provider_name} is assigned to your appointment."
+            if provider_name
+            else "A provider is assigned to your appointment."
+        )
+    elif kind == "APPOINTMENT_PROVIDER_REASSIGNED":
+        provider_name = payload.get("new_provider_name") if isinstance(payload, dict) else None
+        base_title = "Provider updated"
+        base_body = (
+            f"Your appointment is now assigned to {provider_name}."
+            if provider_name
+            else "Your appointment was reassigned."
+        )
     elif kind == "APPOINTMENT_STATUS_CHANGED":
         new_status = payload.get("new_status") if isinstance(payload, dict) else None
         base_title = "Appointment status updated"

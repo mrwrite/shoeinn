@@ -184,6 +184,25 @@ export default function AppointmentDetailScreen({ route }: Props) {
               </View>
             </View>
 
+            {shouldShowFinishedPhotoSection ? (
+              <View style={styles.card}>
+                <Text style={styles.sectionTitle}>Finished Photo</Text>
+                {finishedPhotoUrl ? (
+                  <Pressable
+                    onPress={() => setExpandedPhotoUrl(finishedPhotoUrl)}
+                  >
+                    <Image
+                      source={{ uri: finishedPhotoUrl }}
+                      style={styles.finishedPhoto}
+                    />
+                    <Text style={styles.meta}>Tap to expand</Text>
+                  </Pressable>
+                ) : (
+                  <Text style={styles.meta}>Photo pending</Text>
+                )}
+              </View>
+            ) : null}
+
             <View style={styles.card}>
               <Text style={styles.sectionTitle}>Details</Text>
               <Text style={styles.label}>Customer</Text>
@@ -211,22 +230,9 @@ export default function AppointmentDetailScreen({ route }: Props) {
               ) : null}
             </View>
 
-            {shouldShowFinishedPhotoSection ? (
-              <View style={styles.card}>
-                <Text style={styles.sectionTitle}>Finished Photo</Text>
-                {finishedPhotoUrl ? (
-                  <Pressable onPress={() => setExpandedPhotoUrl(finishedPhotoUrl)}>
-                    <Image source={{ uri: finishedPhotoUrl }} style={styles.finishedPhoto} />
-                    <Text style={styles.meta}>Tap to expand</Text>
-                  </Pressable>
-                ) : (
-                  <Text style={styles.meta}>Photo pending</Text>
-                )}
-              </View>
-            ) : null}
-
             <View style={styles.card}>
               <Text style={styles.sectionTitle}>Status timeline</Text>
+              {eventsQuery.isLoading ? <ActivityIndicator style={{ marginTop: 8, marginBottom: 8 }} /> : null}
               {statusHistory.map((item) => (
                 <StatusRow
                   key={item.status}
@@ -252,8 +258,16 @@ export default function AppointmentDetailScreen({ route }: Props) {
       </ScrollView>
 
       <Modal visible={!!expandedPhotoUrl} transparent animationType="fade">
-        <Pressable style={styles.photoModalBackdrop} onPress={() => setExpandedPhotoUrl(null)}>
-          {expandedPhotoUrl ? <Image source={{ uri: expandedPhotoUrl }} style={styles.photoModalImage} /> : null}
+        <Pressable
+          style={styles.photoModalBackdrop}
+          onPress={() => setExpandedPhotoUrl(null)}
+        >
+          {expandedPhotoUrl ? (
+            <Image
+              source={{ uri: expandedPhotoUrl }}
+              style={styles.photoModalImage}
+            />
+          ) : null}
         </Pressable>
       </Modal>
     </SafeAreaView>

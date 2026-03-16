@@ -12,6 +12,8 @@ from app.utils.notifications import enqueue_notification_intent
 
 APPOINTMENT_CONFIRMED = "APPOINTMENT_CONFIRMED"
 APPOINTMENT_STATUS_CHANGED = "APPOINTMENT_STATUS_CHANGED"
+APPOINTMENT_PROVIDER_ASSIGNED = "APPOINTMENT_PROVIDER_ASSIGNED"
+APPOINTMENT_PROVIDER_REASSIGNED = "APPOINTMENT_PROVIDER_REASSIGNED"
 NEW_APPOINTMENT = "NEW_APPOINTMENT"
 PAYMENT_SUCCEEDED = "PAYMENT_SUCCEEDED"
 PAYMENT_FAILED = "PAYMENT_FAILED"
@@ -50,9 +52,15 @@ def enqueue_customer_notification(
     channel: str = "email",
     payload: dict | None = None,
 ):
-    target = appointment.customer_email or appointment.customer_phone
-    if not target:
-        return None
+    customer_user_id = _customer_user_id(db, appointment)
+    if channel in {"in_app", "push"}:
+        if customer_user_id is None:
+            return None
+        target = str(customer_user_id)
+    else:
+        target = appointment.customer_email or appointment.customer_phone
+        if not target:
+            return None
 
     payload_data = _default_payload(appointment)
     if payload:
@@ -70,8 +78,7 @@ def enqueue_customer_notification(
     if channel == "in_app" and notification.outbox_entry:
         _mark_in_app_delivered(notification, notification.outbox_entry)
 
-    customer_user_id = _customer_user_id(db, appointment)
-    if customer_user_id and _has_push_tokens(db, customer_user_id):
+    if channel != "push" and customer_user_id and _has_push_tokens(db, customer_user_id):
         enqueue_notification_intent(
             db,
             company_id=appointment.company_id,
@@ -106,6 +113,10 @@ def _customer_user_id(db: Session, appointment: Appointment):
         .first()
     )
     return user.id if user else None
+
+
+def resolve_customer_user_id(db: Session, appointment: Appointment):
+    return _customer_user_id(db, appointment)
 
 
 def enqueue_company_user_notifications(
@@ -150,6 +161,8 @@ def enqueue_company_user_notifications(
 
 __all__ = [
     "APPOINTMENT_CONFIRMED",
+    "APPOINTMENT_PROVIDER_ASSIGNED",
+    "APPOINTMENT_PROVIDER_REASSIGNED",
     "APPOINTMENT_STATUS_CHANGED",
     "NEW_APPOINTMENT",
     "PAYMENT_FAILED",
@@ -157,4 +170,5 @@ __all__ = [
     "WELCOME",
     "enqueue_customer_notification",
     "enqueue_company_user_notifications",
+    "resolve_customer_user_id",
 ]

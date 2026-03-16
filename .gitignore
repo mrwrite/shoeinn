@@ -22,3 +22,14 @@ Thumbs.db
 # Misc
 pytest-cache/
 coverage*
+
+# Python virtual env
+venv/
+apps/api/venv/
+
+# Codex workspace
+.codex/
+
+# Python cache
+__pycache__/
+*.pyc

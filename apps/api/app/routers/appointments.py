@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.db import get_db
-from app.core.security import get_current_customer, get_current_user, get_current_company_user
+from app.core.security import get_current_customer, get_current_user, get_current_company_user, oauth2_scheme
 from app.models import (
     Appointment,
     AppointmentAssignment,
@@ -250,12 +250,8 @@ def _ensure_customer_access(appointment: Appointment, current_customer) -> None:
 def _provider_display_name(user: User | None) -> str | None:
     if not user or not user.full_name:
         return None
-    parts = [p for p in user.full_name.split(" ") if p]
-    if not parts:
-        return None
-    if len(parts) == 1:
-        return parts[0]
-    return "".join(p[0].upper() for p in parts[:2])
+    display_name = user.full_name.strip()
+    return display_name or None
 
 
 def _ensure_appointment_read_access(appointment: Appointment, current_user, company_id: UUID | None) -> None:
@@ -456,6 +452,7 @@ def read_assignment_company(
 def read_assignment(
     appointment_id: UUID,
     current_user=Depends(get_current_user),
+    token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ) -> AppointmentAssignmentRead:    
     appointment = db.get(Appointment, appointment_id)
@@ -465,7 +462,8 @@ def read_assignment(
     if current_user.role == "customer":
         _ensure_customer_access(appointment, current_user)
     else:
-        _ensure_company_access(appointment, current_user, db)   
+        _, company_id = get_current_company_user(db=db, token=token, current_user=current_user)
+        _ensure_company_access(appointment, company_id)
 
     assignment = (
         db.query(AppointmentAssignment)
