@@ -7,8 +7,6 @@ import {
   StyleSheet,
   View,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { ScreenContainer } from "../../components/ScreenContainer";
@@ -21,13 +19,12 @@ import {
   getCustomerNotificationCopy,
   useCustomerNotifications,
 } from "../../hooks/useCustomerNotifications";
-import type { AppointmentStackParamList } from "../../navigation/types";
+import { openCustomerAppointmentFromNotification } from "../../navigation/customerNotificationNavigation";
 import type { Notification } from "../../types/notification";
 import { useTheme } from "../../theme/theme";
 
 export default function CustomerNotificationsScreen() {
   const theme = useTheme();
-  const navigation = useNavigation<NativeStackNavigationProp<AppointmentStackParamList>>();
   const queryClient = useQueryClient();
   const notificationsQuery = useCustomerNotifications(true);
 
@@ -55,9 +52,7 @@ export default function CustomerNotificationsScreen() {
       }
     }
 
-    if (notification.appointment_id) {
-      navigation.navigate("AppointmentDetail", { appointmentId: notification.appointment_id });
-    }
+    openCustomerAppointmentFromNotification(notification);
   };
 
   const renderItem = ({ item }: { item: Notification }) => {

@@ -4,6 +4,7 @@ import { NavigationContainer } from "@react-navigation/native";
 
 import AuthStack from "./AuthStack";
 import AppStack from "./AppStack";
+import { navigationRef } from "./rootNavigation";
 import { useAuthStore } from "../state/authStore";
 
 export default function AuthGate() {
@@ -24,7 +25,7 @@ export default function AuthGate() {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       {!token || !role ? <AuthStack /> : <AppStack />}
     </NavigationContainer>
   );

@@ -1,9 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { ackMyNotification, fetchMyNotifications } from "../api/http";
+import {
+  ackMyNotification,
+  fetchMyNotifications,
+  getMyNotificationPreferences,
+  updateMyNotificationPreferences,
+} from "../api/http";
 import type { Notification } from "../types/notification";
+import type { NotificationPreferences } from "../types/user";
 
 export const customerNotificationsQueryKey = ["me", "notifications"] as const;
+export const customerNotificationPreferencesQueryKey = ["me", "notification-preferences"] as const;
 
 const statusLabels: Record<string, string> = {
   requested: "Requested",
@@ -116,6 +123,14 @@ export function useCustomerNotifications(enabled = true) {
   });
 }
 
+export function useCustomerNotificationPreferences(enabled = true) {
+  return useQuery({
+    queryKey: customerNotificationPreferencesQueryKey,
+    queryFn: getMyNotificationPreferences,
+    enabled,
+  });
+}
+
 export function getUnreadCustomerNotificationCount(notifications: Notification[] | undefined): number {
   return (notifications ?? []).filter((notification) => !notification.read_at).length;
 }
@@ -130,3 +145,5 @@ export function getLatestNotificationForAppointment(
 }
 
 export { ackMyNotification };
+export { updateMyNotificationPreferences };
+export type { NotificationPreferences };

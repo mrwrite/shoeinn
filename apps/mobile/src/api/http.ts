@@ -21,7 +21,7 @@ import type { ProviderAppointment, StatusUpdatePayload } from "../types/company"
 import { getAuthToken } from "../state/authStore";
 import type { Notification } from "../types/notification";
 import type { PushRegisterRequest, PushUnregisterRequest } from "../types/push";
-import type { CustomerAddressUpdatePayload, UserProfile } from "../types/user";
+import type { CustomerAddressUpdatePayload, NotificationPreferences, UserProfile } from "../types/user";
 
 export const API_URL: string =
   (Constants.expoConfig?.extra as any)?.API_URL ??
@@ -277,4 +277,12 @@ export function getMe(): Promise<UserProfile> {
 
 export function updateMyAddress(payload: CustomerAddressUpdatePayload): Promise<UserProfile> {
   return request<UserProfile>("PATCH", "/me/address", payload, { auth: true });
+}
+
+export function getMyNotificationPreferences(): Promise<NotificationPreferences> {
+  return request<NotificationPreferences>("GET", "/me/notification-preferences", undefined, { auth: true });
+}
+
+export function updateMyNotificationPreferences(payload: NotificationPreferences): Promise<NotificationPreferences> {
+  return request<NotificationPreferences>("PATCH", "/me/notification-preferences", payload, { auth: true });
 }

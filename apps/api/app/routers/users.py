@@ -11,7 +11,12 @@ from app.core.security import get_current_customer, get_current_user
 from app.models.notification import Notification
 from app.models.user import User
 from app.schemas.notification import NotificationRead
-from app.schemas.user import CustomerAddressUpdate, UserRead
+from app.schemas.user import (
+    CustomerAddressUpdate,
+    NotificationPreferencesRead,
+    NotificationPreferencesUpdate,
+    UserRead,
+)
 
 router = APIRouter(tags=["users"])
 
@@ -72,6 +77,18 @@ def update_my_address(
     return UserRead.model_validate(current_user, from_attributes=True)
 
 
+def _read_bool_flag(value: str | bool | None, default: bool = True) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return default
+    return str(value).strip().lower() not in {"false", "0", "off", "no"}
+
+
+def _write_bool_flag(value: bool) -> bool:
+    return bool(value)
+
+
 @router.get("/me/notifications", response_model=list[NotificationRead])
 def list_my_notifications(
     current_customer: User = Depends(get_current_customer),
@@ -111,3 +128,37 @@ def ack_my_notification(
     db.commit()
     db.refresh(notification)
     return _serialize_notification(notification)
+
+
+@router.get("/me/notification-preferences", response_model=NotificationPreferencesRead)
+def read_my_notification_preferences(
+    current_customer: User = Depends(get_current_customer),
+) -> NotificationPreferencesRead:
+    return NotificationPreferencesRead(
+        customer_push_enabled=_read_bool_flag(getattr(current_customer, "customer_push_enabled", True)),
+        customer_push_assignment_updates=_read_bool_flag(
+            getattr(current_customer, "customer_push_assignment_updates", True)
+        ),
+        customer_push_milestone_updates=_read_bool_flag(
+            getattr(current_customer, "customer_push_milestone_updates", True)
+        ),
+    )
+
+
+@router.patch("/me/notification-preferences", response_model=NotificationPreferencesRead)
+def update_my_notification_preferences(
+    payload: NotificationPreferencesUpdate,
+    current_customer: User = Depends(get_current_customer),
+    db: Session = Depends(get_db),
+) -> NotificationPreferencesRead:
+    current_customer.customer_push_enabled = _write_bool_flag(payload.customer_push_enabled)
+    current_customer.customer_push_assignment_updates = _write_bool_flag(payload.customer_push_assignment_updates)
+    current_customer.customer_push_milestone_updates = _write_bool_flag(payload.customer_push_milestone_updates)
+    db.add(current_customer)
+    db.commit()
+    db.refresh(current_customer)
+    return NotificationPreferencesRead(
+        customer_push_enabled=_read_bool_flag(current_customer.customer_push_enabled),
+        customer_push_assignment_updates=_read_bool_flag(current_customer.customer_push_assignment_updates),
+        customer_push_milestone_updates=_read_bool_flag(current_customer.customer_push_milestone_updates),
+    )

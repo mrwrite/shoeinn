@@ -9,6 +9,9 @@ export interface UserProfile {
   state?: string | null;
   postal_code?: string | null;
   country?: string | null;
+  customer_push_enabled?: boolean;
+  customer_push_assignment_updates?: boolean;
+  customer_push_milestone_updates?: boolean;
 }
 
 export interface CustomerAddressUpdatePayload {
@@ -18,4 +21,10 @@ export interface CustomerAddressUpdatePayload {
   state: string;
   postal_code: string;
   country?: string;
+}
+
+export interface NotificationPreferences {
+  customer_push_enabled: boolean;
+  customer_push_assignment_updates: boolean;
+  customer_push_milestone_updates: boolean;
 }

@@ -1,18 +1,25 @@
 import React, { useEffect, useState } from "react";
-import { Alert, StyleSheet, TextInput, View } from "react-native";
+import { Alert, StyleSheet, Switch, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { getMe, updateMyAddress } from "../../api/http";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { Text } from "../../components/ui/Text";
+import {
+  customerNotificationPreferencesQueryKey,
+  useCustomerNotificationPreferences,
+  updateMyNotificationPreferences,
+} from "../../hooks/useCustomerNotifications";
 import { useAuthStore } from "../../state/authStore";
 import { useTheme } from "../../theme/theme";
 
 export default function ProfileScreen() {
   const theme = useTheme();
   const { fullName, email, role, logout } = useAuthStore();
+  const queryClient = useQueryClient();
   const [addressLine1, setAddressLine1] = useState("");
   const [addressLine2, setAddressLine2] = useState("");
   const [city, setCity] = useState("");
@@ -20,6 +27,11 @@ export default function ProfileScreen() {
   const [postalCode, setPostalCode] = useState("");
   const [country, setCountry] = useState("US");
   const [saving, setSaving] = useState(false);
+  const [savingPreferences, setSavingPreferences] = useState(false);
+  const preferencesQuery = useCustomerNotificationPreferences(role === "customer");
+  const [pushEnabled, setPushEnabled] = useState(true);
+  const [assignmentPushEnabled, setAssignmentPushEnabled] = useState(true);
+  const [milestonePushEnabled, setMilestonePushEnabled] = useState(true);
 
   useEffect(() => {
     let mounted = true;
@@ -44,6 +56,22 @@ export default function ProfileScreen() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!preferencesQuery.data) {
+      return;
+    }
+    setPushEnabled(preferencesQuery.data.customer_push_enabled);
+    setAssignmentPushEnabled(preferencesQuery.data.customer_push_assignment_updates);
+    setMilestonePushEnabled(preferencesQuery.data.customer_push_milestone_updates);
+  }, [preferencesQuery.data]);
+
+  const preferencesMutation = useMutation({
+    mutationFn: updateMyNotificationPreferences,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: customerNotificationPreferencesQueryKey });
+    },
+  });
+
   const onSaveAddress = async () => {
     if (!addressLine1.trim() || !city.trim() || !state.trim() || !postalCode.trim()) {
       Alert.alert("Missing address", "Address line 1, city, state, and postal code are required.");
@@ -65,6 +93,22 @@ export default function ProfileScreen() {
       Alert.alert("Failed", err?.message ?? "Unable to update address.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const onSaveNotificationPreferences = async () => {
+    try {
+      setSavingPreferences(true);
+      await preferencesMutation.mutateAsync({
+        customer_push_enabled: pushEnabled,
+        customer_push_assignment_updates: assignmentPushEnabled,
+        customer_push_milestone_updates: milestonePushEnabled,
+      });
+      Alert.alert("Saved", "Notification preferences updated.");
+    } catch (err: any) {
+      Alert.alert("Failed", err?.message ?? "Unable to update notification preferences.");
+    } finally {
+      setSavingPreferences(false);
     }
   };
 
@@ -137,8 +181,79 @@ export default function ProfileScreen() {
           <Button label={saving ? "Saving..." : "Save address"} onPress={onSaveAddress} loading={saving} disabled={saving} />
         </View>
       </Card>
+      {role === "customer" ? (
+        <Card>
+          <Text variant="subtitle" weight="semibold">
+            Notifications
+          </Text>
+          <Text color={theme.colors.mutedText} style={{ marginTop: 6 }}>
+            Keep push alerts useful by choosing which customer updates can reach your device.
+          </Text>
+          <View style={{ marginTop: 14, gap: 14 }}>
+            <PreferenceRow
+              label="Push notifications"
+              detail="Enable or disable all appointment push notifications."
+              value={pushEnabled}
+              onValueChange={(value) => {
+                setPushEnabled(value);
+                if (!value) {
+                  setAssignmentPushEnabled(false);
+                  setMilestonePushEnabled(false);
+                }
+              }}
+            />
+            <PreferenceRow
+              label="Assignment updates"
+              detail="Provider assigned or provider changed."
+              value={assignmentPushEnabled}
+              disabled={!pushEnabled}
+              onValueChange={setAssignmentPushEnabled}
+            />
+            <PreferenceRow
+              label="Milestone updates"
+              detail="Confirmed, ready, out for delivery, and delivered."
+              value={milestonePushEnabled}
+              disabled={!pushEnabled}
+              onValueChange={setMilestonePushEnabled}
+            />
+            <Button
+              label={savingPreferences ? "Saving..." : "Save notification settings"}
+              onPress={onSaveNotificationPreferences}
+              loading={savingPreferences}
+              disabled={savingPreferences || preferencesQuery.isLoading}
+            />
+          </View>
+        </Card>
+      ) : null}
       <Button label="Logout" variant="secondary" onPress={logout} />
     </ScreenContainer>
+  );
+}
+
+function PreferenceRow({
+  label,
+  detail,
+  value,
+  onValueChange,
+  disabled = false,
+}: {
+  label: string;
+  detail: string;
+  value: boolean;
+  onValueChange: (value: boolean) => void;
+  disabled?: boolean;
+}) {
+  const theme = useTheme();
+  return (
+    <View style={styles.preferenceRow}>
+      <View style={{ flex: 1, gap: 4 }}>
+        <Text weight="semibold">{label}</Text>
+        <Text variant="caption" color={theme.colors.mutedText}>
+          {detail}
+        </Text>
+      </View>
+      <Switch value={value} onValueChange={onValueChange} disabled={disabled} />
+    </View>
   );
 }
 
@@ -162,5 +277,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: 14,
     backgroundColor: "#FFFFFF",
+  },
+  preferenceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
   },
 });

@@ -41,6 +41,9 @@ class UserRead(BaseModel):
     state: str | None = None
     postal_code: str | None = None
     country: str | None = None
+    customer_push_enabled: bool = True
+    customer_push_assignment_updates: bool = True
+    customer_push_milestone_updates: bool = True
 
     class Config:
         from_attributes = True
@@ -48,3 +51,15 @@ class UserRead(BaseModel):
 
 class UserOut(UserRead):
     pass
+
+
+class NotificationPreferencesRead(BaseModel):
+    customer_push_enabled: bool
+    customer_push_assignment_updates: bool
+    customer_push_milestone_updates: bool
+
+
+class NotificationPreferencesUpdate(BaseModel):
+    customer_push_enabled: bool
+    customer_push_assignment_updates: bool
+    customer_push_milestone_updates: bool

@@ -19,11 +19,11 @@ const queryClient = new QueryClient({
 
 function AppShell() {
   useLiveAppointmentEvents();
+  usePushNotifications();
   return <AuthGate />;
 }
 
 export default function App() {
-  usePushNotifications();
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>

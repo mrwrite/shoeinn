@@ -1,7 +1,7 @@
 from datetime import datetime
 import uuid
 
-from sqlalchemy import Column, DateTime, String, UniqueConstraint
+from sqlalchemy import Boolean, Column, DateTime, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -23,6 +23,9 @@ class User(Base):
     state = Column(String(100), nullable=True)
     postal_code = Column(String(20), nullable=True)
     country = Column(String(2), nullable=True)
+    customer_push_enabled = Column(Boolean, nullable=False, default=True)
+    customer_push_assignment_updates = Column(Boolean, nullable=False, default=True)
+    customer_push_milestone_updates = Column(Boolean, nullable=False, default=True)
 
     refresh_tokens = relationship(
         "RefreshToken",
