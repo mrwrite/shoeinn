@@ -120,6 +120,19 @@ export function getJson<T>(path: string): Promise<T> {
   return request<T>("GET", path);
 }
 
+export function getLiveEventsWebSocketUrl(token: string | null): string | null {
+  if (!token) {
+    return null;
+  }
+
+  const baseUrl = API_URL.replace(/\/$/, "");
+  const wsBase =
+    baseUrl.startsWith("https://") ? `wss://${baseUrl.slice("https://".length)}` :
+    baseUrl.startsWith("http://") ? `ws://${baseUrl.slice("http://".length)}` :
+    baseUrl;
+  return `${wsBase}/live/ws?token=${encodeURIComponent(token)}`;
+}
+
 export function getAvailability(serviceId: string, date: string): Promise<string[]> {
   const params = new URLSearchParams({ service_id: serviceId, date });
   return request<string[]>("GET", `/availability?${params.toString()}`);

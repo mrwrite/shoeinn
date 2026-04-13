@@ -48,6 +48,7 @@ from app.services.notifications import (
     enqueue_customer_notification,
     resolve_customer_user_id,
 )
+from app.services.live_events import publish_assignment_changed, publish_status_changed
 
 router = APIRouter(prefix="/company", tags=["company"])
 
@@ -472,6 +473,14 @@ def claim_appointment(
         logger.exception("IntegrityError when claiming appointment %s", appointment_id)
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Appointment already assigned")
     db.refresh(assignment)
+    publish_assignment_changed(
+        db,
+        appointment=appt,
+        event_kind="assignment_claimed",
+        assignment_action="claimed",
+        old_provider=None,
+        new_provider=current_user,
+    )
     return _serialize_assignment(assignment, current_user)
 
 
@@ -559,6 +568,14 @@ def reassign_appointment(
         logger.exception("IntegrityError when reassigning appointment %s", appointment_id)
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Appointment already assigned")
     db.refresh(assignment)
+    publish_assignment_changed(
+        db,
+        appointment=appt,
+        event_kind="assignment_reassigned",
+        assignment_action="reassigned",
+        old_provider=old_provider,
+        new_provider=new_provider,
+    )
     return _serialize_assignment(assignment, new_provider)
 
 
@@ -797,6 +814,11 @@ async def set_ready_with_photo(
         )
     db.commit()
     db.refresh(appt)
+    publish_status_changed(
+        db,
+        appointment=appt,
+        previous_status=previous_status.value if previous_status else None,
+    )
 
     ready_photo_url = appt.ready_photo_url
     if ready_photo_url and ready_photo_url.startswith("/"):
@@ -860,6 +882,11 @@ def update_status(
         )
     db.commit()
     db.refresh(appt)
+    publish_status_changed(
+        db,
+        appointment=appt,
+        previous_status=previous_status.value if previous_status else None,
+    )
     return {"id": appt.id, "status": appt.status}
 
 

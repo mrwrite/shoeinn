@@ -29,6 +29,10 @@ def _auth_header(user: User, *, company_id=None) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
+def _access_token(user: User, *, company_id=None) -> str:
+    return _auth_header(user, company_id=company_id)["Authorization"].split(" ", 1)[1]
+
+
 def _make_company(db: Session, *, name: str = "Claim Co") -> Company:
     company = Company(id=uuid4(), name=name, city="Austin", state="TX")
     db.add(company)
@@ -137,6 +141,35 @@ def test_claim_creates_assignment_event_and_customer_notifications(db_session: S
     assert ("APPOINTMENT_PROVIDER_ASSIGNED", "in_app") in kinds
     assert ("APPOINTMENT_PROVIDER_ASSIGNED", "push") in kinds
     assert ("APPOINTMENT_PROVIDER_ASSIGNED", "email") not in kinds
+
+
+def test_claim_publishes_live_assignment_event_to_company_clients(db_session: Session, client: TestClient) -> None:
+    company = _make_company(db_session, name="Live Claim Co")
+    service = _make_service(db_session, company)
+    provider = _make_user(
+        db_session,
+        email="live-provider@example.com",
+        role="provider",
+        full_name="Live Provider",
+    )
+    db_session.add(CompanyUser(user_id=provider.id, company_id=company.id))
+    appointment = _make_appointment(db_session, company=company, service=service)
+    db_session.commit()
+
+    token = _access_token(provider, company_id=company.id)
+    with client.websocket_connect(f"/live/ws?token={token}") as websocket:
+        response = client.post(
+            f"/company/appointments/{appointment.id}/claim",
+            headers=_auth_header(provider, company_id=company.id),
+        )
+
+        assert response.status_code == 201, response.text
+        payload = websocket.receive_json()
+        assert payload["type"] == "assignment_changed"
+        assert payload["event_kind"] == "assignment_claimed"
+        assert payload["appointment_id"] == str(appointment.id)
+        assert payload["assignment_action"] == "claimed"
+        assert payload["new_provider_name"] == "Live Provider"
 
 
 def test_guest_booking_with_phone_only_gets_sms_assignment_notification(db_session: Session, client: TestClient) -> None:
@@ -354,3 +387,47 @@ def test_company_admin_can_reassign_and_provider_cannot(db_session: Session, cli
     notifications = db_session.query(Notification).filter(Notification.appointment_id == appointment.id).all()
     assert any(notification.kind == "APPOINTMENT_PROVIDER_REASSIGNED" for notification in notifications)
     assert any(notification.kind == "APPOINTMENT_PROVIDER_REASSIGNED" and notification.channel == "in_app" for notification in notifications)
+
+
+def test_status_update_publishes_live_status_event_to_customer_clients(db_session: Session, client: TestClient) -> None:
+    company = _make_company(db_session, name="Live Status Co")
+    service = _make_service(db_session, company)
+    provider = _make_user(
+        db_session,
+        email="status-provider@example.com",
+        role="provider",
+        full_name="Status Provider",
+    )
+    customer = _make_user(
+        db_session,
+        email="status-customer@example.com",
+        role="customer",
+        full_name="Status Customer",
+    )
+    db_session.add(CompanyUser(user_id=provider.id, company_id=company.id))
+    appointment = _make_appointment(db_session, company=company, service=service, email=customer.email)
+    db_session.add(
+        AppointmentAssignment(
+            appointment_id=appointment.id,
+            company_id=company.id,
+            user_id=provider.id,
+            is_active=True,
+        )
+    )
+    db_session.commit()
+
+    token = _access_token(customer)
+    with client.websocket_connect(f"/live/ws?token={token}") as websocket:
+        response = client.post(
+            f"/company/appointments/{appointment.id}/status",
+            json={"status": "en_route_pickup"},
+            headers=_auth_header(provider, company_id=company.id),
+        )
+
+        assert response.status_code == 200, response.text
+        payload = websocket.receive_json()
+        assert payload["type"] == "appointment_status_changed"
+        assert payload["event_kind"] == "status_change"
+        assert payload["appointment_id"] == str(appointment.id)
+        assert payload["previous_status"] == "confirmed"
+        assert payload["status"] == "en_route_pickup"

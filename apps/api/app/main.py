@@ -12,6 +12,7 @@ from app.routers import (
     auth,
     companies,
     company_ops,
+    live,
     admin,
     dev_seed,
     health,
@@ -54,6 +55,7 @@ app.include_router(companies.router)
 app.include_router(services.router)
 app.include_router(appointments.router)
 app.include_router(company_ops.router)
+app.include_router(live.router)
 app.include_router(dev_seed.router)
 app.include_router(slots.router)
 app.include_router(webhooks.router)

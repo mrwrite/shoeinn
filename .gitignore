@@ -33,3 +33,7 @@ apps/api/venv/
 # Python cache
 __pycache__/
 *.pyc
+
+apps/api/app/static/
+apps/api/app/static/uploads/
+dev.db
