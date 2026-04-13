@@ -250,6 +250,10 @@ export function ackMyNotification(id: string): Promise<Notification> {
   return request<Notification>("POST", `/me/notifications/${id}/ack`, undefined, { auth: true });
 }
 
+export function ackAllMyNotifications(): Promise<{ updated: number }> {
+  return request<{ updated: number }>("POST", "/me/notifications/ack-all", undefined, { auth: true });
+}
+
 export function createCompanyUser(payload: {
   email: string;
   full_name: string;

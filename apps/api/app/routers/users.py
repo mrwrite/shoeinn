@@ -10,7 +10,7 @@ from app.core.db import get_db
 from app.core.security import get_current_customer, get_current_user
 from app.models.notification import Notification
 from app.models.user import User
-from app.schemas.notification import NotificationRead
+from app.schemas.notification import NotificationAckSummary, NotificationRead
 from app.schemas.user import (
     CustomerAddressUpdate,
     NotificationPreferencesRead,
@@ -128,6 +128,36 @@ def ack_my_notification(
     db.commit()
     db.refresh(notification)
     return _serialize_notification(notification)
+
+
+@router.post("/me/notifications/ack-all", response_model=NotificationAckSummary)
+def ack_all_my_notifications(
+    current_customer: User = Depends(get_current_customer),
+    db: Session = Depends(get_db),
+) -> NotificationAckSummary:
+    notifications = (
+        db.query(Notification)
+        .filter(
+            Notification.channel == "in_app",
+            Notification.target == str(current_customer.id),
+            Notification.read_at.is_(None),
+        )
+        .all()
+    )
+
+    now = datetime.now(timezone.utc)
+    updated = 0
+    for notification in notifications:
+        notification.read_at = now
+        if not notification.delivered:
+            notification.delivered = True
+            notification.delivered_at = now
+            notification.status = "delivered"
+        db.add(notification)
+        updated += 1
+
+    db.commit()
+    return NotificationAckSummary(updated=updated)
 
 
 @router.get("/me/notification-preferences", response_model=NotificationPreferencesRead)

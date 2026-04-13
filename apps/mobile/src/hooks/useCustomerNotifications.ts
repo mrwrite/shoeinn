@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import {
+  ackAllMyNotifications,
   ackMyNotification,
   fetchMyNotifications,
   getMyNotificationPreferences,
@@ -39,6 +40,10 @@ export type GroupedCustomerNotification = {
   older: Notification[];
   unread: boolean;
   isStandalone: boolean;
+};
+
+export type CustomerNotificationGroupAckInput = {
+  notificationIds: string[];
 };
 
 function formatStatusLabel(status?: string | null): string | null {
@@ -232,6 +237,26 @@ export function getLatestNotificationForAppointment(
   return group?.latest ?? null;
 }
 
+export function getUnreadNotificationIdsForGroup(
+  group: GroupedCustomerNotification,
+): string[] {
+  return [group.latest, ...group.older]
+    .filter((notification) => !notification.read_at)
+    .map((notification) => notification.id);
+}
+
+export async function ackCustomerNotificationGroup(
+  input: CustomerNotificationGroupAckInput,
+): Promise<number> {
+  if (input.notificationIds.length === 0) {
+    return 0;
+  }
+
+  await Promise.all(input.notificationIds.map((notificationId) => ackMyNotification(notificationId)));
+  return input.notificationIds.length;
+}
+
 export { ackMyNotification };
+export { ackAllMyNotifications };
 export { updateMyNotificationPreferences };
 export type { NotificationPreferences };

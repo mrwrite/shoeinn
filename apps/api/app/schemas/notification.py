@@ -23,3 +23,7 @@ class NotificationRead(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class NotificationAckSummary(BaseModel):
+    updated: int

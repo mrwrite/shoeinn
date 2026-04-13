@@ -14,14 +14,16 @@ import { Card } from "../../components/ui/Card";
 import { Text } from "../../components/ui/Text";
 import { useFocusedAutoRefresh } from "../../hooks/useFocusedAutoRefresh";
 import {
-  ackMyNotification,
+  ackAllMyNotifications,
+  ackCustomerNotificationGroup,
   customerNotificationsQueryKey,
   getCustomerNotificationCopy,
+  getUnreadCustomerNotificationCount,
+  getUnreadNotificationIdsForGroup,
   groupCustomerNotifications,
   useCustomerNotifications,
 } from "../../hooks/useCustomerNotifications";
 import { openCustomerAppointmentFromNotification } from "../../navigation/customerNotificationNavigation";
-import type { Notification } from "../../types/notification";
 import { useTheme } from "../../theme/theme";
 
 export default function CustomerNotificationsScreen() {
@@ -29,9 +31,17 @@ export default function CustomerNotificationsScreen() {
   const queryClient = useQueryClient();
   const notificationsQuery = useCustomerNotifications(true);
   const groupedNotifications = groupCustomerNotifications(notificationsQuery.data);
+  const unreadCount = getUnreadCustomerNotificationCount(notificationsQuery.data);
 
-  const ackMutation = useMutation({
-    mutationFn: (notificationId: string) => ackMyNotification(notificationId),
+  const ackGroupMutation = useMutation({
+    mutationFn: ackCustomerNotificationGroup,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: customerNotificationsQueryKey });
+    },
+  });
+
+  const ackAllMutation = useMutation({
+    mutationFn: ackAllMyNotifications,
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: customerNotificationsQueryKey });
     },
@@ -45,16 +55,34 @@ export default function CustomerNotificationsScreen() {
     },
   });
 
-  const handlePress = async (notification: Notification) => {
-    if (!notification.read_at) {
+  const handlePress = async (item: ReturnType<typeof groupCustomerNotifications>[number]) => {
+    const unreadIds = getUnreadNotificationIdsForGroup(item);
+    if (unreadIds.length > 0) {
       try {
-        await ackMutation.mutateAsync(notification.id);
+        await ackGroupMutation.mutateAsync({
+          notificationIds: unreadIds,
+        });
       } catch (error) {
         // Keep navigation behavior even if ack fails; next refresh will retry state.
       }
     }
 
-    openCustomerAppointmentFromNotification(notification);
+    openCustomerAppointmentFromNotification(item.latest);
+  };
+
+  const handleMarkGroupRead = async (item: ReturnType<typeof groupCustomerNotifications>[number]) => {
+    const unreadIds = getUnreadNotificationIdsForGroup(item);
+    if (unreadIds.length === 0) {
+      return;
+    }
+
+    try {
+      await ackGroupMutation.mutateAsync({
+        notificationIds: unreadIds,
+      });
+    } catch (error) {
+      // Keep the inbox stable; refetch paths will recover state on next refresh.
+    }
   };
 
   const renderItem = ({
@@ -66,7 +94,7 @@ export default function CustomerNotificationsScreen() {
     const olderVisible = item.older.slice(0, 2);
     const remainingOlderCount = Math.max(0, item.older.length - olderVisible.length);
     return (
-      <Pressable onPress={() => void handlePress(item.latest)}>
+      <Pressable onPress={() => void handlePress(item)}>
         <Card
           style={[
             styles.notificationCard,
@@ -118,10 +146,25 @@ export default function CustomerNotificationsScreen() {
           ) : null}
           <View style={styles.notificationFooter}>
             {item.unread ? (
-              <View style={styles.unreadPill}>
-                <Text variant="overline" weight="semibold" color={theme.colors.peacockPrimary}>
-                  New
-                </Text>
+              <View style={styles.footerLeft}>
+                <View style={styles.unreadPill}>
+                  <Text variant="overline" weight="semibold" color={theme.colors.peacockPrimary}>
+                    {getUnreadNotificationIdsForGroup(item).length > 1
+                      ? `${getUnreadNotificationIdsForGroup(item).length} new`
+                      : "New"}
+                  </Text>
+                </View>
+                <Pressable
+                  hitSlop={8}
+                  onPress={(event) => {
+                    event.stopPropagation();
+                    void handleMarkGroupRead(item);
+                  }}
+                >
+                  <Text variant="caption" weight="semibold" color={theme.colors.peacockPrimary}>
+                    Mark read
+                  </Text>
+                </Pressable>
               </View>
             ) : (
               <Text variant="caption" color={theme.colors.mutedText}>
@@ -140,12 +183,29 @@ export default function CustomerNotificationsScreen() {
   return (
     <ScreenContainer>
       <View style={styles.header}>
-        <Text variant="title" weight="bold">
-          Notifications
-        </Text>
-        <Text color={theme.colors.mutedText} style={{ marginTop: 4 }}>
-          Recent provider and appointment updates.
-        </Text>
+        <View style={styles.headerRow}>
+          <View style={{ flex: 1 }}>
+            <Text variant="title" weight="bold">
+              Notifications
+            </Text>
+            <Text color={theme.colors.mutedText} style={{ marginTop: 4 }}>
+              Recent provider and appointment updates.
+            </Text>
+          </View>
+          {unreadCount > 0 ? (
+            <Pressable
+              hitSlop={8}
+              disabled={ackAllMutation.isPending}
+              onPress={() => {
+                void ackAllMutation.mutateAsync();
+              }}
+            >
+              <Text variant="caption" weight="semibold" color={theme.colors.peacockPrimary}>
+                {ackAllMutation.isPending ? "Marking..." : "Mark all read"}
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
       </View>
 
       {notificationsQuery.isLoading ? (
@@ -195,6 +255,12 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 4,
   },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+  },
   list: {
     padding: 16,
     paddingTop: 4,
@@ -242,6 +308,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+  },
+  footerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
   unreadPill: {
     borderRadius: 999,
