@@ -1,6 +1,7 @@
 import React from "react";
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from "react-native";
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useQuery } from "@tanstack/react-query";
 
@@ -9,6 +10,10 @@ import { AppointmentCard } from "../../components/AppointmentCard";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { Button } from "../../components/ui/Button";
 import { Text } from "../../components/ui/Text";
+import {
+  getUnreadCustomerNotificationCount,
+  useCustomerNotifications,
+} from "../../hooks/useCustomerNotifications";
 import type { AppointmentStackParamList } from "../../navigation/types";
 import { useAuthStore } from "../../state/authStore";
 import { useTheme } from "../../theme/theme";
@@ -19,6 +24,8 @@ export default function AppointmentListScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<AppointmentStackParamList>>();
   const role = useAuthStore((s) => s.role);
   const isCustomer = role === "customer";
+  const notificationsQuery = useCustomerNotifications(isCustomer);
+  const unreadCount = getUnreadCustomerNotificationCount(notificationsQuery.data);
   const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ["appointments", "mine"],
     queryFn: getMyAppointments,
@@ -49,12 +56,27 @@ export default function AppointmentListScreen() {
   return (
     <ScreenContainer>
       <View style={styles.header}>
-        <Text variant="title" weight="bold">
-          Appointments
-        </Text>
-        <Text color={theme.colors.mutedText} style={{ marginTop: 4 }}>
-          Track your bookings
-        </Text>
+        <View>
+          <Text variant="title" weight="bold">
+            Appointments
+          </Text>
+          <Text color={theme.colors.mutedText} style={{ marginTop: 4 }}>
+            Track your bookings
+          </Text>
+        </View>
+        <Pressable
+          onPress={() => navigation.navigate("CustomerNotifications")}
+          style={styles.notificationButton}
+        >
+          <Ionicons name="notifications-outline" size={20} color={theme.colors.peacockPrimary} />
+          {unreadCount > 0 ? (
+            <View style={styles.notificationBadge}>
+              <Text variant="caption" weight="bold" color="#fff">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </Text>
+            </View>
+          ) : null}
+        </Pressable>
       </View>
       {isLoading ? (
         <View style={styles.center}>
@@ -92,6 +114,30 @@ const styles = StyleSheet.create({
   header: {
     padding: 16,
     gap: 4,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  notificationButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#eff6ff",
+    position: "relative",
+  },
+  notificationBadge: {
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    position: "absolute",
+    top: -1,
+    right: -1,
+    backgroundColor: "#dc2626",
+    alignItems: "center",
+    justifyContent: "center",
   },
   center: {
     flex: 1,

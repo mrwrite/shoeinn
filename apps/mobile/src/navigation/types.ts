@@ -15,6 +15,7 @@ export type HomeStackParamList = {
 export type AppointmentStackParamList = {
   AppointmentList: undefined;
   AppointmentDetail: { appointmentId: string; summary?: AppointmentSummary };
+  CustomerNotifications: undefined;
 };
 
 export type CustomerFlowStackParamList = {
@@ -32,6 +33,7 @@ export type ProviderStackParamList = {
 
 export type ProfileStackParamList = {
   ProfileHome: undefined;
+  CustomerNotifications: undefined;
 };
 
 export type RootTabParamList = {

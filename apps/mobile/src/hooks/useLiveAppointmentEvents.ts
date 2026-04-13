@@ -66,6 +66,7 @@ export function useLiveAppointmentEvents() {
 
       if (role === "customer") {
         void queryClient.invalidateQueries({ queryKey: ["appointments", "mine"] });
+        void queryClient.invalidateQueries({ queryKey: ["me", "notifications"] });
       } else {
         void queryClient.invalidateQueries({ queryKey: ["provider", "open"] });
         void queryClient.invalidateQueries({ queryKey: ["provider", "my"] });

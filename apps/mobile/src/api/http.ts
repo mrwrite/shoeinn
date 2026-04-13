@@ -242,6 +242,14 @@ export function ackNotification(id: string): Promise<Notification> {
   return request<Notification>("POST", `/company/notifications/${id}/ack`, undefined, { auth: true });
 }
 
+export function fetchMyNotifications(): Promise<Notification[]> {
+  return request<Notification[]>("GET", "/me/notifications", undefined, { auth: true });
+}
+
+export function ackMyNotification(id: string): Promise<Notification> {
+  return request<Notification>("POST", `/me/notifications/${id}/ack`, undefined, { auth: true });
+}
+
 export function createCompanyUser(payload: {
   email: string;
   full_name: string;

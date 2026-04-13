@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import AppointmentDetailScreen from "../screens/customer/AppointmentDetailScreen";
+import CustomerNotificationsScreen from "../screens/customer/CustomerNotificationsScreen";
 import AppointmentListScreen from "../screens/appointments/AppointmentListScreen";
 import BookingConfirmScreen from "../screens/home/BookingConfirmScreen";
 import BookingDateScreen from "../screens/home/BookingDateScreen";
@@ -23,6 +24,10 @@ import type {
   RootTabParamList,
 } from "./types";
 import { useAuthStore } from "../state/authStore";
+import {
+  getUnreadCustomerNotificationCount,
+  useCustomerNotifications,
+} from "../hooks/useCustomerNotifications";
 import { useTheme } from "../theme/theme";
 
 const HomeStack = createNativeStackNavigator<HomeStackParamList>();
@@ -50,6 +55,11 @@ function AppointmentNavigator() {
     <AppointmentStack.Navigator>
       <AppointmentStack.Screen name="AppointmentList" component={AppointmentListScreen} options={{ headerShown: false }} />
       <AppointmentStack.Screen name="AppointmentDetail" component={AppointmentDetailScreen} options={{ title: "Appointment" }} />
+      <AppointmentStack.Screen
+        name="CustomerNotifications"
+        component={CustomerNotificationsScreen}
+        options={{ title: "Notifications" }}
+      />
     </AppointmentStack.Navigator>
   );
 }
@@ -75,6 +85,11 @@ function ProfileNavigator() {
   return (
     <ProfileStack.Navigator>
       <ProfileStack.Screen name="ProfileHome" component={ProfileScreen} options={{ headerShown: false }} />
+      <ProfileStack.Screen
+        name="CustomerNotifications"
+        component={CustomerNotificationsScreen}
+        options={{ title: "Notifications" }}
+      />
     </ProfileStack.Navigator>
   );
 }
@@ -83,7 +98,8 @@ export default function RootTabs() {
   const theme = useTheme();
   const role = useAuthStore((s) => s.role);
   const showProviderTab = ["provider", "company", "company_admin"].includes(role ?? "");
-  const showAssignmentsTab = ["provider", "company"].includes(role ?? "");
+  const notificationsQuery = useCustomerNotifications(role === "customer");
+  const unreadNotifications = getUnreadCustomerNotificationCount(notificationsQuery.data);
   const insets = useSafeAreaInsets();
   const bottomPadding = Math.max(insets.bottom, 8);
 
@@ -112,7 +128,10 @@ export default function RootTabs() {
         <Tab.Screen
           name="AppointmentsTab"
           component={AppointmentNavigator}
-          options={{ title: "Appointments" }}
+          options={{
+            title: "Appointments",
+            tabBarBadge: unreadNotifications > 0 ? unreadNotifications : undefined,
+          }}
         />
       ) : null}
       {showProviderTab ? (

@@ -11,6 +11,8 @@ import {
 } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
@@ -21,6 +23,11 @@ import {
 } from "../../api/http";
 import { CustomerTravelMapCard } from "../../components/CustomerTravelMapCard";
 import { useFocusedAutoRefresh } from "../../hooks/useFocusedAutoRefresh";
+import {
+  getCustomerNotificationCopy,
+  getLatestNotificationForAppointment,
+  useCustomerNotifications,
+} from "../../hooks/useCustomerNotifications";
 import type { AppointmentStackParamList } from "../../navigation/types";
 import type {
   AppointmentEvent,
@@ -129,6 +136,7 @@ const resolvePhotoUrl = (url?: string | null) => {
 
 export default function AppointmentDetailScreen({ route }: Props) {
   const { appointmentId, summary } = route.params;
+  const navigation = useNavigation<NativeStackNavigationProp<AppointmentStackParamList>>();
   const [expandedPhotoUrl, setExpandedPhotoUrl] = useState<string | null>(null);
 
   const appointmentQuery = useQuery({
@@ -147,6 +155,7 @@ export default function AppointmentDetailScreen({ route }: Props) {
     queryFn: () => getAppointmentAssignment(appointmentId),
     retry: false,
   });
+  const notificationsQuery = useCustomerNotifications(true);
 
   const status = appointmentQuery.data?.status ?? summary?.status;
   const shouldShowTravelMap = status ? travelStatuses.has(status) : false;
@@ -187,6 +196,8 @@ export default function AppointmentDetailScreen({ route }: Props) {
   const currentStatusLabel = appointment
     ? statusLabels[appointment.status] ?? appointment.status
     : "Appointment";
+  const recentNotification = getLatestNotificationForAppointment(notificationsQuery.data, appointmentId);
+  const recentNotificationCopy = recentNotification ? getCustomerNotificationCopy(recentNotification) : null;
   const nextStepCopy: Record<string, string> = {
     requested: "Your appointment request has been received.",
     confirmed: "A provider can now prepare for pickup.",
@@ -258,6 +269,20 @@ export default function AppointmentDetailScreen({ route }: Props) {
                 <Text style={styles.meta}>{assignmentState.detail}</Text>
               ) : null}
             </View>
+
+            {recentNotificationCopy ? (
+              <Pressable
+                style={[styles.card, recentNotificationCopy.unread && styles.recentUpdateCard]}
+                onPress={() => navigation.navigate("CustomerNotifications")}
+              >
+                <View style={styles.recentUpdateHeader}>
+                  <Text style={styles.sectionTitle}>Recent update</Text>
+                  <Text style={styles.meta}>{recentNotificationCopy.timestampLabel}</Text>
+                </View>
+                <Text style={styles.value}>{recentNotificationCopy.title}</Text>
+                <Text style={styles.meta}>{recentNotificationCopy.detail}</Text>
+              </Pressable>
+            ) : null}
 
             {shouldShowTravelMap ? (
               <CustomerTravelMapCard
@@ -432,6 +457,17 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
     gap: 8,
+  },
+  recentUpdateCard: {
+    borderWidth: 1,
+    borderColor: "#bfdbfe",
+    backgroundColor: "#eff6ff",
+  },
+  recentUpdateHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
   },
   title: { fontSize: 20, fontWeight: "800" },
   meta: { color: "#6b7280" },

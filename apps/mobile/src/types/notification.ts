@@ -5,7 +5,7 @@ export interface NotificationPayload {
 export interface Notification {
   id: string;
   company_id: string;
-  appointment_id: string;
+  appointment_id?: string | null;
   kind: string;
   channel: string;
   target?: string | null;
