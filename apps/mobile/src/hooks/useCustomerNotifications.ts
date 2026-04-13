@@ -1,3 +1,5 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import {
@@ -52,6 +54,20 @@ export type CustomerNotificationPriorityPresentation = {
   tone: CustomerNotificationPriorityTone;
   label: string;
 };
+
+export type ArchivedCustomerNotificationGroupRecord = {
+  latestNotificationId: string;
+  archivedAt: string;
+};
+
+export type ArchivedCustomerNotificationGroupState = Record<
+  string,
+  ArchivedCustomerNotificationGroupRecord
+>;
+
+const CUSTOMER_NOTIFICATION_ARCHIVE_STORAGE_KEY = "customer-notification-archive-v1";
+const DEFAULT_RETENTION_DAYS = 30;
+const HIGH_PRIORITY_RETENTION_DAYS = 60;
 
 function formatStatusLabel(status?: string | null): string | null {
   if (!status) {
@@ -209,6 +225,11 @@ export function getNotificationPriorityPresentation(
   return { tone: "normal", label: notification.appointment_id ? "Appointment update" : "Update" };
 }
 
+function getAgeInDays(value: string): number {
+  const ageMs = Date.now() - new Date(value).getTime();
+  return Math.floor(ageMs / (1000 * 60 * 60 * 24));
+}
+
 function sortNotificationsNewestFirst(notifications: Notification[]): Notification[] {
   return [...notifications].sort(
     (left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime(),
@@ -267,6 +288,139 @@ export function getLatestNotificationForAppointment(
     (item) => item.appointmentId === appointmentId,
   );
   return group?.latest ?? null;
+}
+
+export function isNotificationGroupRetentionEligible(
+  group: GroupedCustomerNotification,
+): boolean {
+  if (group.unread) {
+    return false;
+  }
+
+  const priority = getNotificationPriorityPresentation(group.latest);
+  const ageInDays = getAgeInDays(group.latest.created_at);
+  const retentionDays =
+    priority.tone === "high" ? HIGH_PRIORITY_RETENTION_DAYS : DEFAULT_RETENTION_DAYS;
+  return ageInDays >= retentionDays;
+}
+
+export function shouldRestoreArchivedGroup(
+  group: GroupedCustomerNotification,
+  archiveRecord: ArchivedCustomerNotificationGroupRecord | undefined,
+): boolean {
+  if (!archiveRecord) {
+    return false;
+  }
+
+  return group.unread && group.latest.id !== archiveRecord.latestNotificationId;
+}
+
+export function shouldHideNotificationGroup(
+  group: GroupedCustomerNotification,
+  archivedGroups: ArchivedCustomerNotificationGroupState,
+): boolean {
+  const archiveRecord = archivedGroups[group.key];
+  if (archiveRecord && !shouldRestoreArchivedGroup(group, archiveRecord)) {
+    return true;
+  }
+
+  return isNotificationGroupRetentionEligible(group);
+}
+
+export function useArchivedCustomerNotificationGroups(
+  groups: GroupedCustomerNotification[],
+) {
+  const [archivedGroups, setArchivedGroups] =
+    useState<ArchivedCustomerNotificationGroupState>({});
+  const [isArchiveStateLoaded, setIsArchiveStateLoaded] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadArchivedGroups() {
+      try {
+        const raw = await AsyncStorage.getItem(CUSTOMER_NOTIFICATION_ARCHIVE_STORAGE_KEY);
+        if (!active) {
+          return;
+        }
+        if (!raw) {
+          setArchivedGroups({});
+          return;
+        }
+
+        const parsed = JSON.parse(raw) as ArchivedCustomerNotificationGroupState;
+        setArchivedGroups(parsed ?? {});
+      } catch (error) {
+        if (active) {
+          setArchivedGroups({});
+        }
+      } finally {
+        if (active) {
+          setIsArchiveStateLoaded(true);
+        }
+      }
+    }
+
+    void loadArchivedGroups();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const normalizedArchivedGroups = useMemo(() => {
+    let changed = false;
+    const nextEntries = Object.entries(archivedGroups).filter(([groupKey, archiveRecord]) => {
+      const group = groups.find((candidate) => candidate.key === groupKey);
+      if (!group) {
+        return true;
+      }
+      const shouldKeep = !shouldRestoreArchivedGroup(group, archiveRecord);
+      if (!shouldKeep) {
+        changed = true;
+      }
+      return shouldKeep;
+    });
+
+    if (!changed) {
+      return archivedGroups;
+    }
+
+    return Object.fromEntries(nextEntries);
+  }, [archivedGroups, groups]);
+
+  useEffect(() => {
+    if (!isArchiveStateLoaded) {
+      return;
+    }
+
+    if (normalizedArchivedGroups !== archivedGroups) {
+      setArchivedGroups(normalizedArchivedGroups);
+      return;
+    }
+
+    void AsyncStorage.setItem(
+      CUSTOMER_NOTIFICATION_ARCHIVE_STORAGE_KEY,
+      JSON.stringify(normalizedArchivedGroups),
+    ).catch(() => {
+      // Keep inbox usable even if local persistence fails.
+    });
+  }, [archivedGroups, isArchiveStateLoaded, normalizedArchivedGroups]);
+
+  const archiveGroup = async (group: GroupedCustomerNotification) => {
+    setArchivedGroups((current) => ({
+      ...current,
+      [group.key]: {
+        latestNotificationId: group.latest.id,
+        archivedAt: new Date().toISOString(),
+      },
+    }));
+  };
+
+  return {
+    archivedGroups: normalizedArchivedGroups,
+    archiveGroup,
+    isArchiveStateLoaded,
+  };
 }
 
 export function getUnreadNotificationIdsForGroup(

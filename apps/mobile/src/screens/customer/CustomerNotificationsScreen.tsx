@@ -22,6 +22,8 @@ import {
   getUnreadCustomerNotificationCount,
   getUnreadNotificationIdsForGroup,
   groupCustomerNotifications,
+  shouldHideNotificationGroup,
+  useArchivedCustomerNotificationGroups,
   useCustomerNotifications,
 } from "../../hooks/useCustomerNotifications";
 import { openCustomerAppointmentFromNotification } from "../../navigation/customerNotificationNavigation";
@@ -35,13 +37,21 @@ export default function CustomerNotificationsScreen() {
   const [selectedFilter, setSelectedFilter] = useState<InboxFilter>("all");
   const notificationsQuery = useCustomerNotifications(true);
   const groupedNotifications = groupCustomerNotifications(notificationsQuery.data);
+  const { archivedGroups, archiveGroup, isArchiveStateLoaded } =
+    useArchivedCustomerNotificationGroups(groupedNotifications);
   const unreadCount = getUnreadCustomerNotificationCount(notificationsQuery.data);
   const visibleNotifications = useMemo(
     () =>
       selectedFilter === "unread"
-        ? groupedNotifications.filter((notificationGroup) => notificationGroup.unread)
-        : groupedNotifications,
-    [groupedNotifications, selectedFilter],
+        ? groupedNotifications.filter(
+            (notificationGroup) =>
+              notificationGroup.unread &&
+              !shouldHideNotificationGroup(notificationGroup, archivedGroups),
+          )
+        : groupedNotifications.filter(
+            (notificationGroup) => !shouldHideNotificationGroup(notificationGroup, archivedGroups),
+          ),
+    [archivedGroups, groupedNotifications, selectedFilter],
   );
 
   const ackGroupMutation = useMutation({
@@ -94,6 +104,10 @@ export default function CustomerNotificationsScreen() {
     } catch (error) {
       // Keep the inbox stable; refetch paths will recover state on next refresh.
     }
+  };
+
+  const handleArchiveGroup = async (item: ReturnType<typeof groupCustomerNotifications>[number]) => {
+    await archiveGroup(item);
   };
 
   const renderItem = ({
@@ -193,9 +207,22 @@ export default function CustomerNotificationsScreen() {
                 Read
               </Text>
             )}
-            <Text variant="caption" color={theme.colors.peacockPrimary}>
-              Open update
-            </Text>
+            <View style={styles.footerRight}>
+              <Pressable
+                hitSlop={8}
+                onPress={(event) => {
+                  event.stopPropagation();
+                  void handleArchiveGroup(item);
+                }}
+              >
+                <Text variant="caption" weight="semibold" color={theme.colors.mutedText}>
+                  Archive
+                </Text>
+              </Pressable>
+              <Text variant="caption" color={theme.colors.peacockPrimary}>
+                Open update
+              </Text>
+            </View>
           </View>
         </Card>
       </Pressable>
@@ -253,7 +280,7 @@ export default function CustomerNotificationsScreen() {
         </View>
       </View>
 
-      {notificationsQuery.isLoading ? (
+      {notificationsQuery.isLoading || !isArchiveStateLoaded ? (
         <View style={styles.state}>
           <ActivityIndicator color={theme.colors.peacockPrimary} />
           <Text color={theme.colors.mutedText}>Loading your latest updates.</Text>
@@ -284,12 +311,18 @@ export default function CustomerNotificationsScreen() {
           ListEmptyComponent={
             <View style={styles.state}>
               <Text weight="semibold">
-                {selectedFilter === "unread" ? "You're all caught up" : "No updates yet"}
+                {selectedFilter === "unread"
+                  ? "You're all caught up"
+                  : groupedNotifications.length > 0
+                    ? "Inbox cleared"
+                    : "No updates yet"}
               </Text>
               <Text color={theme.colors.mutedText} style={{ textAlign: "center" }}>
                 {selectedFilter === "unread"
                   ? "Unread provider and appointment updates will appear here when something new comes in."
-                  : "Assignment and delivery progress updates will appear here as your appointments move."}
+                  : groupedNotifications.length > 0
+                    ? "Archived groups and older read updates are tucked out of the default inbox."
+                    : "Assignment and delivery progress updates will appear here as your appointments move."}
               </Text>
             </View>
           }
@@ -389,6 +422,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+  },
+  footerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
   },
   footerLeft: {
     flexDirection: "row",
