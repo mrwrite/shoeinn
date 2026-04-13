@@ -17,6 +17,7 @@ import {
   ackMyNotification,
   customerNotificationsQueryKey,
   getCustomerNotificationCopy,
+  groupCustomerNotifications,
   useCustomerNotifications,
 } from "../../hooks/useCustomerNotifications";
 import { openCustomerAppointmentFromNotification } from "../../navigation/customerNotificationNavigation";
@@ -27,6 +28,7 @@ export default function CustomerNotificationsScreen() {
   const theme = useTheme();
   const queryClient = useQueryClient();
   const notificationsQuery = useCustomerNotifications(true);
+  const groupedNotifications = groupCustomerNotifications(notificationsQuery.data);
 
   const ackMutation = useMutation({
     mutationFn: (notificationId: string) => ackMyNotification(notificationId),
@@ -55,16 +57,32 @@ export default function CustomerNotificationsScreen() {
     openCustomerAppointmentFromNotification(notification);
   };
 
-  const renderItem = ({ item }: { item: Notification }) => {
-    const copy = getCustomerNotificationCopy(item);
+  const renderItem = ({
+    item,
+  }: {
+    item: ReturnType<typeof groupCustomerNotifications>[number];
+  }) => {
+    const copy = getCustomerNotificationCopy(item.latest);
+    const olderVisible = item.older.slice(0, 2);
+    const remainingOlderCount = Math.max(0, item.older.length - olderVisible.length);
     return (
-      <Pressable onPress={() => void handlePress(item)}>
+      <Pressable onPress={() => void handlePress(item.latest)}>
         <Card
           style={[
             styles.notificationCard,
-            copy.unread && { borderColor: "#bfdbfe", backgroundColor: "#eff6ff" },
+            item.unread && { borderColor: "#bfdbfe", backgroundColor: "#eff6ff" },
           ]}
         >
+          {!item.isStandalone ? (
+            <View style={styles.groupHeader}>
+              <Text variant="overline" weight="semibold" color={theme.colors.peacockPrimary}>
+                Appointment update
+              </Text>
+              <Text variant="caption" color={theme.colors.mutedText}>
+                {item.older.length > 0 ? `${item.older.length + 1} updates` : "1 update"}
+              </Text>
+            </View>
+          ) : null}
           <View style={styles.notificationHeader}>
             <Text variant="subtitle" weight="semibold" style={{ flex: 1 }}>
               {copy.title}
@@ -76,8 +94,30 @@ export default function CustomerNotificationsScreen() {
           <Text color={theme.colors.mutedText} style={{ marginTop: 8 }}>
             {copy.detail}
           </Text>
+          {olderVisible.length > 0 ? (
+            <View style={styles.olderUpdates}>
+              {olderVisible.map((notification) => {
+                const olderCopy = getCustomerNotificationCopy(notification);
+                return (
+                  <View key={notification.id} style={styles.olderUpdateRow}>
+                    <Text variant="caption" weight="semibold" color={theme.colors.textCharcoal}>
+                      {olderCopy.title}
+                    </Text>
+                    <Text variant="caption" color={theme.colors.mutedText}>
+                      {olderCopy.timestampLabel}
+                    </Text>
+                  </View>
+                );
+              })}
+              {remainingOlderCount > 0 ? (
+                <Text variant="caption" color={theme.colors.mutedText}>
+                  +{remainingOlderCount} older update{remainingOlderCount === 1 ? "" : "s"}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
           <View style={styles.notificationFooter}>
-            {copy.unread ? (
+            {item.unread ? (
               <View style={styles.unreadPill}>
                 <Text variant="overline" weight="semibold" color={theme.colors.peacockPrimary}>
                   New
@@ -126,8 +166,8 @@ export default function CustomerNotificationsScreen() {
         </View>
       ) : (
         <FlatList
-          data={notificationsQuery.data ?? []}
-          keyExtractor={(item) => item.id}
+          data={groupedNotifications}
+          keyExtractor={(item) => item.key}
           renderItem={renderItem}
           contentContainerStyle={styles.list}
           refreshControl={
@@ -172,9 +212,29 @@ const styles = StyleSheet.create({
     borderColor: "#e5e7eb",
     gap: 4,
   },
+  groupHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 2,
+  },
   notificationHeader: {
     flexDirection: "row",
     alignItems: "flex-start",
+    gap: 12,
+  },
+  olderUpdates: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#e5e7eb",
+    gap: 6,
+  },
+  olderUpdateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     gap: 12,
   },
   notificationFooter: {
