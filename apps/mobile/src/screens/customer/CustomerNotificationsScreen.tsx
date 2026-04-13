@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -18,6 +18,7 @@ import {
   ackCustomerNotificationGroup,
   customerNotificationsQueryKey,
   getCustomerNotificationCopy,
+  getNotificationPriorityPresentation,
   getUnreadCustomerNotificationCount,
   getUnreadNotificationIdsForGroup,
   groupCustomerNotifications,
@@ -26,12 +27,22 @@ import {
 import { openCustomerAppointmentFromNotification } from "../../navigation/customerNotificationNavigation";
 import { useTheme } from "../../theme/theme";
 
+type InboxFilter = "all" | "unread";
+
 export default function CustomerNotificationsScreen() {
   const theme = useTheme();
   const queryClient = useQueryClient();
+  const [selectedFilter, setSelectedFilter] = useState<InboxFilter>("all");
   const notificationsQuery = useCustomerNotifications(true);
   const groupedNotifications = groupCustomerNotifications(notificationsQuery.data);
   const unreadCount = getUnreadCustomerNotificationCount(notificationsQuery.data);
+  const visibleNotifications = useMemo(
+    () =>
+      selectedFilter === "unread"
+        ? groupedNotifications.filter((notificationGroup) => notificationGroup.unread)
+        : groupedNotifications,
+    [groupedNotifications, selectedFilter],
+  );
 
   const ackGroupMutation = useMutation({
     mutationFn: ackCustomerNotificationGroup,
@@ -91,28 +102,41 @@ export default function CustomerNotificationsScreen() {
     item: ReturnType<typeof groupCustomerNotifications>[number];
   }) => {
     const copy = getCustomerNotificationCopy(item.latest);
+    const priority = getNotificationPriorityPresentation(item.latest);
     const olderVisible = item.older.slice(0, 2);
     const remainingOlderCount = Math.max(0, item.older.length - olderVisible.length);
+    const unreadIds = getUnreadNotificationIdsForGroup(item);
+    const isHighPriority = priority.tone === "high";
     return (
       <Pressable onPress={() => void handlePress(item)}>
         <Card
           style={[
             styles.notificationCard,
+            isHighPriority && styles.notificationCardPriority,
             item.unread && { borderColor: "#bfdbfe", backgroundColor: "#eff6ff" },
+            item.unread && isHighPriority && styles.notificationCardPriorityUnread,
           ]}
         >
-          {!item.isStandalone ? (
-            <View style={styles.groupHeader}>
-              <Text variant="overline" weight="semibold" color={theme.colors.peacockPrimary}>
-                Appointment update
-              </Text>
+          <View style={styles.groupHeader}>
+            <Text
+              variant="overline"
+              weight="semibold"
+              color={isHighPriority ? theme.colors.textCharcoal : theme.colors.peacockPrimary}
+            >
+              {priority.label}
+            </Text>
+            {!item.isStandalone ? (
               <Text variant="caption" color={theme.colors.mutedText}>
                 {item.older.length > 0 ? `${item.older.length + 1} updates` : "1 update"}
               </Text>
-            </View>
-          ) : null}
+            ) : null}
+          </View>
           <View style={styles.notificationHeader}>
-            <Text variant="subtitle" weight="semibold" style={{ flex: 1 }}>
+            <Text
+              variant="subtitle"
+              weight="semibold"
+              style={[styles.notificationTitle, isHighPriority && styles.notificationTitlePriority]}
+            >
               {copy.title}
             </Text>
             <Text variant="caption" color={theme.colors.mutedText}>
@@ -147,11 +171,9 @@ export default function CustomerNotificationsScreen() {
           <View style={styles.notificationFooter}>
             {item.unread ? (
               <View style={styles.footerLeft}>
-                <View style={styles.unreadPill}>
+                <View style={[styles.unreadPill, isHighPriority && styles.unreadPillPriority]}>
                   <Text variant="overline" weight="semibold" color={theme.colors.peacockPrimary}>
-                    {getUnreadNotificationIdsForGroup(item).length > 1
-                      ? `${getUnreadNotificationIdsForGroup(item).length} new`
-                      : "New"}
+                    {unreadIds.length > 1 ? `${unreadIds.length} new` : "New"}
                   </Text>
                 </View>
                 <Pressable
@@ -206,6 +228,29 @@ export default function CustomerNotificationsScreen() {
             </Pressable>
           ) : null}
         </View>
+        <View style={styles.filterRow}>
+          {([
+            { key: "all", label: "All" },
+            { key: "unread", label: "Unread" },
+          ] as const).map((option) => {
+            const active = selectedFilter === option.key;
+            return (
+              <Pressable
+                key={option.key}
+                onPress={() => setSelectedFilter(option.key)}
+                style={[styles.filterPill, active && styles.filterPillActive]}
+              >
+                <Text
+                  variant="caption"
+                  weight="semibold"
+                  color={active ? theme.colors.peacockPrimary : theme.colors.mutedText}
+                >
+                  {option.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
 
       {notificationsQuery.isLoading ? (
@@ -226,7 +271,7 @@ export default function CustomerNotificationsScreen() {
         </View>
       ) : (
         <FlatList
-          data={groupedNotifications}
+          data={visibleNotifications}
           keyExtractor={(item) => item.key}
           renderItem={renderItem}
           contentContainerStyle={styles.list}
@@ -238,9 +283,13 @@ export default function CustomerNotificationsScreen() {
           }
           ListEmptyComponent={
             <View style={styles.state}>
-              <Text weight="semibold">No updates yet</Text>
+              <Text weight="semibold">
+                {selectedFilter === "unread" ? "You're all caught up" : "No updates yet"}
+              </Text>
               <Text color={theme.colors.mutedText} style={{ textAlign: "center" }}>
-                Assignment and delivery progress updates will appear here as your appointments move.
+                {selectedFilter === "unread"
+                  ? "Unread provider and appointment updates will appear here when something new comes in."
+                  : "Assignment and delivery progress updates will appear here as your appointments move."}
               </Text>
             </View>
           }
@@ -261,6 +310,24 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 12,
   },
+  filterRow: {
+    marginTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  filterPill: {
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    backgroundColor: "#f3f4f6",
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+  },
+  filterPillActive: {
+    backgroundColor: "#eff6ff",
+    borderColor: "#bfdbfe",
+  },
   list: {
     padding: 16,
     paddingTop: 4,
@@ -278,6 +345,14 @@ const styles = StyleSheet.create({
     borderColor: "#e5e7eb",
     gap: 4,
   },
+  notificationCardPriority: {
+    borderColor: "#d1d5db",
+    backgroundColor: "#fcfcfd",
+  },
+  notificationCardPriorityUnread: {
+    borderColor: "#93c5fd",
+    backgroundColor: "#f8fbff",
+  },
   groupHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -289,6 +364,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 12,
+  },
+  notificationTitle: {
+    flex: 1,
+  },
+  notificationTitlePriority: {
+    color: "#111827",
   },
   olderUpdates: {
     marginTop: 10,
@@ -319,6 +400,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     backgroundColor: "#dbeafe",
+  },
+  unreadPillPriority: {
+    backgroundColor: "#e0f2fe",
   },
   retryButton: {
     marginTop: 6,

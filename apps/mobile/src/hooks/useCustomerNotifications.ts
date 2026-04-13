@@ -46,6 +46,13 @@ export type CustomerNotificationGroupAckInput = {
   notificationIds: string[];
 };
 
+export type CustomerNotificationPriorityTone = "high" | "normal";
+
+export type CustomerNotificationPriorityPresentation = {
+  tone: CustomerNotificationPriorityTone;
+  label: string;
+};
+
 function formatStatusLabel(status?: string | null): string | null {
   if (!status) {
     return null;
@@ -175,6 +182,31 @@ export function getNotificationPriority(notification: Notification): number {
     return 40;
   }
   return 30;
+}
+
+export function getNotificationPriorityPresentation(
+  notification: Notification,
+): CustomerNotificationPriorityPresentation {
+  const payload = notification.payload ?? {};
+  const newStatus = typeof payload.new_status === "string" ? payload.new_status : null;
+
+  if (notification.kind === "APPOINTMENT_PROVIDER_REASSIGNED") {
+    return { tone: "high", label: "Assignment change" };
+  }
+  if (notification.kind === "APPOINTMENT_PROVIDER_ASSIGNED") {
+    return { tone: "high", label: "Provider assigned" };
+  }
+  if (notification.kind === "APPOINTMENT_STATUS_CHANGED" && newStatus === "ready") {
+    return { tone: "high", label: "Ready for delivery" };
+  }
+  if (notification.kind === "APPOINTMENT_STATUS_CHANGED" && newStatus === "out_for_delivery") {
+    return { tone: "high", label: "Delivery in progress" };
+  }
+  if (notification.kind === "APPOINTMENT_STATUS_CHANGED" && newStatus === "delivered") {
+    return { tone: "high", label: "Delivered" };
+  }
+
+  return { tone: "normal", label: notification.appointment_id ? "Appointment update" : "Update" };
 }
 
 function sortNotificationsNewestFirst(notifications: Notification[]): Notification[] {
