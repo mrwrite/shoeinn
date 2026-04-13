@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { Alert, StyleSheet, Switch, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getMe, updateMyAddress } from "../../api/http";
 import { ScreenContainer } from "../../components/ScreenContainer";
@@ -18,6 +20,8 @@ import { useTheme } from "../../theme/theme";
 
 export default function ProfileScreen() {
   const theme = useTheme();
+  const tabBarHeight = useBottomTabBarHeight();
+  const insets = useSafeAreaInsets();
   const { fullName, email, role, logout } = useAuthStore();
   const queryClient = useQueryClient();
   const [addressLine1, setAddressLine1] = useState("");
@@ -113,7 +117,14 @@ export default function ProfileScreen() {
   };
 
   return (
-    <ScreenContainer contentContainerStyle={{ padding: 16, gap: 12 }}>
+    <ScreenContainer
+      scrollable
+      contentContainerStyle={{
+        padding: 16,
+        gap: 12,
+        paddingBottom: tabBarHeight + insets.bottom + 24,
+      }}
+    >
       <Text variant="title" weight="bold">
         Profile
       </Text>
