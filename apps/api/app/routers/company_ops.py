@@ -96,6 +96,10 @@ class AppointmentReassignPayload(BaseModel):
     provider_user_id: UUID
 
 
+class AppointmentAssignPayload(BaseModel):
+    provider_user_id: UUID
+
+
 def _generate_temp_password() -> str:
     return secrets.token_urlsafe(8)
 
@@ -188,6 +192,42 @@ def _notify_customer_assignment_change(
         channel=fallback_channel,
         payload=payload_data,
     )
+
+
+def _create_assignment_for_provider(
+    db: Session,
+    *,
+    appointment: Appointment,
+    provider: User,
+    event_kind: str,
+    assignment_kind: str,
+) -> AppointmentAssignment:
+    assignment = AppointmentAssignment(
+        appointment_id=appointment.id,
+        user_id=provider.id,
+        is_active=True,
+    )
+    db.add(assignment)
+    db.flush()
+
+    payload = _assignment_payload(
+        assignment=assignment,
+        old_provider=None,
+        new_provider=provider,
+    )
+    _record_assignment_event(
+        db,
+        appointment_id=appointment.id,
+        kind=event_kind,
+        payload=payload,
+    )
+    _notify_customer_assignment_change(
+        db,
+        appointment=appointment,
+        assignment_kind=assignment_kind,
+        payload=payload,
+    )
+    return assignment
 
 
 def _ensure_appointment_claimable_status(appt: Appointment) -> None:
@@ -379,10 +419,10 @@ def claimed_appointments(current=Depends(get_current_company_user), db: Session 
     q = (
         db.query(Appointment, AppointmentAssignment)
         .join(AppointmentAssignment, AppointmentAssignment.appointment_id == Appointment.id)
-        .filter(AppointmentAssignment.company_id == company_id)
-        .filter(AppointmentAssignment.user_id == current_user.id)
-        .filter(AppointmentAssignment.is_active.is_(True))
-        .order_by(Appointment.start_time.asc())
+        .filter(Appointment.company_id == company_id) 
+        .filter(AppointmentAssignment.user_id == current_user.id) 
+        .filter(AppointmentAssignment.is_active.is_(True)) 
+        .order_by(Appointment.start_time.asc()) 
     )
     items = []
     for appt, assignment in q.all():
@@ -444,28 +484,13 @@ def claim_appointment(
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Appointment already assigned")
 
-    assignment = AppointmentAssignment(
-        appointment_id=appointment_id, user_id=current_user.id, company_id=company_id, is_active=True
-    )
-    db.add(assignment)
     try:
-        db.flush()
-        payload = _assignment_payload(
-            assignment=assignment,
-            old_provider=None,
-            new_provider=current_user,
-        )
-        _record_assignment_event(
-            db,
-            appointment_id=appointment_id,
-            kind="assignment_claimed",
-            payload=payload,
-        )
-        _notify_customer_assignment_change(
+        assignment = _create_assignment_for_provider(
             db,
             appointment=appt,
+            provider=current_user,
+            event_kind="assignment_claimed",
             assignment_kind=APPOINTMENT_PROVIDER_ASSIGNED,
-            payload=payload,
         )
         db.commit()
     except IntegrityError:
@@ -482,6 +507,75 @@ def claim_appointment(
         new_provider=current_user,
     )
     return _serialize_assignment(assignment, current_user)
+
+
+@router.post(
+    "/appointments/{appointment_id}/assign",
+    response_model=AppointmentAssignmentRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def assign_appointment(
+    appointment_id: UUID,
+    payload: AppointmentAssignPayload,
+    current=Depends(get_current_company_admin),
+    db: Session = Depends(get_db),
+):
+    _, company_id = current
+    appt = db.query(Appointment).filter(Appointment.id == appointment_id).with_for_update().first()
+    if not appt:
+        raise HTTPException(status_code=404, detail="Not found")
+    if appt.company_id != company_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    _ensure_appointment_claimable_status(appt)
+
+    existing = (
+        db.query(AppointmentAssignment)
+        .filter(
+            AppointmentAssignment.appointment_id == appointment_id,
+            AppointmentAssignment.is_active.is_(True),
+        )
+        .first()
+    )
+    if existing:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Appointment already assigned")
+
+    provider = (
+        db.query(User)
+        .join(CompanyUser, CompanyUser.user_id == User.id)
+        .filter(
+            User.id == payload.provider_user_id,
+            CompanyUser.company_id == company_id,
+            User.role == "provider",
+        )
+        .first()
+    )
+    if provider is None:
+        raise HTTPException(status_code=400, detail="Assigned provider must belong to the company")
+
+    try:
+        assignment = _create_assignment_for_provider(
+            db,
+            appointment=appt,
+            provider=provider,
+            event_kind="assignment_assigned",
+            assignment_kind=APPOINTMENT_PROVIDER_ASSIGNED,
+        )
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        logger.exception("IntegrityError when assigning appointment %s", appointment_id)
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Appointment already assigned")
+
+    db.refresh(assignment)
+    publish_assignment_changed(
+        db,
+        appointment=appt,
+        event_kind="assignment_assigned",
+        assignment_action="assigned",
+        old_provider=None,
+        new_provider=provider,
+    )
+    return _serialize_assignment(assignment, provider)
 
 
 @router.post(
@@ -539,7 +633,6 @@ def reassign_appointment(
     assignment = AppointmentAssignment(
         appointment_id=appointment_id,
         user_id=new_provider.id,
-        company_id=company_id,
         is_active=True,
     )
     db.add(assignment)

@@ -375,8 +375,22 @@ python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 Seed demo data:
 
 ```powershell
-Invoke-RestMethod -Method Post http://localhost:8000/dev/seed
+Invoke-RestMethod -Method Post "http://localhost:8000/dev/seed?reset=true"
 ```
+
+The owner-demo seed is tuned for Helena/Pelham conversations and returns a repeatable local scenario:
+
+- `Pelham Pickup & Press` owner: `pelham.admin@shoeinn.com` / `Password1!`
+- Pelham providers: `pelham.driver1@shoeinn.com` / `Password1!`, `pelham.driver2@shoeinn.com` / `Password1!`
+- `Helena Shoe & Dry Care` owner: `helena.admin@shoeinn.com` / `Password1!`
+- Customer: `customer@shoeinn.com` / `Password1!`
+
+The Pelham company is the primary live-demo story. It seeds:
+
+- one confirmed unassigned job,
+- multiple assigned in-progress jobs,
+- one ready-for-delivery job,
+- owner and provider roles that make dispatch value obvious immediately.
 
 ### Optional notification worker
 
@@ -451,6 +465,8 @@ cd .\apps\api
    - a provider can claim a confirmed appointment
    - a duplicate claim returns `409`
    - a company admin can reassign an active appointment
+   - a company admin sees the owner command center instead of the provider queue
+   - a company admin can assign an unassigned confirmed appointment from the owner detail flow
    - terminal appointments cannot be reassigned
    - customer detail shows the assigned provider
    - customer detail keeps the status timeline visible

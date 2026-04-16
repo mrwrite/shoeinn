@@ -19,14 +19,13 @@ import { AuthStackParamList } from "../../navigation/AuthStack";
 import { useAuthStore } from "../../state/authStore";
 
 const demoAccounts = [
-  { label: "Global Admin", email: "admin@shoeinn.test", password: "Password1!" },
-  { label: "Clean Kicks Admin", email: "clean-kicks.admin@shoeinn.test", password: "Password1!" },
-  { label: "Clean Kicks Provider", email: "clean-kicks.provider@shoeinn.test", password: "Password1!" },
-  { label: "Fresh Soles Admin", email: "fresh-soles.admin@shoeinn.test", password: "Password1!" },
-  { label: "Fresh Soles Provider", email: "fresh-soles.provider@shoeinn.test", password: "Password1!" },
-  { label: "Sole Spa Admin", email: "sole-spa.admin@shoeinn.test", password: "Password1!" },
-  { label: "Sole Spa Provider", email: "sole-spa.provider@shoeinn.test", password: "Password1!" },
-  { label: "Customer", email: "customer@test.com", password: "Password1!" },
+  { label: "Global Admin", email: "admin@shoeinn.com", password: "Password1!" },
+  { label: "Pelham Owner", email: "pelham.admin@shoeinn.com", password: "Password1!" },
+  { label: "Pelham Driver 1", email: "pelham.driver1@shoeinn.com", password: "Password1!" },
+  { label: "Pelham Driver 2", email: "pelham.driver2@shoeinn.com", password: "Password1!" },
+  { label: "Helena Owner", email: "helena.admin@shoeinn.com", password: "Password1!" },
+  { label: "Helena Driver", email: "helena.driver@shoeinn.com", password: "Password1!" },
+  { label: "Customer", email: "customer@shoeinn.com", password: "Password1!" },
 ];
 
 type Props = NativeStackScreenProps<AuthStackParamList, "Login">;
@@ -35,7 +34,7 @@ export default function LoginScreen({ navigation }: Props) {
   const setAuth = useAuthStore((s) => s.setAuth);
   const rememberMe = useAuthStore((s) => s.rememberMe);
   const setRememberMe = useAuthStore((s) => s.setRememberMe);
-  const [email, setEmail] = useState("customer@test.com");
+  const [email, setEmail] = useState("customer@shoeinn.com");
   const [password, setPassword] = useState("Password1!");
   const [error, setError] = useState<string | null>(null);
 

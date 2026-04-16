@@ -16,6 +16,8 @@ import ServiceDetailScreen from "../screens/home/ServiceDetailScreen";
 import ProfileScreen from "../screens/profile/ProfileScreen";
 import ProviderAppointmentDetailScreen from "../screens/provider/ProviderAppointmentDetailScreen";
 import ProviderDashboardScreen from "../screens/provider/ProviderDashboardScreen";
+import OwnerAppointmentDetailScreen from "../screens/owner/OwnerAppointmentDetailScreen";
+import OwnerDashboardScreen from "../screens/owner/OwnerDashboardScreen";
 import type {
   AppointmentStackParamList,
   HomeStackParamList,
@@ -65,17 +67,19 @@ function AppointmentNavigator() {
 }
 
 function ProviderNavigator() {
+  const role = useAuthStore((state) => state.role);
+  const isOwner = role === "company_admin";
   return (
     <ProviderStack.Navigator>
       <ProviderStack.Screen
         name="ProviderDashboard"
-        component={ProviderDashboardScreen}
+        component={isOwner ? OwnerDashboardScreen : ProviderDashboardScreen}
         options={{ headerShown: false }}
       />
       <ProviderStack.Screen
         name="ProviderAppointmentDetail"
-        component={ProviderAppointmentDetailScreen}
-        options={{ title: "Job" }}
+        component={isOwner ? OwnerAppointmentDetailScreen : ProviderAppointmentDetailScreen}
+        options={{ title: isOwner ? "Owner job view" : "Job" }}
       />
     </ProviderStack.Navigator>
   );
@@ -97,7 +101,9 @@ function ProfileNavigator() {
 export default function RootTabs() {
   const theme = useTheme();
   const role = useAuthStore((s) => s.role);
-  const showProviderTab = ["provider", "company", "company_admin"].includes(role ?? "");
+  const usesOperationalHome = role === "provider" || role === "company_admin";
+  const showProviderTab = role === "company";
+  const homeTabComponent = usesOperationalHome ? ProviderNavigator : HomeNavigator;
   const notificationsQuery = useCustomerNotifications(role === "customer");
   const unreadNotifications = getUnreadCustomerNotificationCount(notificationsQuery.data);
   const insets = useSafeAreaInsets();
@@ -123,7 +129,7 @@ export default function RootTabs() {
         },
       })}
     >
-      <Tab.Screen name="HomeTab" component={HomeNavigator} options={{ title: "Home" }} />
+      <Tab.Screen name="HomeTab" component={homeTabComponent} options={{ title: "Home" }} />
       {role === "customer" ? (
         <Tab.Screen
           name="AppointmentsTab"
@@ -135,7 +141,11 @@ export default function RootTabs() {
         />
       ) : null}
       {showProviderTab ? (
-        <Tab.Screen name="ProviderTab" component={ProviderNavigator} options={{ title: "Jobs" }} />
+        <Tab.Screen
+          name="ProviderTab"
+          component={ProviderNavigator}
+          options={{ title: "Jobs" }}
+        />
       ) : null}
       <Tab.Screen name="ProfileTab" component={ProfileNavigator} options={{ title: "Profile" }} />
     </Tab.Navigator>

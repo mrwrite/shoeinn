@@ -109,7 +109,7 @@ def test_hold_and_confirm_can_fallback_to_saved_customer_address(client, db_sess
 
 def test_get_me_returns_clear_500_for_invalid_seeded_email(client, db_session):
     user = User(
-        email="invalid@shoeinn.test",
+        email="invalid-email",
         password_hash=hash_password("pass"),
         full_name="Broken Seed User",
         role="customer",

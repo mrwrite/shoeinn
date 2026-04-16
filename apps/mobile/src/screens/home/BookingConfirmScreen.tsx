@@ -256,7 +256,7 @@ export default function BookingConfirmScreen() {
             Payment
           </Text>
           <Text color={theme.colors.mutedText} style={{ marginTop: 6 }}>
-            Payment is processed after confirmation.
+            Payment collection can be configured separately. This demo flow focuses on scheduling, dispatch, and customer updates.
           </Text>
         </Card>
       </View>

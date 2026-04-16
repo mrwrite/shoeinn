@@ -253,13 +253,12 @@ def test_claim_returns_conflict_when_appointment_already_assigned(db_session: Se
         ]
     )
     appointment = _make_appointment(db_session, company=company, service=service)
-    db_session.add(
-        AppointmentAssignment(
-            appointment_id=appointment.id,
-            company_id=company.id,
-            user_id=provider_one.id,
-            is_active=True,
-        )
+    db_session.add( 
+        AppointmentAssignment( 
+            appointment_id=appointment.id, 
+            user_id=provider_one.id, 
+            is_active=True, 
+        ) 
     )
     db_session.commit()
 
@@ -301,13 +300,12 @@ def test_customer_assignment_endpoint_returns_provider_full_name_and_404_when_un
     assert unassigned.status_code == 404
     assert unassigned.json()["detail"] == "No provider assigned"
 
-    db_session.add(
-        AppointmentAssignment(
-            appointment_id=appointment.id,
-            company_id=company.id,
-            user_id=provider.id,
-            is_active=True,
-        )
+    db_session.add( 
+        AppointmentAssignment( 
+            appointment_id=appointment.id, 
+            user_id=provider.id, 
+            is_active=True, 
+        ) 
     )
     db_session.commit()
 
@@ -334,12 +332,11 @@ def test_company_admin_can_reassign_and_provider_cannot(db_session: Session, cli
         ]
     )
     appointment = _make_appointment(db_session, company=company, service=service, email=customer.email)
-    initial_assignment = AppointmentAssignment(
-        appointment_id=appointment.id,
-        company_id=company.id,
-        user_id=provider_one.id,
-        is_active=True,
-    )
+    initial_assignment = AppointmentAssignment( 
+        appointment_id=appointment.id, 
+        user_id=provider_one.id, 
+        is_active=True, 
+    ) 
     db_session.add(initial_assignment)
     db_session.commit()
 
@@ -389,6 +386,89 @@ def test_company_admin_can_reassign_and_provider_cannot(db_session: Session, cli
     assert any(notification.kind == "APPOINTMENT_PROVIDER_REASSIGNED" and notification.channel == "in_app" for notification in notifications)
 
 
+def test_company_admin_can_assign_unassigned_appointment(db_session: Session, client: TestClient) -> None:
+    company = _make_company(db_session, name="Assign Co")
+    service = _make_service(db_session, company)
+    provider = _make_user(db_session, email="provider-assign@example.com", role="provider", full_name="Assign Provider")
+    admin = _make_user(db_session, email="admin-assign@example.com", role="company_admin", full_name="Assign Admin")
+    customer = _make_user(
+        db_session,
+        email="customer-assign@example.com",
+        role="customer",
+        full_name="Assigned Customer",
+    )
+    db_session.add_all(
+        [
+            CompanyUser(user_id=provider.id, company_id=company.id),
+            CompanyUser(user_id=admin.id, company_id=company.id),
+        ]
+    )
+    appointment = _make_appointment(db_session, company=company, service=service, email=customer.email)
+    db_session.commit()
+
+    response = client.post(
+        f"/company/appointments/{appointment.id}/assign",
+        json={"provider_user_id": str(provider.id)},
+        headers=_auth_header(admin, company_id=company.id),
+    )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["provider_name"] == "Assign Provider"
+
+    db_session.expire_all()
+    assignment = (
+        db_session.query(AppointmentAssignment)
+        .filter(AppointmentAssignment.appointment_id == appointment.id, AppointmentAssignment.is_active.is_(True))
+        .one()
+    )
+    assert assignment.user_id == provider.id
+
+    event = (
+        db_session.query(AppointmentEvent)
+        .filter(
+            AppointmentEvent.appointment_id == appointment.id,
+            AppointmentEvent.kind == "assignment_assigned",
+        )
+        .one()
+    )
+    assert event.payload["new_provider_name"] == "Assign Provider"
+
+
+def test_company_admin_dashboard_open_route_returns_all_company_jobs(db_session: Session, client: TestClient) -> None:
+    company = _make_company(db_session, name="Overview Co")
+    service = _make_service(db_session, company)
+    admin = _make_user(db_session, email="overview-admin@example.com", role="company_admin", full_name="Overview Admin")
+    provider = _make_user(db_session, email="overview-provider@example.com", role="provider", full_name="Overview Provider")
+    db_session.add_all(
+        [
+            CompanyUser(user_id=admin.id, company_id=company.id),
+            CompanyUser(user_id=provider.id, company_id=company.id),
+        ]
+    )
+    confirmed = _make_appointment(db_session, company=company, service=service, status=AppointmentStatus.confirmed)
+    ready = _make_appointment(db_session, company=company, service=service, status=AppointmentStatus.ready)
+    db_session.add( 
+        AppointmentAssignment( 
+            appointment_id=ready.id, 
+            user_id=provider.id, 
+            is_active=True, 
+        ) 
+    )
+    db_session.commit()
+
+    response = client.get(
+        "/company/appointments/open",
+        headers=_auth_header(admin, company_id=company.id),
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert len(payload) == 2
+    ready_item = next(item for item in payload if item["id"] == str(ready.id))
+    assert ready_item["provider_name"] == "Overview Provider"
+    assert ready_item["is_assigned"] is True
+
+
 def test_status_update_publishes_live_status_event_to_customer_clients(db_session: Session, client: TestClient) -> None:
     company = _make_company(db_session, name="Live Status Co")
     service = _make_service(db_session, company)
@@ -406,13 +486,12 @@ def test_status_update_publishes_live_status_event_to_customer_clients(db_sessio
     )
     db_session.add(CompanyUser(user_id=provider.id, company_id=company.id))
     appointment = _make_appointment(db_session, company=company, service=service, email=customer.email)
-    db_session.add(
-        AppointmentAssignment(
-            appointment_id=appointment.id,
-            company_id=company.id,
-            user_id=provider.id,
-            is_active=True,
-        )
+    db_session.add( 
+        AppointmentAssignment( 
+            appointment_id=appointment.id, 
+            user_id=provider.id, 
+            is_active=True, 
+        ) 
     )
     db_session.commit()
 

@@ -70,13 +70,12 @@ def _make_appointment(
     return appt
 
 
-def _assign_appointment(db: Session, *, appointment: Appointment, company: Company, provider: User) -> AppointmentAssignment:
-    assignment = AppointmentAssignment(
-        appointment_id=appointment.id,
-        company_id=company.id,
-        user_id=provider.id,
-        is_active=True,
-    )
+def _assign_appointment(db: Session, *, appointment: Appointment, company: Company, provider: User) -> AppointmentAssignment: 
+    assignment = AppointmentAssignment( 
+        appointment_id=appointment.id, 
+        user_id=provider.id, 
+        is_active=True, 
+    ) 
     db.add(assignment)
     db.flush()
     return assignment

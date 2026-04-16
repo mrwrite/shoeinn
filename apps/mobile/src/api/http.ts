@@ -1,5 +1,6 @@
 // src/api/http.ts
 import Constants from "expo-constants";
+import { Platform } from "react-native";
 
 import type {
   Appointment,
@@ -23,11 +24,54 @@ import type { Notification } from "../types/notification";
 import type { PushRegisterRequest, PushUnregisterRequest } from "../types/push";
 import type { CustomerAddressUpdatePayload, NotificationPreferences, UserProfile } from "../types/user";
 
-export const API_URL: string =
-  (Constants.expoConfig?.extra as any)?.API_URL ??
-  // eslint-disable-next-line no-process-env
-  (process.env.EXPO_PUBLIC_API_URL as string) ??
-  "http://CHANGE_ME:8000";
+const DEFAULT_API_PORT = 8000;
+const ANDROID_LOOPBACK_HOST = "10.0.2.2";
+const ANDROID_LOCALHOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]"]);
+
+function normalizeHostForPlatform(host: string): string {
+  const normalizedHost = host.trim();
+  if (Platform.OS !== "android") {
+    return normalizedHost;
+  }
+  return ANDROID_LOCALHOSTS.has(normalizedHost) ? ANDROID_LOOPBACK_HOST : normalizedHost;
+}
+
+function getExpoHost(): string | undefined {
+  const debuggerHost = Constants.expoGoConfig?.debuggerHost;
+  if (debuggerHost) {
+    return debuggerHost.split(":")[0];
+  }
+
+  const hostUri = Constants.expoConfig?.hostUri;
+  if (hostUri) {
+    return hostUri.split(":")[0];
+  }
+
+  return undefined;
+}
+
+function resolveApiUrl(): string {
+  const configuredUrl =
+    (Constants.expoConfig?.extra as any)?.API_URL ??
+    // eslint-disable-next-line no-process-env
+    (process.env.EXPO_PUBLIC_API_URL as string | undefined);
+  if (configuredUrl) {
+    return configuredUrl;
+  }
+
+  const expoHost = getExpoHost();
+  if (expoHost) {
+    return `http://${normalizeHostForPlatform(expoHost)}:${DEFAULT_API_PORT}`;
+  }
+
+  if (Platform.OS === "android") {
+    return `http://${ANDROID_LOOPBACK_HOST}:${DEFAULT_API_PORT}`;
+  }
+
+  return `http://localhost:${DEFAULT_API_PORT}`;
+}
+
+export const API_URL: string = resolveApiUrl();
 
 type HttpMethod = "GET" | "POST" | "PATCH" | "PUT";
 
@@ -120,6 +164,10 @@ export function getJson<T>(path: string): Promise<T> {
   return request<T>("GET", path);
 }
 
+export function getCompany(companyId: string): Promise<Company> {
+  return request<Company>("GET", `/companies/${companyId}`);
+}
+
 export function getLiveEventsWebSocketUrl(token: string | null): string | null {
   if (!token) {
     return null;
@@ -187,6 +235,24 @@ export function claimAppointment(id: string): Promise<AppointmentAssignment> {
   return request<AppointmentAssignment>("POST", `/company/appointments/${id}/claim`, undefined, {
     auth: true,
   });
+}
+
+export function assignAppointment(id: string, providerUserId: string): Promise<AppointmentAssignment> {
+  return request<AppointmentAssignment>(
+    "POST",
+    `/company/appointments/${id}/assign`,
+    { provider_user_id: providerUserId },
+    { auth: true },
+  );
+}
+
+export function reassignAppointment(id: string, providerUserId: string): Promise<AppointmentAssignment> {
+  return request<AppointmentAssignment>(
+    "POST",
+    `/company/appointments/${id}/reassign`,
+    { provider_user_id: providerUserId },
+    { auth: true },
+  );
 }
 
 export function expireHolds(): Promise<{ expired: number }> {

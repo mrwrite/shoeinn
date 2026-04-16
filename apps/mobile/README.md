@@ -1,5 +1,26 @@
 # ShoeInn Mobile
 
+## Expo Go local development
+
+For a physical phone in Expo Go, the app must be able to reach both:
+
+1. the Expo Metro server on your computer
+2. the ShoeInn API on your computer
+
+Recommended setup:
+
+```bash
+npx expo start --tunnel
+```
+
+If you want to use LAN instead, make sure your phone and computer are on the same Wi-Fi network and set:
+
+```bash
+EXPO_PUBLIC_API_URL=http://YOUR_COMPUTER_LAN_IP:8000
+```
+
+The mobile app now auto-detects the Expo host for local development when `EXPO_PUBLIC_API_URL` is not set, but explicit LAN configuration is still the safest option for demos.
+
 ## Google Maps Directions API key
 
 The travel tracking card uses the Google Directions API to render the route polyline, ETA, and distance.

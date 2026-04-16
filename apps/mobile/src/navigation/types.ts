@@ -37,7 +37,10 @@ export type ProfileStackParamList = {
 };
 
 export type RootTabParamList = {
-  HomeTab: NavigatorScreenParams<HomeStackParamList> | undefined;
+  HomeTab:
+    | NavigatorScreenParams<HomeStackParamList>
+    | NavigatorScreenParams<ProviderStackParamList>
+    | undefined;
   AppointmentsTab: NavigatorScreenParams<AppointmentStackParamList> | undefined;
   ProviderTab: NavigatorScreenParams<ProviderStackParamList> | undefined;
   ProfileTab: NavigatorScreenParams<ProfileStackParamList> | undefined;

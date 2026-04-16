@@ -49,13 +49,21 @@ def upgrade():
         op.execute("ALTER TYPE appointmentstatus RENAME TO appointmentstatus_old")
         new_enum = postgresql.ENUM(*NEW_STATUSES, name="appointmentstatus")
         new_enum.create(bind, checkfirst=False)
-        op.execute(
-            """
-            ALTER TABLE appointments
-            ALTER COLUMN status TYPE appointmentstatus
-            USING status::text::appointmentstatus
-            """
-        )
+        op.execute("""
+        ALTER TABLE appointments
+        ALTER COLUMN status DROP DEFAULT
+        """)
+
+        op.execute("""
+        ALTER TABLE appointments
+        ALTER COLUMN status TYPE appointmentstatus
+        USING status::text::appointmentstatus
+        """)
+
+        op.execute("""
+        ALTER TABLE appointments
+        ALTER COLUMN status SET DEFAULT 'requested'
+        """)
         op.execute("DROP TYPE appointmentstatus_old")
     else:
         appointmentstatus = sa.Enum(*NEW_STATUSES, name="appointmentstatus")
@@ -65,7 +73,7 @@ def upgrade():
         "appointment_assignments",
         sa.Column("id", sa.Uuid(), primary_key=True, server_default=sa.text("gen_random_uuid()")),
         sa.Column("appointment_id", sa.Uuid(), sa.ForeignKey("appointments.id"), nullable=False),
-        sa.Column("company_user_id", sa.Uuid(), sa.ForeignKey("company_users.user_id"), nullable=False),
+        sa.Column("user_id", sa.Uuid(), sa.ForeignKey("users.id"), nullable=False),
         sa.Column("assigned_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("timezone('utc', now())")),
         sa.Column("unassigned_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
@@ -84,7 +92,7 @@ def upgrade():
         "appointment_location_updates",
         sa.Column("id", sa.Uuid(), primary_key=True, server_default=sa.text("gen_random_uuid()")),
         sa.Column("appointment_id", sa.Uuid(), sa.ForeignKey("appointments.id"), nullable=False),
-        sa.Column("company_user_id", sa.Uuid(), sa.ForeignKey("company_users.user_id"), nullable=False),
+        sa.Column("company_user_id", sa.Uuid(), sa.ForeignKey("users.id"), nullable=False),
         sa.Column("lat", sa.Float(), nullable=False),
         sa.Column("lng", sa.Float(), nullable=False),
         sa.Column("heading", sa.Float(), nullable=True),
