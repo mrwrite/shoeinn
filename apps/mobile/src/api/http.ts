@@ -1,5 +1,6 @@
 // src/api/http.ts
 import Constants from "expo-constants";
+import { Platform } from "react-native";
 
 import type {
   Appointment,
@@ -7,6 +8,7 @@ import type {
   AppointmentEvent,
   AppointmentLocationUpdate,
   AppointmentLocationUpdatePayload,
+  AppointmentProviderLocationResponse,
   AppointmentSummary,
   AppointmentHold,
   AppointmentTracking,
@@ -20,14 +22,58 @@ import type { ProviderAppointment, StatusUpdatePayload } from "../types/company"
 import { getAuthToken } from "../state/authStore";
 import type { Notification } from "../types/notification";
 import type { PushRegisterRequest, PushUnregisterRequest } from "../types/push";
+import type { CustomerAddressUpdatePayload, NotificationPreferences, UserProfile } from "../types/user";
 
-export const API_URL: string =
-  (Constants.expoConfig?.extra as any)?.API_URL ??
-  // eslint-disable-next-line no-process-env
-  (process.env.EXPO_PUBLIC_API_URL as string) ??
-  "http://CHANGE_ME:8000";
+const DEFAULT_API_PORT = 8000;
+const ANDROID_LOOPBACK_HOST = "10.0.2.2";
+const ANDROID_LOCALHOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]"]);
 
-type HttpMethod = "GET" | "POST";
+function normalizeHostForPlatform(host: string): string {
+  const normalizedHost = host.trim();
+  if (Platform.OS !== "android") {
+    return normalizedHost;
+  }
+  return ANDROID_LOCALHOSTS.has(normalizedHost) ? ANDROID_LOOPBACK_HOST : normalizedHost;
+}
+
+function getExpoHost(): string | undefined {
+  const debuggerHost = Constants.expoGoConfig?.debuggerHost;
+  if (debuggerHost) {
+    return debuggerHost.split(":")[0];
+  }
+
+  const hostUri = Constants.expoConfig?.hostUri;
+  if (hostUri) {
+    return hostUri.split(":")[0];
+  }
+
+  return undefined;
+}
+
+function resolveApiUrl(): string {
+  const configuredUrl =
+    (Constants.expoConfig?.extra as any)?.API_URL ??
+    // eslint-disable-next-line no-process-env
+    (process.env.EXPO_PUBLIC_API_URL as string | undefined);
+  if (configuredUrl) {
+    return configuredUrl;
+  }
+
+  const expoHost = getExpoHost();
+  if (expoHost) {
+    return `http://${normalizeHostForPlatform(expoHost)}:${DEFAULT_API_PORT}`;
+  }
+
+  if (Platform.OS === "android") {
+    return `http://${ANDROID_LOOPBACK_HOST}:${DEFAULT_API_PORT}`;
+  }
+
+  return `http://localhost:${DEFAULT_API_PORT}`;
+}
+
+export const API_URL: string = resolveApiUrl();
+
+type HttpMethod = "GET" | "POST" | "PATCH" | "PUT";
 
 interface RequestOptions extends RequestInit {
   auth?: boolean;
@@ -47,12 +93,13 @@ async function request<T>(
   console.log(`[HTTP] ${method}`, url);
 
   try {
+    const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
     const response = await fetch(url, {
       ...init,
       method,
-      body: body ? JSON.stringify(body) : undefined,
+      body: body ? (isFormData ? (body as FormData) : JSON.stringify(body)) : undefined,
       headers: {
-        "Content-Type": "application/json",
+        ...(isFormData ? {} : { "Content-Type": "application/json" }),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(init.headers ?? {}),
       },
@@ -117,6 +164,23 @@ export function getJson<T>(path: string): Promise<T> {
   return request<T>("GET", path);
 }
 
+export function getCompany(companyId: string): Promise<Company> {
+  return request<Company>("GET", `/companies/${companyId}`);
+}
+
+export function getLiveEventsWebSocketUrl(token: string | null): string | null {
+  if (!token) {
+    return null;
+  }
+
+  const baseUrl = API_URL.replace(/\/$/, "");
+  const wsBase =
+    baseUrl.startsWith("https://") ? `wss://${baseUrl.slice("https://".length)}` :
+    baseUrl.startsWith("http://") ? `ws://${baseUrl.slice("http://".length)}` :
+    baseUrl;
+  return `${wsBase}/live/ws?token=${encodeURIComponent(token)}`;
+}
+
 export function getAvailability(serviceId: string, date: string): Promise<string[]> {
   const params = new URLSearchParams({ service_id: serviceId, date });
   return request<string[]>("GET", `/availability?${params.toString()}`);
@@ -140,7 +204,7 @@ export function confirmAppointment(payload: ConfirmAppointmentPayload): Promise<
 }
 
 export function getAppointment(id: string): Promise<Appointment> {
-  return request<Appointment>("GET", `/appointments/${id}`);
+  return request<Appointment>("GET", `/appointments/${id}`, undefined, { auth: true });
 }
 
 export function getMyAppointments(): Promise<AppointmentSummary[]> {
@@ -151,8 +215,8 @@ export function getAppointmentEvents(id: string): Promise<AppointmentEvent[]> {
   return request<AppointmentEvent[]>("GET", `/appointments/${id}/events`, undefined, { auth: true });
 }
 
-export function getAppointmentLatestLocation(id: string): Promise<AppointmentLocationUpdate> {
-  return request<AppointmentLocationUpdate>("GET", `/appointments/${id}/location/latest`, undefined, { auth: true });
+export function getAppointmentProviderLocation(id: string): Promise<AppointmentProviderLocationResponse> {
+  return request<AppointmentProviderLocationResponse>("GET", `/appointments/${id}/provider-location`, undefined, { auth: true });
 }
 
 export function getAppointmentTracking(id: string): Promise<AppointmentTracking> {
@@ -171,6 +235,24 @@ export function claimAppointment(id: string): Promise<AppointmentAssignment> {
   return request<AppointmentAssignment>("POST", `/company/appointments/${id}/claim`, undefined, {
     auth: true,
   });
+}
+
+export function assignAppointment(id: string, providerUserId: string): Promise<AppointmentAssignment> {
+  return request<AppointmentAssignment>(
+    "POST",
+    `/company/appointments/${id}/assign`,
+    { provider_user_id: providerUserId },
+    { auth: true },
+  );
+}
+
+export function reassignAppointment(id: string, providerUserId: string): Promise<AppointmentAssignment> {
+  return request<AppointmentAssignment>(
+    "POST",
+    `/company/appointments/${id}/reassign`,
+    { provider_user_id: providerUserId },
+    { auth: true },
+  );
 }
 
 export function expireHolds(): Promise<{ expired: number }> {
@@ -194,6 +276,21 @@ export function updateAppointmentStatus(
   });
 }
 
+
+export function setAppointmentReadyWithPhoto(id: string, fileUri: string): Promise<{ id: string; status: string; ready_photo_url?: string | null }> {
+  const form = new FormData();
+  form.append("file", {
+    uri: fileUri,
+    name: `ready-${Date.now()}.jpg`,
+    type: "image/jpeg",
+  } as unknown as Blob);
+
+  return request<{ id: string; status: string; ready_photo_url?: string | null }>("PUT", `/company/appointments/${id}/ready`, form, {
+    auth: true,
+    timeoutMs: 20000,
+  });
+}
+
 export function postAppointmentLocation(
   id: string,
   payload: AppointmentLocationUpdatePayload,
@@ -209,6 +306,18 @@ export function fetchNotifications(): Promise<Notification[]> {
 
 export function ackNotification(id: string): Promise<Notification> {
   return request<Notification>("POST", `/company/notifications/${id}/ack`, undefined, { auth: true });
+}
+
+export function fetchMyNotifications(): Promise<Notification[]> {
+  return request<Notification[]>("GET", "/me/notifications", undefined, { auth: true });
+}
+
+export function ackMyNotification(id: string): Promise<Notification> {
+  return request<Notification>("POST", `/me/notifications/${id}/ack`, undefined, { auth: true });
+}
+
+export function ackAllMyNotifications(): Promise<{ updated: number }> {
+  return request<{ updated: number }>("POST", "/me/notifications/ack-all", undefined, { auth: true });
 }
 
 export function createCompanyUser(payload: {
@@ -230,4 +339,20 @@ export function registerPushToken(payload: PushRegisterRequest): Promise<void> {
 
 export function unregisterPushToken(payload: PushUnregisterRequest): Promise<void> {
   return request<void>("POST", "/push/unregister", payload, { auth: true });
+}
+
+export function getMe(): Promise<UserProfile> {
+  return request<UserProfile>("GET", "/me", undefined, { auth: true });
+}
+
+export function updateMyAddress(payload: CustomerAddressUpdatePayload): Promise<UserProfile> {
+  return request<UserProfile>("PATCH", "/me/address", payload, { auth: true });
+}
+
+export function getMyNotificationPreferences(): Promise<NotificationPreferences> {
+  return request<NotificationPreferences>("GET", "/me/notification-preferences", undefined, { auth: true });
+}
+
+export function updateMyNotificationPreferences(payload: NotificationPreferences): Promise<NotificationPreferences> {
+  return request<NotificationPreferences>("PATCH", "/me/notification-preferences", payload, { auth: true });
 }

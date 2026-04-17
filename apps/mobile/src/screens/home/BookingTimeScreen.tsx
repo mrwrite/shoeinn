@@ -8,7 +8,7 @@ import { getAvailability } from "../../api/http";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { Button } from "../../components/ui/Button";
 import { Text } from "../../components/ui/Text";
-import type { HomeStackParamList } from "../../navigation/RootTabs";
+import type { HomeStackParamList } from "../../navigation/types";
 import { useTheme } from "../../theme/theme";
 
 export default function BookingTimeScreen() {

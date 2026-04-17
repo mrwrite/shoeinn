@@ -44,6 +44,11 @@ class HoldRead(BaseModel):
     customer_name: str | None
     customer_phone: str | None
     customer_email: str | None
+    address_line1: str | None = None
+    address_line2: str | None = None
+    city: str | None = None
+    state: str | None = None
+    postal_code: str | None = None
     start_time: datetime
     end_time: datetime
     ttl_expires_at: datetime
@@ -94,6 +99,9 @@ class AppointmentRead(BaseModel):
     payment_amount_expected: int | None = None
     payment_amount_received: int | None = None
     payment_currency: str | None = None
+    ready_photo_url: str | None = None
+    ready_photo_uploaded_at: datetime | None = None
+    ready_photo_uploaded_by_user_id: UUID | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -104,6 +112,13 @@ class AppointmentListItem(BaseModel):
     id: UUID
     company_id: UUID | None = None
     service_name: str | None = None
+    customer_name: str | None = None
+    customer_phone: str | None = None
+    address_line1: str | None = None
+    address_line2: str | None = None
+    city: str | None = None
+    state: str | None = None
+    postal_code: str | None = None
     start_time: datetime
     status: AppointmentStatus
 
@@ -159,3 +174,18 @@ class AppointmentTrackingRead(BaseModel):
     is_travel_state: bool
     latest_location: LocationUpdateRead | None
     recent_locations: list[LocationUpdateRead]
+
+
+class AppointmentProviderLocationRead(BaseModel):
+    lat: float
+    lng: float
+    heading: float | None = None
+    speed: float | None = None
+    accuracy: float | None = None
+    recorded_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AppointmentProviderLocationResponse(BaseModel):
+    location: AppointmentProviderLocationRead | None

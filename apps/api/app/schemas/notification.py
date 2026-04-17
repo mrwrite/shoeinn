@@ -10,7 +10,7 @@ from pydantic import BaseModel
 class NotificationRead(BaseModel):
     id: UUID
     company_id: UUID
-    appointment_id: UUID
+    appointment_id: UUID | None = None
     kind: str
     channel: str
     target: str | None = None
@@ -23,3 +23,7 @@ class NotificationRead(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class NotificationAckSummary(BaseModel):
+    updated: int

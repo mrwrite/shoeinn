@@ -4,12 +4,13 @@ import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useMutation } from "@tanstack/react-query";
 
-import { confirmAppointment, createHold } from "../../api/http";
+import { confirmAppointment, createHold, getMe } from "../../api/http";
+import { useCityState } from "../../hooks/useCityState";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { Text } from "../../components/ui/Text";
-import type { HomeStackParamList } from "../../navigation/RootTabs";
+import type { HomeStackParamList } from "../../navigation/types";
 import { useAuthStore } from "../../state/authStore";
 import { useTheme } from "../../theme/theme";
 
@@ -22,33 +23,81 @@ export default function BookingConfirmScreen() {
   const [name, setName] = useState(fullName ?? "");
   const [phone, setPhone] = useState("");
   const [customerEmail, setCustomerEmail] = useState(email ?? "");
+  const [addressLine1, setAddressLine1] = useState("");
+  const [addressLine2, setAddressLine2] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+  const [postalCode, setPostalCode] = useState("");
   const [holdId, setHoldId] = useState<string | null>(null);
-
-  const holdMutation = useMutation({
-    mutationFn: () =>
-      createHold({
-        service_id: service.id,
-        start_time: time,
-        company_id: service.company_id ?? companyId ?? undefined,
-      }),
-    onSuccess: (hold) => setHoldId(hold.id),
-    onError: (err: Error) => Alert.alert("Hold failed", err.message),
-  });
+  const { city: detectedCity, state: detectedState } = useCityState();
 
   useEffect(() => {
-    holdMutation.mutate();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let mounted = true;
+    const loadProfile = async () => {
+      try {
+        const me = await getMe();
+        if (!mounted) return;
+        if (!name && me.full_name) setName(me.full_name);
+        if (!customerEmail && me.email) setCustomerEmail(me.email);
+        if (!addressLine1 && me.address_line1) setAddressLine1(me.address_line1);
+        if (!addressLine2 && me.address_line2) setAddressLine2(me.address_line2);
+        if (!city && me.city) setCity(me.city);
+        if (!state && me.state) setState(me.state);
+        if (!postalCode && me.postal_code) setPostalCode(me.postal_code);
+      } catch (err) {
+        // non-blocking prefill
+      }
+    };
+    loadProfile();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
+  useEffect(() => {
+    if (!city && detectedCity) {
+      setCity(detectedCity);
+    }
+  }, [city, detectedCity]);
+
+  useEffect(() => {
+    if (!state && detectedState) {
+      setState(detectedState);
+    }
+  }, [state, detectedState]);
+
   const confirmMutation = useMutation({
-    mutationFn: () => {
-      if (!holdId) throw new Error("Hold missing");
-      return confirmAppointment({
-        hold_id: holdId,
-        company_id: service.company_id ?? companyId ?? "",
+    mutationFn: async () => {
+      const company = service.company_id ?? companyId;
+      if (!company) throw new Error("Company missing");
+
+      const hold = await createHold({
+        service_id: service.id,
+        start_time: time,
+        company_id: company,
         customer_name: name,
         customer_phone: phone,
         customer_email: customerEmail || undefined,
+        address_line1: addressLine1,
+        address_line2: addressLine2 || undefined,
+        city,
+        state,
+        postal_code: postalCode,
+      });
+
+      setHoldId(hold.id);
+
+      return confirmAppointment({
+        hold_id: hold.id,
+        company_id: company,
+        customer_name: name,
+        customer_phone: phone,
+        customer_email: customerEmail || undefined,
+        address_line1: addressLine1,
+        address_line2: addressLine2 || undefined,
+        city,
+        state,
+        postal_code: postalCode,
       });
     },
     onSuccess: (appt) => {
@@ -70,7 +119,14 @@ export default function BookingConfirmScreen() {
   );
 
   const price = service.price_cents ? `$${(service.price_cents / 100).toFixed(2)}` : "Pricing";
-  const disabled = !name || !phone || confirmMutation.isPending || !holdId;
+  const disabled =
+    !name.trim() ||
+    !phone.trim() ||
+    !addressLine1.trim() ||
+    !city.trim() ||
+    !state.trim() ||
+    !postalCode.trim() ||
+    confirmMutation.isPending;
 
   return (
     <ScreenContainer
@@ -110,9 +166,9 @@ export default function BookingConfirmScreen() {
               </Text>
             </View>
           </View>
-          {!holdId ? (
+          {holdId ? (
             <Text variant="caption" color={theme.colors.mutedText} style={{ marginTop: 8 }}>
-              Reserving your slot...
+              Slot reserved.
             </Text>
           ) : null}
         </Card>
@@ -151,10 +207,56 @@ export default function BookingConfirmScreen() {
 
         <Card>
           <Text variant="subtitle" weight="semibold">
+            Service address
+          </Text>
+          <View style={{ marginTop: 12, gap: 12 }}>
+            <TextInput
+              placeholder="Address line 1"
+              value={addressLine1}
+              onChangeText={setAddressLine1}
+              style={[styles.input, { borderColor: theme.colors.border }]}
+              placeholderTextColor={theme.colors.mutedText}
+            />
+            <TextInput
+              placeholder="Address line 2 (optional)"
+              value={addressLine2}
+              onChangeText={setAddressLine2}
+              style={[styles.input, { borderColor: theme.colors.border }]}
+              placeholderTextColor={theme.colors.mutedText}
+            />
+            <TextInput
+              placeholder="City"
+              value={city}
+              onChangeText={setCity}
+              style={[styles.input, { borderColor: theme.colors.border }]}
+              placeholderTextColor={theme.colors.mutedText}
+            />
+            <TextInput
+              placeholder="State"
+              value={state}
+              onChangeText={setState}
+              style={[styles.input, { borderColor: theme.colors.border }]}
+              placeholderTextColor={theme.colors.mutedText}
+              autoCapitalize="characters"
+              maxLength={2}
+            />
+            <TextInput
+              placeholder="Postal code"
+              value={postalCode}
+              onChangeText={setPostalCode}
+              style={[styles.input, { borderColor: theme.colors.border }]}
+              placeholderTextColor={theme.colors.mutedText}
+              keyboardType="numbers-and-punctuation"
+            />
+          </View>
+        </Card>
+
+        <Card>
+          <Text variant="subtitle" weight="semibold">
             Payment
           </Text>
           <Text color={theme.colors.mutedText} style={{ marginTop: 6 }}>
-            Payment is processed after confirmation.
+            Payment collection can be configured separately. This demo flow focuses on scheduling, dispatch, and customer updates.
           </Text>
         </Card>
       </View>

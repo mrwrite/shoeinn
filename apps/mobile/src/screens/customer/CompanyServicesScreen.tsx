@@ -1,15 +1,16 @@
 import React, { useEffect } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import ServicesListScreen from "../ServicesListScreen";
-import type { CustomerStackParamList } from "../../navigation/CustomerStack";
+import type { CustomerFlowStackParamList } from "../../navigation/types";
 import { useAuthStore } from "../../state/authStore";
 import { useBooking } from "../../state/bookingStore";
 import { useCompanyStore } from "../../state/companyStore";
 
 export default function CompanyServicesScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<CustomerFlowStackParamList, "CompanyServices">>();
   const selectedCompany = useCompanyStore((s) => s.selectedCompany);
   const clearCompany = useCompanyStore((s) => s.clearSelectedCompany);
   const { setService, setDate, setStartTime, setHold, setAppointment, setStep } = useBooking();
@@ -17,7 +18,7 @@ export default function CompanyServicesScreen() {
 
   useEffect(() => {
     if (!selectedCompany) {
-      navigation.navigate("CompanyPicker" as keyof CustomerStackParamList);
+      navigation.navigate("CompanyPicker");
     }
   }, [navigation, selectedCompany]);
 
@@ -48,7 +49,7 @@ export default function CompanyServicesScreen() {
         <Text>Choose a provider to see services.</Text>
         <TouchableOpacity
           style={styles.secondaryButton}
-          onPress={() => navigation.navigate("CompanyPicker" as keyof CustomerStackParamList)}
+          onPress={() => navigation.navigate("CompanyPicker")}
         >
           <Text style={styles.secondaryText}>Back to providers</Text>
         </TouchableOpacity>
@@ -64,7 +65,7 @@ export default function CompanyServicesScreen() {
           accessibilityRole="button"
           onPress={() => {
             clearCompany();
-            navigation.navigate("CompanyPicker" as keyof CustomerStackParamList);
+            navigation.navigate("CompanyPicker");
           }}
         >
           <Text style={styles.link}>Change provider</Text>
@@ -79,7 +80,7 @@ export default function CompanyServicesScreen() {
           setHold(undefined);
           setAppointment(undefined);
           setStep("detail");
-          navigation.navigate("Booking" as keyof CustomerStackParamList);
+          navigation.navigate("Booking");
         }}
       />
     </View>

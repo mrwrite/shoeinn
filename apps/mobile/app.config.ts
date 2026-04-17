@@ -1,6 +1,6 @@
 import { ConfigContext, ExpoConfig } from "expo/config";
 
-const DEFAULT_API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000";
+const configuredApiUrl = process.env.EXPO_PUBLIC_API_URL;
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   name: "Shoeinn",
@@ -13,8 +13,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     fallbackToCacheTimeout: 0,
   },
   extra: {
-    API_URL: DEFAULT_API_URL,
     ...config.extra,
+    ...(configuredApiUrl ? { API_URL: configuredApiUrl } : {}),
     eas: {
         "projectId": "1a753a1a-ae23-47e9-ba06-cc6148fb36ee"
       }

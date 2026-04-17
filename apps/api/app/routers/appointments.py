@@ -4,19 +4,21 @@ from __future__ import annotations
 
 from asyncio.log import logger
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from threading import Lock
 from typing import Dict, Tuple
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, File, Header, HTTPException, Request, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.db import get_db
-from app.core.security import get_current_customer, get_current_user, get_current_company_user
+from app.core.security import get_current_customer, get_current_user, get_current_company_user, oauth2_scheme
 from app.models import (
     Appointment,
     AppointmentAssignment,
+    CompanyUser,
     AppointmentEvent,
     AppointmentLocationUpdate,
     AppointmentHold,
@@ -43,6 +45,8 @@ from app.schemas.appointment import (
     HoldCreate,
     HoldRead,
     LocationUpdateRead,
+    AppointmentProviderLocationRead,
+    AppointmentProviderLocationResponse,
 )
 
 router = APIRouter(prefix="/appointments", tags=["appointments"])
@@ -52,6 +56,8 @@ _CACHE_LOCK = Lock()
 _IDEMPOTENCY_TTL = timedelta(minutes=10)
 _HOLD_TTL = timedelta(minutes=15)
 CANCELLED_STATUS = AppointmentStatus.cancelled
+READY_UPLOAD_MAX_BYTES = 10 * 1024 * 1024
+ALLOWED_READY_MIME_TYPES = {"image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"}
 
 
 def _utcnow() -> datetime:
@@ -93,6 +99,11 @@ def _serialize_hold(hold: AppointmentHold) -> HoldRead:
             "customer_name": hold.customer_name,
             "customer_phone": hold.customer_phone,
             "customer_email": hold.customer_email,
+            "address_line1": hold.address_line1,
+            "address_line2": hold.address_line2,
+            "city": hold.city,
+            "state": hold.state,
+            "postal_code": hold.postal_code,
             "start_time": _ensure_utc(hold.start_time),
             "end_time": _ensure_utc(hold.end_time),
             "ttl_expires_at": _ensure_utc(hold.ttl_expires_at),
@@ -130,11 +141,63 @@ def _serialize_appointment(appointment: Appointment) -> AppointmentRead:
             "payment_amount_expected": appointment.payment_amount_expected,
             "payment_amount_received": appointment.payment_amount_received,
             "payment_currency": appointment.payment_currency,
+            "ready_photo_url": appointment.ready_photo_url,
+            "ready_photo_uploaded_at": _ensure_utc(appointment.ready_photo_uploaded_at)
+            if appointment.ready_photo_uploaded_at
+            else None,
+            "ready_photo_uploaded_by_user_id": appointment.ready_photo_uploaded_by_user_id,
             "created_at": _ensure_utc(appointment.created_at),
             "updated_at": _ensure_utc(appointment.updated_at),
         },
         from_attributes=True,
     )
+
+
+def _normalize_optional(value: str | None) -> str | None:
+    if value is None:
+        return None
+    cleaned = value.strip()
+    return cleaned or None
+
+
+def _resolve_customer_address(
+    *,
+    db: Session,
+    customer_email: str | None,
+    address_line1: str | None,
+    address_line2: str | None,
+    city: str | None,
+    state: str | None,
+    postal_code: str | None,
+) -> dict[str, str | None]:
+    resolved = {
+        "address_line1": _normalize_optional(address_line1),
+        "address_line2": _normalize_optional(address_line2),
+        "city": _normalize_optional(city),
+        "state": _normalize_optional(state),
+        "postal_code": _normalize_optional(postal_code),
+    }
+
+    required_present = all(
+        [resolved["address_line1"], resolved["city"], resolved["state"], resolved["postal_code"]]
+    )
+    if required_present:
+        return resolved
+
+    if not customer_email:
+        return resolved
+
+    user = db.query(User).filter(User.email == customer_email).one_or_none()
+    if user is None:
+        return resolved
+
+    return {
+        "address_line1": resolved["address_line1"] or user.address_line1,
+        "address_line2": resolved["address_line2"] or user.address_line2,
+        "city": resolved["city"] or user.city,
+        "state": resolved["state"] or user.state,
+        "postal_code": resolved["postal_code"] or user.postal_code,
+    }
 
 
 @router.get("/mine", response_model=list[AppointmentListItem])
@@ -160,6 +223,13 @@ def list_my_appointments(
                     "id": appt.id,
                     "company_id": appt.company_id,
                     "service_name": service_name,
+                    "customer_name": appt.customer_name,
+                    "customer_phone": appt.customer_phone,
+                    "address_line1": appt.address_line1,
+                    "address_line2": appt.address_line2,
+                    "city": appt.city,
+                    "state": appt.state,
+                    "postal_code": appt.postal_code,
                     "start_time": _ensure_utc(appt.start_time),
                     "status": appt.status,
                 }
@@ -180,12 +250,25 @@ def _ensure_customer_access(appointment: Appointment, current_customer) -> None:
 def _provider_display_name(user: User | None) -> str | None:
     if not user or not user.full_name:
         return None
-    parts = [p for p in user.full_name.split(" ") if p]
-    if not parts:
-        return None
-    if len(parts) == 1:
-        return parts[0]
-    return "".join(p[0].upper() for p in parts[:2])
+    display_name = user.full_name.strip()
+    return display_name or None
+
+
+def _ensure_appointment_read_access(appointment: Appointment, current_user, company_id: UUID | None) -> None:
+    if current_user.role == "customer":
+        _ensure_customer_access(appointment, current_user)
+        return
+
+    if current_user.role in {"company", "provider", "company_admin"}:
+        if company_id is None or appointment.company_id != company_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+        return
+
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
+
+def _ready_upload_dir() -> Path:
+    return Path(__file__).resolve().parent.parent / "static" / "uploads" / "appointments"
 
 
 @router.post("/holds", response_model=HoldRead, status_code=status.HTTP_201_CREATED)
@@ -220,11 +303,26 @@ def create_hold(payload: HoldCreate, db: Session = Depends(get_db)) -> HoldRead:
     if conflict:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Time slot already booked")
 
+    resolved_address = _resolve_customer_address(
+        db=db,
+        customer_email=payload.customer_email,
+        address_line1=payload.address_line1,
+        address_line2=payload.address_line2,
+        city=payload.city,
+        state=payload.state,
+        postal_code=payload.postal_code,
+    )
+
     hold = AppointmentHold(
         service_id=service.id,
         customer_name=payload.customer_name,
         customer_phone=payload.customer_phone,
         customer_email=payload.customer_email,
+        address_line1=resolved_address["address_line1"],
+        address_line2=resolved_address["address_line2"],
+        city=resolved_address["city"],
+        state=resolved_address["state"],
+        postal_code=resolved_address["postal_code"],
         start_time=start_time,
         end_time=end_time,
         ttl_expires_at=_utcnow() + _HOLD_TTL,
@@ -244,10 +342,21 @@ def get_payment_gateway() -> PaymentGateway:
 
 
 @router.get("/{appointment_id}", response_model=AppointmentRead)
-def read_appointment(appointment_id: UUID, db: Session = Depends(get_db)) -> AppointmentRead:
+def read_appointment(
+    appointment_id: UUID,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AppointmentRead:
     appointment = db.get(Appointment, appointment_id)
     if appointment is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
+
+    company_id: UUID | None = None
+    if current_user.role in {"company", "provider", "company_admin"}:
+        company_user = db.query(CompanyUser).filter(CompanyUser.user_id == current_user.id).first()
+        company_id = company_user.company_id if company_user else None
+
+    _ensure_appointment_read_access(appointment, current_user, company_id)
     return _serialize_appointment(appointment)
 
 
@@ -263,14 +372,14 @@ def read_appointment_events(appointment_id: UUID, db: Session = Depends(get_db))
 
 
 @router.get(
-    "/{appointment_id}/location/latest",
-    response_model=LocationUpdateRead,
+    "/{appointment_id}/provider-location",
+    response_model=AppointmentProviderLocationResponse,
 )
-def read_latest_location(
+def read_provider_location(
     appointment_id: UUID,
     current_customer=Depends(get_current_customer),
     db: Session = Depends(get_db),
-) -> LocationUpdateRead:
+) -> AppointmentProviderLocationResponse:
     appointment = db.get(Appointment, appointment_id)
     if appointment is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
@@ -284,8 +393,11 @@ def read_latest_location(
         .first()
     )
     if update is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Location not available")
-    return LocationUpdateRead.model_validate(update, from_attributes=True)
+        return AppointmentProviderLocationResponse(location=None)
+
+    return AppointmentProviderLocationResponse(
+        location=AppointmentProviderLocationRead.model_validate(update, from_attributes=True)
+    )
 
 
 @router.get(
@@ -340,6 +452,7 @@ def read_assignment_company(
 def read_assignment(
     appointment_id: UUID,
     current_user=Depends(get_current_user),
+    token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ) -> AppointmentAssignmentRead:    
     appointment = db.get(Appointment, appointment_id)
@@ -349,7 +462,8 @@ def read_assignment(
     if current_user.role == "customer":
         _ensure_customer_access(appointment, current_user)
     else:
-        _ensure_company_access(appointment, current_user, db)   
+        _, company_id = get_current_company_user(db=db, token=token, current_user=current_user)
+        _ensure_company_access(appointment, company_id)
 
     assignment = (
         db.query(AppointmentAssignment)
@@ -438,9 +552,24 @@ def confirm_hold(
     if conflict:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Time slot already booked")
 
+    resolved_address = _resolve_customer_address(
+        db=db,
+        customer_email=payload.customer_email or hold.customer_email,
+        address_line1=payload.address_line1 or hold.address_line1,
+        address_line2=payload.address_line2 or hold.address_line2,
+        city=payload.city or hold.city,
+        state=payload.state or hold.state,
+        postal_code=payload.postal_code or hold.postal_code,
+    )
+
     hold.customer_name = payload.customer_name
     hold.customer_phone = payload.customer_phone
     hold.customer_email = payload.customer_email
+    hold.address_line1 = resolved_address["address_line1"]
+    hold.address_line2 = resolved_address["address_line2"]
+    hold.city = resolved_address["city"]
+    hold.state = resolved_address["state"]
+    hold.postal_code = resolved_address["postal_code"]
     hold.start_time = hold_start
     hold.end_time = hold_end
     hold.ttl_expires_at = expires_at
@@ -472,11 +601,11 @@ def confirm_hold(
         customer_name=payload.customer_name,
         customer_phone=payload.customer_phone,
         customer_email=payload.customer_email,
-        address_line1=payload.address_line1,
-        address_line2=payload.address_line2,
-        city=payload.city,
-        state=payload.state,
-        postal_code=payload.postal_code,
+        address_line1=resolved_address["address_line1"],
+        address_line2=resolved_address["address_line2"],
+        city=resolved_address["city"],
+        state=resolved_address["state"],
+        postal_code=resolved_address["postal_code"],
         start_time=hold_start,
         end_time=hold_end,
         status=AppointmentStatus.requested,
@@ -511,6 +640,11 @@ def confirm_hold(
     hold.customer_name = payload.customer_name
     hold.customer_phone = payload.customer_phone
     hold.customer_email = payload.customer_email
+    hold.address_line1 = payload.address_line1 or hold.address_line1
+    hold.address_line2 = payload.address_line2 or hold.address_line2
+    hold.city = payload.city or hold.city
+    hold.state = payload.state or hold.state
+    hold.postal_code = payload.postal_code or hold.postal_code
 
     appointment.payment_id = checkout.payment_id
 

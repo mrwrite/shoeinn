@@ -12,6 +12,8 @@ from app.utils.notifications import enqueue_notification_intent
 
 APPOINTMENT_CONFIRMED = "APPOINTMENT_CONFIRMED"
 APPOINTMENT_STATUS_CHANGED = "APPOINTMENT_STATUS_CHANGED"
+APPOINTMENT_PROVIDER_ASSIGNED = "APPOINTMENT_PROVIDER_ASSIGNED"
+APPOINTMENT_PROVIDER_REASSIGNED = "APPOINTMENT_PROVIDER_REASSIGNED"
 NEW_APPOINTMENT = "NEW_APPOINTMENT"
 PAYMENT_SUCCEEDED = "PAYMENT_SUCCEEDED"
 PAYMENT_FAILED = "PAYMENT_FAILED"
@@ -23,6 +25,8 @@ def _default_payload(appointment: Appointment) -> dict:
         "appointment_id": str(appointment.id),
         "company_id": str(appointment.company_id) if appointment.company_id else None,
         "service_id": str(appointment.service_id) if appointment.service_id else None,
+        "destination_screen": "AppointmentDetail",
+        "destination_appointment_id": str(appointment.id),
         "customer_name": appointment.customer_name,
         "customer_email": appointment.customer_email,
         "customer_phone": appointment.customer_phone,
@@ -50,9 +54,17 @@ def enqueue_customer_notification(
     channel: str = "email",
     payload: dict | None = None,
 ):
-    target = appointment.customer_email or appointment.customer_phone
-    if not target:
-        return None
+    customer_user_id = _customer_user_id(db, appointment)
+    customer_target = str(customer_user_id) if customer_user_id is not None else None
+
+    if channel in {"in_app", "push"}:
+        if customer_target is None:
+            return None
+        target = customer_target
+    else:
+        target = appointment.customer_email or appointment.customer_phone
+        if not target:
+            return None
 
     payload_data = _default_payload(appointment)
     if payload:
@@ -70,8 +82,20 @@ def enqueue_customer_notification(
     if channel == "in_app" and notification.outbox_entry:
         _mark_in_app_delivered(notification, notification.outbox_entry)
 
-    customer_user_id = _customer_user_id(db, appointment)
-    if customer_user_id and _has_push_tokens(db, customer_user_id):
+    if channel not in {"in_app", "push"} and customer_target is not None:
+        in_app_notification = enqueue_notification_intent(
+            db,
+            company_id=appointment.company_id,
+            appointment_id=appointment.id,
+            kind=kind,
+            channel="in_app",
+            target=customer_target,
+            payload=payload_data,
+        )
+        if in_app_notification.outbox_entry:
+            _mark_in_app_delivered(in_app_notification, in_app_notification.outbox_entry)
+
+    if channel != "push" and customer_user_id and _should_enqueue_customer_push(db, customer_user_id, kind, payload_data):
         enqueue_notification_intent(
             db,
             company_id=appointment.company_id,
@@ -82,6 +106,47 @@ def enqueue_customer_notification(
             payload=payload_data,
         )
     return notification
+
+
+def _read_bool_flag(value: str | bool | None, default: bool = True) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return default
+    return str(value).strip().lower() not in {"false", "0", "off", "no"}
+
+
+def _is_customer_push_milestone(kind: str, payload: dict) -> bool:
+    if kind == APPOINTMENT_CONFIRMED:
+        return True
+    if kind != APPOINTMENT_STATUS_CHANGED:
+        return False
+    new_status = str(payload.get("new_status") or "").strip().lower()
+    return new_status in {"ready", "out_for_delivery", "delivered"}
+
+
+def _is_customer_push_assignment(kind: str) -> bool:
+    return kind in {APPOINTMENT_PROVIDER_ASSIGNED, APPOINTMENT_PROVIDER_REASSIGNED}
+
+
+def _should_enqueue_customer_push(db: Session, user_id, kind: str, payload: dict) -> bool:
+    if not _has_push_tokens(db, user_id):
+        return False
+
+    user = db.get(User, user_id)
+    if user is None:
+        return False
+
+    if not _read_bool_flag(getattr(user, "customer_push_enabled", True)):
+        return False
+
+    if _is_customer_push_assignment(kind):
+        return _read_bool_flag(getattr(user, "customer_push_assignment_updates", True))
+
+    if _is_customer_push_milestone(kind, payload):
+        return _read_bool_flag(getattr(user, "customer_push_milestone_updates", True))
+
+    return False
 
 
 def _company_users(db: Session, company_id) -> Iterable[CompanyUser]:
@@ -106,6 +171,10 @@ def _customer_user_id(db: Session, appointment: Appointment):
         .first()
     )
     return user.id if user else None
+
+
+def resolve_customer_user_id(db: Session, appointment: Appointment):
+    return _customer_user_id(db, appointment)
 
 
 def enqueue_company_user_notifications(
@@ -150,6 +219,8 @@ def enqueue_company_user_notifications(
 
 __all__ = [
     "APPOINTMENT_CONFIRMED",
+    "APPOINTMENT_PROVIDER_ASSIGNED",
+    "APPOINTMENT_PROVIDER_REASSIGNED",
     "APPOINTMENT_STATUS_CHANGED",
     "NEW_APPOINTMENT",
     "PAYMENT_FAILED",
@@ -157,4 +228,5 @@ __all__ = [
     "WELCOME",
     "enqueue_customer_notification",
     "enqueue_company_user_notifications",
+    "resolve_customer_user_id",
 ]

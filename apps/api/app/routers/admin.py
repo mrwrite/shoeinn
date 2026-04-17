@@ -152,7 +152,6 @@ def _seed_demo_data(db: Session) -> dict[str, object]:
 
     assignment = AppointmentAssignment(
         appointment_id=appt_one.id,
-        company_id=company_one.id,
         user_id=provider_one.id,
     )
     db.add(assignment)
@@ -161,6 +160,7 @@ def _seed_demo_data(db: Session) -> dict[str, object]:
     db.add(
         AppointmentLocationUpdate(
             appointment_id=appt_one.id,
+            company_id=company_one.id,
             user_id=provider_one.id,
             lat=37.7749,
             lng=-122.4194,

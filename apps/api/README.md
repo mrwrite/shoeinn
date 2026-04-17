@@ -1,13 +1,15 @@
 # ShoeInn API
 
-## Quickstart
+## Quickstart (Windows PowerShell)
 ```
-cp .env.example .env
-make up
-python -m venv .venv && source .venv/bin/activate
+Copy-Item .env.example .env
+docker compose up -d
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r ..\..\requirements.txt
 pip install -e .
 alembic upgrade head
-make dev
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 > **Postgres credentials**
@@ -18,16 +20,21 @@ make dev
 > while docker-compose still provisions `postgres` / `postgres`) will result in `password authentication failed for user` errors
 > when running Alembic migrations.
 
+For Windows host + Docker Postgres, use `localhost` in `DATABASE_URL`. The checked-in `.env.example` uses `db`, which only works from inside the Docker network.
+
 If you've previously started the database with a different password, Postgres will keep that credential inside the persisted
 volume. You can reset the local database (and remove all data) with:
 
 ```
-make reset-db
-make up
+docker compose down -v
+docker compose up -d
 ```
+
+The `Makefile` in this folder is useful as a reference, but do not assume `make` exists on Windows PowerShell.
+
 Seed demo data:
 ```
-curl -X POST http://localhost:8000/dev/seed
+Invoke-RestMethod -Method Post http://localhost:8000/dev/seed
 ```
 
 ### Availability projection
@@ -90,3 +97,24 @@ Claim appointment (company user):
 ```
 curl -X POST http://localhost:8000/company/appointments/APP_ID/claim -H 'Authorization: Bearer TOKEN'
 ```
+
+## Tests
+
+Focused provider appointment claiming and assignment tests:
+
+```powershell
+.\venv\Scripts\python.exe -m pytest tests\test_assignment_claiming.py -q
+```
+
+These tests use in-memory SQLite through `tests/conftest.py`, so no external Postgres, migrations, or seed data are required.
+
+## Workers
+
+- `app.main` starts the payment sync worker only when `PAYMENT_SERVICE_BASE_URL` is configured.
+- The notification worker is manual:
+
+```powershell
+python -m app.workers.notification_worker
+```
+
+- The current docs in `docs/cqrs.md` mention hold cleanup starting automatically, but `app.main` does not currently start that worker.

@@ -80,6 +80,11 @@ export function TravelMapCard({ appointment, onOpenFullScreenMap }: Props) {
   const [loadingDirections, setLoadingDirections] = useState(false);
 
   const isTravelStatus = TRAVEL_STATUSES.has(appointment.status);
+  const hasDestinationAddress =
+    Boolean(appointment.address_line1?.trim()) &&
+    Boolean(appointment.city?.trim()) &&
+    Boolean(appointment.state?.trim()) &&
+    Boolean(appointment.postal_code?.trim());
   const address = useMemo(() => buildAddress(appointment), [appointment]);
   const statusLabel =
     appointment.status === "en_route_pickup" ? "En route to pickup" : "Out for delivery";
@@ -117,8 +122,14 @@ export function TravelMapCard({ appointment, onOpenFullScreenMap }: Props) {
 
   useEffect(() => {
     if (!isTravelStatus) return;
+    if (!hasDestinationAddress) {
+      setDestination(null);
+      setGeocodeError(null);
+      return;
+    }
     if (!address) {
-      setGeocodeError("Destination address unavailable.");
+      setDestination(null);
+      setGeocodeError(null);
       return;
     }
 
@@ -152,7 +163,7 @@ export function TravelMapCard({ appointment, onOpenFullScreenMap }: Props) {
     return () => {
       isActive = false;
     };
-  }, [address, appointment.id, isTravelStatus]);
+  }, [address, appointment.id, hasDestinationAddress, isTravelStatus]);
 
   useEffect(() => {
     if (!providerLocation || !destination) {
@@ -306,7 +317,7 @@ export function TravelMapCard({ appointment, onOpenFullScreenMap }: Props) {
     return null;
   }
 
-  const showMap = permissionStatus === "granted" && destination;
+  const showMap = permissionStatus === "granted" && destination && hasDestinationAddress;
 
   return (
     <Card style={styles.card}>
@@ -318,7 +329,7 @@ export function TravelMapCard({ appointment, onOpenFullScreenMap }: Props) {
           </Text>
         </View>
         {onOpenFullScreenMap ? (
-          <Button label="Open" variant="ghost" onPress={onOpenFullScreenMap} />
+          <Button label="Appointment details" variant="ghost" onPress={onOpenFullScreenMap} />
         ) : null}
       </View>
 
@@ -335,7 +346,14 @@ export function TravelMapCard({ appointment, onOpenFullScreenMap }: Props) {
         ) : null}
       </View>
 
-      {locationError ? (
+      {!hasDestinationAddress ? (
+        <View style={styles.messageBox}>
+          <Text color={theme.colors.mutedText}>Customer address missing. Ask customer to update address.</Text>
+          {onOpenFullScreenMap ? (
+            <Button label="Open appointment details" variant="secondary" onPress={onOpenFullScreenMap} style={{ marginTop: 12 }} />
+          ) : null}
+        </View>
+      ) : locationError ? (
         <View style={styles.messageBox}>
           <Text color={theme.colors.mutedText}>{locationError}</Text>
           <Button label="Open in Maps" variant="secondary" onPress={openInMaps} style={{ marginTop: 12 }} />

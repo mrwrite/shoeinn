@@ -1,17 +1,18 @@
 import React from "react";
-import { Text as RNText, TextProps, StyleSheet } from "react-native";
+import { Text as RNText, TextProps, StyleSheet, type TextStyle } from "react-native";
 
 import { useTheme } from "../../theme/theme";
 
 type Variant = "title" | "subtitle" | "body" | "caption" | "overline";
+type Weight = "regular" | "medium" | "semibold" | "bold";
 
 type Props = TextProps & {
   variant?: Variant;
-  weight?: "regular" | "medium" | "semibold" | "bold";
+  weight?: Weight;
   color?: string;
 };
 
-const fontWeightMap: Record<Props["weight"], string> = {
+const fontWeightMap: Record<Weight, TextStyle["fontWeight"]> = {
   regular: "400",
   medium: "500",
   semibold: "600",

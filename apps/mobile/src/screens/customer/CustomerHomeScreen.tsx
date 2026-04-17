@@ -9,11 +9,11 @@ import { ScreenContainer } from "../../components/ScreenContainer";
 import { SearchBar } from "../../components/SearchBar";
 import { ServiceCard } from "../../components/ServiceCard";
 import { categories, services } from "../../data/mock";
-import type { CustomerStackParamList } from "../../navigation/RootTabs";
+import type { HomeStackParamList } from "../../navigation/types";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 export default function CustomerHomeScreen() {
-  const navigation = useNavigation<NativeStackNavigationProp<CustomerStackParamList>>();
+  const navigation = useNavigation<NativeStackNavigationProp<HomeStackParamList>>();
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
@@ -31,7 +31,7 @@ export default function CustomerHomeScreen() {
         <Text style={styles.ctaLabel}>Next available today</Text>
         <Text style={styles.ctaSubtitle}>Sneaker techs near you</Text>
       </View>
-      <PrimaryButton label="View Appointments" onPress={() => navigation.navigate("CustomerHome")} style={styles.ctaButton} />
+      <PrimaryButton label="View Appointments" onPress={() => navigation.navigate("Home")} style={styles.ctaButton} />
     </View>
   );
 
@@ -59,9 +59,9 @@ export default function CustomerHomeScreen() {
         scrollEnabled={false}
         renderItem={({ item }) => (
           <ServiceCard
-            service={item}
-            onPress={(svc) => navigation.navigate("ServiceDetail", { service: svc })}
-            onBook={(svc) => navigation.navigate("BookingDate", { service: svc })}
+            service={item as any}
+            onPress={(svc) => navigation.navigate("ServiceDetail", { service: svc as any })}
+            onBook={(svc) => navigation.navigate("BookingDate", { service: svc as any })}
           />
         )}
       />
