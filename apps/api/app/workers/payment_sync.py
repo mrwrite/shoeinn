@@ -4,25 +4,15 @@ from __future__ import annotations
 
 import logging
 import threading
-from datetime import datetime, timezone
 
-from app.enums import AppointmentStatus
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.db import SessionLocal
-from app.models import Appointment, AppointmentHold, HoldStatus, PaymentStatus
-from app.services.notifications import (
-    APPOINTMENT_CONFIRMED,
-    APPOINTMENT_STATUS_CHANGED,
-    NEW_APPOINTMENT,
-    PAYMENT_FAILED,
-    PAYMENT_SUCCEEDED,
-    enqueue_company_user_notifications,
-    enqueue_customer_notification,
-)
+from app.models import Appointment, PaymentStatus
 from app.services.payment_gateway import PaymentGateway, PaymentGatewayError
+from app.services.payment_reconciliation import reconcile_payment_record
 
 logger = logging.getLogger(__name__)
 
@@ -32,16 +22,6 @@ _TERMINAL_PAYMENT_STATUSES = {
     PaymentStatus.refunded,
     PaymentStatus.disputed,
 }
-
-
-def _ensure_timezone(dt: datetime | None) -> datetime | None:
-    if dt is None:
-        return None
-    if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
-
-
 class PaymentSyncWorker:
     """Background worker that polls the payment service for updates."""
 
@@ -54,8 +34,11 @@ class PaymentSyncWorker:
         if not settings.enable_payment_sync_worker:
             logger.info("Payment sync worker disabled via configuration")
             return
+        if self._gateway.mode != "service":
+            logger.info("Payment sync worker not started - payment mode is %s", self._gateway.mode)
+            return
         if not self._gateway.enabled:
-            logger.warning("Payment sync worker not started - payment service URL missing")
+            logger.warning("Payment sync worker not started - PAYMENT_MODE=service requires payment service URL")
             return
         if self._thread and self._thread.is_alive():
             return
@@ -90,7 +73,7 @@ class PaymentSyncWorker:
                     Appointment.payment_id.isnot(None),
                     or_(
                         Appointment.payment_status.is_(None),
-                        Appointment.payment_status.notin(_TERMINAL_PAYMENT_STATUSES),
+                        Appointment.payment_status.not_in(_TERMINAL_PAYMENT_STATUSES),
                     ),
                 )
                 .all()
@@ -118,50 +101,7 @@ class PaymentSyncWorker:
         logger.info(
             "Payment status change", extra={"appointment_id": booking_id, "status": new_status.value}
         )
-        appointment.payment_status = new_status
-        if payment_record.amount_expected is not None:
-            appointment.payment_amount_expected = payment_record.amount_expected
-        appointment.payment_amount_received = payment_record.amount_received
-        appointment.payment_currency = payment_record.currency or appointment.payment_currency
-
-        if new_status == PaymentStatus.succeeded:
-            previous_status = appointment.status
-            appointment.status = AppointmentStatus.confirmed
-            self._confirm_hold(session, appointment)
-            enqueue_customer_notification(session, appointment, PAYMENT_SUCCEEDED)
-            enqueue_customer_notification(
-                session,
-                appointment,
-                APPOINTMENT_STATUS_CHANGED,
-                payload={"old_status": previous_status.value, "new_status": appointment.status.value},
-            )
-            enqueue_customer_notification(session, appointment, APPOINTMENT_CONFIRMED)
-            enqueue_company_user_notifications(session, appointment.company_id, appointment, NEW_APPOINTMENT)
-        elif new_status == PaymentStatus.failed:
-            previous_status = appointment.status
-            appointment.status = AppointmentStatus.cancelled
-            self._release_hold(session, appointment)
-            enqueue_customer_notification(session, appointment, PAYMENT_FAILED)
-            enqueue_customer_notification(
-                session,
-                appointment,
-                APPOINTMENT_STATUS_CHANGED,
-                payload={"old_status": previous_status.value, "new_status": appointment.status.value},
-            )
-
-    def _confirm_hold(self, session: Session, appointment: Appointment) -> None:
-        hold = appointment.hold_id and session.get(AppointmentHold, appointment.hold_id)
-        if hold:
-            hold.status = HoldStatus.CONFIRMED
-            hold.ttl_expires_at = _ensure_timezone(hold.ttl_expires_at)
-        enqueue_customer_notification(session, appointment, APPOINTMENT_CONFIRMED)
-
-    def _release_hold(self, session: Session, appointment: Appointment) -> None:
-        hold = appointment.hold_id and session.get(AppointmentHold, appointment.hold_id)
-        if hold:
-            hold.status = HoldStatus.EXPIRED
-            hold.ttl_expires_at = datetime.now(timezone.utc)
-        enqueue_customer_notification(session, appointment, PAYMENT_FAILED)
+        reconcile_payment_record(session, appointment, payment_record)
 
 
 payment_sync_worker = PaymentSyncWorker()

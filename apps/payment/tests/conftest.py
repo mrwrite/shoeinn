@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import sys
 from collections.abc import Generator
@@ -22,10 +23,17 @@ BASE_DIR = Path(__file__).resolve().parents[1]
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
-from app.config import get_settings
 from app.database import Base, SessionLocal, get_engine, get_db
 from app.main import create_app
 from app.routers.payments import get_stripe_client
+
+
+class FakeStripeEvent(dict):
+    def __getattr__(self, name: str):
+        try:
+            return self[name]
+        except KeyError as exc:
+            raise AttributeError(name) from exc
 
 
 class FakeStripeClient:
@@ -47,14 +55,12 @@ class FakeStripeClient:
         return intent
 
     def verify_signature(self, payload: str, sig_header: str) -> stripe.Event:
-        settings = get_settings()
-        return stripe.Webhook.construct_event(payload, sig_header, settings.stripe_webhook_secret)
+        del sig_header
+        return FakeStripeEvent(json.loads(payload))
 
 
 @pytest.fixture(scope="session", autouse=True)
 def configure_settings() -> None:
-    get_settings.cache_clear()
-    get_settings()
     engine = get_engine()
     Base.metadata.create_all(bind=engine)
 

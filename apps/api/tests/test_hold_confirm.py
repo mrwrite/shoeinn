@@ -3,16 +3,23 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
+from app.core.security import create_access_token, hash_password
 from app.models import (
     Appointment,
     AppointmentHold,
+    CompanyUser,
     HoldStatus,
     Notification,
     NotificationOutbox,
+    User,
 )
+from app.routers.appointments import get_payment_gateway
+from app.services.payment_gateway import CheckoutSession, PaymentRecord
 
 
 def _pick_service(client: TestClient) -> tuple[UUID, UUID]:
@@ -22,7 +29,52 @@ def _pick_service(client: TestClient) -> tuple[UUID, UUID]:
     return UUID(data[0]["id"]), UUID(data[0]["company_id"])
 
 
-def test_hold_and_confirm_flow(client: TestClient, db_session: Session) -> None:
+def _auth_header(user: User) -> dict[str, str]:
+    token = create_access_token({"sub": str(user.id), "role": user.role})
+    return {"Authorization": f"Bearer {token}"}
+
+
+class FakeServiceGateway:
+    def __init__(self) -> None:
+        self.mode = "service"
+        self.enabled = True
+        self.payment_status = "pending"
+
+    def create_checkout_session(
+        self,
+        *,
+        booking_id: str,
+        amount_cents: int,
+        currency: str,
+        customer_email: str | None,
+    ) -> CheckoutSession:
+        return CheckoutSession(
+            payment_id=f"pay_{booking_id}",
+            checkout_session_id=f"cs_{booking_id}",
+            checkout_url=f"https://checkout.stripe.test/{booking_id}",
+            status="pending",
+        )
+
+    def fetch_payment(self, *, booking_id: str) -> PaymentRecord:
+        return PaymentRecord(
+            payment_id=f"pay_{booking_id}",
+            booking_id=booking_id,
+            status=self.payment_status,
+            amount_expected=1000,
+            amount_received=1000 if self.payment_status == "succeeded" else None,
+            currency="usd",
+        )
+
+
+def test_hold_and_confirm_flow(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "payment_mode", "mock")
+    monkeypatch.setattr(settings, "payment_checkout_success_url", "")
+    monkeypatch.setattr(settings, "payment_checkout_cancel_url", "")
+
     service_id, company_id = _pick_service(client)
     start_time = datetime.now(timezone.utc).replace(hour=9, minute=0, second=0, microsecond=0) + timedelta(days=1)
 
@@ -51,6 +103,11 @@ def test_hold_and_confirm_flow(client: TestClient, db_session: Session) -> None:
     assert confirm_res.status_code == 200, confirm_res.text
     appointment = confirm_res.json()
     assert appointment["service_id"] == str(service_id)
+    assert appointment["status"] == "confirmed"
+    assert appointment["payment_status"] == "succeeded"
+    assert appointment["payment_checkout_url"] is None
+    assert appointment["payment_mode"] == "mock"
+    assert "simulated" in appointment["payment_message"].lower()
 
     db_session.expire_all()
     holds = db_session.query(AppointmentHold).all()
@@ -93,3 +150,237 @@ def test_confirm_expired_hold_returns_gone(client: TestClient, db_session: Sessi
         },
     )
     assert response.status_code == 410
+
+
+def test_confirm_in_service_mode_requires_payment_service_url(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service_id, company_id = _pick_service(client)
+    start_time = datetime.now(timezone.utc).replace(hour=11, minute=0, second=0, microsecond=0) + timedelta(days=1)
+
+    monkeypatch.setattr(settings, "payment_mode", "service")
+    monkeypatch.setattr(settings, "payment_service_base_url", None)
+
+    hold_res = client.post(
+        "/appointments/holds",
+        json={
+            "service_id": str(service_id),
+            "start_time": start_time.isoformat(),
+        },
+    )
+    assert hold_res.status_code == 201, hold_res.text
+
+    confirm_res = client.post(
+        "/appointments/confirm",
+        json={
+            "hold_id": hold_res.json()["id"],
+            "company_id": str(company_id),
+            "customer_name": "Service Mode User",
+            "customer_phone": "1234567890",
+            "customer_email": "service@example.com",
+        },
+    )
+    assert confirm_res.status_code == 502
+    assert "PAYMENT_MODE=service requires PAYMENT_SERVICE_BASE_URL" in confirm_res.json()["detail"]
+
+
+def test_confirm_in_service_mode_requires_real_return_urls(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service_id, company_id = _pick_service(client)
+    start_time = datetime.now(timezone.utc).replace(hour=12, minute=0, second=0, microsecond=0) + timedelta(days=1)
+
+    monkeypatch.setattr(settings, "payment_mode", "service")
+    monkeypatch.setattr(settings, "payment_service_base_url", "http://payments.test")
+    monkeypatch.setattr(settings, "payment_checkout_success_url", "https://example.com/payment/success")
+    monkeypatch.setattr(settings, "payment_checkout_cancel_url", "https://example.com/payment/cancel")
+
+    hold_res = client.post(
+        "/appointments/holds",
+        json={
+            "service_id": str(service_id),
+            "start_time": start_time.isoformat(),
+        },
+    )
+    assert hold_res.status_code == 201, hold_res.text
+
+    confirm_res = client.post(
+        "/appointments/confirm",
+        json={
+            "hold_id": hold_res.json()["id"],
+            "company_id": str(company_id),
+            "customer_name": "Service Mode User",
+            "customer_phone": "1234567890",
+            "customer_email": "service@example.com",
+        },
+    )
+    assert confirm_res.status_code == 502
+    detail = confirm_res.json()["detail"]
+    assert "PAYMENT_MODE=service requires valid checkout return URLs" in detail
+    assert "PAYMENT_CHECKOUT_SUCCESS_URL" in detail
+    assert "PAYMENT_CHECKOUT_CANCEL_URL" in detail
+    assert "placeholder" in detail
+
+
+def test_service_mode_payment_refresh_and_unpaid_cancel_flow(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service_id, company_id = _pick_service(client)
+    start_time = datetime.now(timezone.utc).replace(hour=13, minute=0, second=0, microsecond=0) + timedelta(days=1)
+
+    customer = User(
+        email="service-customer@example.com",
+        full_name="Service Customer",
+        role="customer",
+        password_hash=hash_password("Password1!"),
+    )
+    db_session.add(customer)
+    db_session.commit()
+
+    gateway = FakeServiceGateway()
+    client.app.dependency_overrides[get_payment_gateway] = lambda: gateway
+    monkeypatch.setattr(settings, "payment_mode", "service")
+
+    hold_res = client.post(
+        "/appointments/holds",
+        json={
+            "service_id": str(service_id),
+            "start_time": start_time.isoformat(),
+            "customer_email": customer.email,
+        },
+    )
+    assert hold_res.status_code == 201, hold_res.text
+
+    confirm_res = client.post(
+        "/appointments/confirm",
+        json={
+            "hold_id": hold_res.json()["id"],
+            "company_id": str(company_id),
+            "customer_name": "Service Customer",
+            "customer_phone": "1234567890",
+            "customer_email": customer.email,
+        },
+    )
+    assert confirm_res.status_code == 200, confirm_res.text
+    appointment = confirm_res.json()
+    assert appointment["status"] == "pending_payment"
+    assert appointment["payment_status"] == "pending"
+    assert appointment["payment_mode"] == "service"
+    assert appointment["payment_checkout_url"].startswith("https://checkout.stripe.test/")
+
+    headers = _auth_header(customer)
+
+    gateway.payment_status = "succeeded"
+    refresh_res = client.post(f"/appointments/{appointment['id']}/payment/refresh", headers=headers)
+    assert refresh_res.status_code == 200, refresh_res.text
+    refreshed = refresh_res.json()
+    assert refreshed["status"] == "confirmed"
+    assert refreshed["payment_status"] == "succeeded"
+    assert refreshed["payment_checkout_url"] is None
+
+    paid_cancel = client.post(f"/appointments/{appointment['id']}/payment/cancel", headers=headers)
+    assert paid_cancel.status_code == 409
+
+    second_hold_res = client.post(
+        "/appointments/holds",
+        json={
+            "service_id": str(service_id),
+            "start_time": (start_time + timedelta(hours=1)).isoformat(),
+            "customer_email": customer.email,
+        },
+    )
+    assert second_hold_res.status_code == 201, second_hold_res.text
+
+    gateway.payment_status = "pending"
+    second_confirm = client.post(
+        "/appointments/confirm",
+        json={
+            "hold_id": second_hold_res.json()["id"],
+            "company_id": str(company_id),
+            "customer_name": "Service Customer",
+            "customer_phone": "1234567890",
+            "customer_email": customer.email,
+        },
+    )
+    assert second_confirm.status_code == 200, second_confirm.text
+
+    cancel_res = client.post(f"/appointments/{second_confirm.json()['id']}/payment/cancel", headers=headers)
+    assert cancel_res.status_code == 200, cancel_res.text
+    cancelled = cancel_res.json()
+    assert cancelled["status"] == "payment_failed"
+    assert cancelled["payment_status"] == "failed"
+    assert cancelled["payment_checkout_url"] is None
+
+    client.app.dependency_overrides.pop(get_payment_gateway, None)
+
+
+def test_payment_webhook_confirms_pending_payment_booking(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service_id, company_id = _pick_service(client)
+    start_time = datetime.now(timezone.utc).replace(hour=14, minute=0, second=0, microsecond=0) + timedelta(days=1)
+
+    customer = User(
+        email="webhook-customer@example.com",
+        full_name="Webhook Customer",
+        role="customer",
+        password_hash=hash_password("Password1!"),
+    )
+    db_session.add(customer)
+    db_session.commit()
+
+    gateway = FakeServiceGateway()
+    client.app.dependency_overrides[get_payment_gateway] = lambda: gateway
+    monkeypatch.setattr(settings, "payment_mode", "service")
+
+    hold_res = client.post(
+        "/appointments/holds",
+        json={
+            "service_id": str(service_id),
+            "start_time": start_time.isoformat(),
+            "customer_email": customer.email,
+        },
+    )
+    assert hold_res.status_code == 201, hold_res.text
+
+    confirm_res = client.post(
+        "/appointments/confirm",
+        json={
+            "hold_id": hold_res.json()["id"],
+            "company_id": str(company_id),
+            "customer_name": "Webhook Customer",
+            "customer_phone": "1234567890",
+            "customer_email": customer.email,
+        },
+    )
+    assert confirm_res.status_code == 200, confirm_res.text
+    appointment = confirm_res.json()
+    assert appointment["status"] == "pending_payment"
+
+    webhook_res = client.post(
+        "/webhooks/payments",
+        json={
+            "booking_id": appointment["id"],
+            "status": "succeeded",
+            "amount_expected": appointment["payment_amount_expected"],
+            "amount_received": appointment["payment_amount_expected"],
+            "currency": appointment["payment_currency"],
+        },
+    )
+    assert webhook_res.status_code == 200, webhook_res.text
+    payload = webhook_res.json()
+    assert payload["previous_status"] == "pending_payment"
+    assert payload["status"] == "confirmed"
+    assert payload["payment_status"] == "succeeded"
+
+    latest = client.get(f"/appointments/{appointment['id']}", headers=_auth_header(customer))
+    assert latest.status_code == 200, latest.text
+    assert latest.json()["status"] == "confirmed"
+
+    client.app.dependency_overrides.pop(get_payment_gateway, None)

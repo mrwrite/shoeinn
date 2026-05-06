@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+import httpx
 from sqlalchemy.orm import Session
 
 from ..config import get_settings
@@ -23,6 +25,7 @@ from ..services.payments import PaymentService
 from ..stripe_client import StripeClient
 
 router = APIRouter(prefix="/payments", tags=["payments"])
+logger = logging.getLogger(__name__)
 
 
 def get_payment_service(db: Session = Depends(get_db)) -> PaymentService:
@@ -31,6 +34,29 @@ def get_payment_service(db: Session = Depends(get_db)) -> PaymentService:
 
 def get_stripe_client() -> StripeClient:
     return StripeClient()
+
+
+def _notify_booking_service(payment: Payment) -> None:
+    settings = get_settings()
+    if not settings.booking_api_webhook_url:
+        return
+
+    headers: dict[str, str] = {}
+    if settings.booking_api_webhook_secret:
+        headers["X-Payment-Webhook-Secret"] = settings.booking_api_webhook_secret
+
+    payload = {
+        "booking_id": payment.booking_id,
+        "status": payment.status.value,
+        "amount_expected": payment.amount_expected,
+        "amount_received": payment.amount_received,
+        "currency": payment.currency,
+    }
+    try:
+        with httpx.Client(timeout=5.0) as client:
+            client.post(settings.booking_api_webhook_url, json=payload, headers=headers)
+    except httpx.HTTPError as exc:
+        logger.warning("Booking API payment webhook callback failed: %s", exc)
 
 
 @router.post("/checkout-session", response_model=CreateCheckoutSessionResponse, status_code=status.HTTP_201_CREATED)
@@ -154,6 +180,7 @@ async def handle_stripe_webhook(
                 amount_received=data_object.get("amount_total"),
                 stripe_event_id=event.id,
             )
+            _notify_booking_service(payment)
     elif event_type == "payment_intent.succeeded":
         payment = payment_service.find_payment_by_payment_intent(data_object["id"])
         if payment:
@@ -164,6 +191,7 @@ async def handle_stripe_webhook(
                 amount_received=data_object.get("amount_received"),
                 stripe_event_id=event.id,
             )
+            _notify_booking_service(payment)
     elif event_type == "payment_intent.payment_failed":
         payment = payment_service.find_payment_by_payment_intent(data_object["id"])
         if payment:
@@ -174,6 +202,7 @@ async def handle_stripe_webhook(
                 stripe_event_id=event.id,
                 payload={"failure_code": data_object.get("last_payment_error", {}).get("code")},
             )
+            _notify_booking_service(payment)
     elif event_type == "charge.refunded":
         payment = payment_service.find_payment_by_payment_intent(data_object.get("payment_intent"))
         if payment:
@@ -185,6 +214,7 @@ async def handle_stripe_webhook(
                 stripe_event_id=event.id,
             )
             payment_service.trigger_compensating_action(payment, reason="refund")
+            _notify_booking_service(payment)
     elif event_type == "charge.dispute.created":
         payment = payment_service.find_payment_by_payment_intent(data_object.get("payment_intent"))
         if payment:
@@ -196,6 +226,7 @@ async def handle_stripe_webhook(
                 payload={"dispute_id": data_object.get("id")},
             )
             payment_service.trigger_compensating_action(payment, reason="dispute")
+            _notify_booking_service(payment)
 
     payment_service.mark_event_processed(event.id)
     db.commit()

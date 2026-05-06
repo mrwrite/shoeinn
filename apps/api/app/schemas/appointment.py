@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -73,6 +72,35 @@ class AppointmentConfirm(BaseModel):
     postal_code: str | None = Field(default=None, max_length=20)
 
 
+class AppointmentQuoteRequest(BaseModel):
+    service_id: UUID
+    start_time: datetime
+    type: str = Field(default="pickup")
+    address_line1: str | None = Field(default=None, max_length=255)
+    address_line2: str | None = Field(default=None, max_length=255)
+    city: str | None = Field(default=None, max_length=100)
+    state: str | None = Field(default=None, max_length=100)
+    postal_code: str | None = Field(default=None, max_length=20)
+
+
+class QuoteLineItem(BaseModel):
+    code: str
+    label: str
+    amount: int
+    kind: str
+
+
+class AppointmentQuoteRead(BaseModel):
+    service_id: UUID
+    service_name: str
+    currency: str
+    line_items: list[QuoteLineItem]
+    subtotal: int
+    fees: int
+    estimated_tax: int
+    total: int
+
+
 class AppointmentRead(BaseModel):
     """Serialized appointment."""
 
@@ -96,6 +124,8 @@ class AppointmentRead(BaseModel):
     payment_id: str | None = None
     payment_status: PaymentStatus | None = None
     payment_checkout_url: str | None = None
+    payment_mode: str | None = None
+    payment_message: str | None = None
     payment_amount_expected: int | None = None
     payment_amount_received: int | None = None
     payment_currency: str | None = None

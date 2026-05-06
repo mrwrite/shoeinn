@@ -21,6 +21,8 @@ type Props = {
 const statusColors: Record<string, string> = {
   confirmed: "#1B998B",
   requested: "#0F4C5C",
+  pending_payment: "#b45309",
+  payment_failed: "#dc2626",
   cleaning: "#E6AF2E",
   ready: "#2EC4B6",
   out_for_delivery: "#2EC4B6",

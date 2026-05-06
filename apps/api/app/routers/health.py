@@ -53,12 +53,11 @@ def ready():
             detail=f"Not ready: {exc}",
         ) from exc
 
-    payment_mode = "service" if settings.payment_service_base_url else "stub"
     return {
         "status": "ready",
         "database": "ok",
         "migrations": "ok",
         "notification_outbox": "ok",
-        "payment_mode": payment_mode,
+        "payment_mode": settings.payment_mode,
         "live_events_mode": "single_instance",
     }

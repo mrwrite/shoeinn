@@ -9,6 +9,7 @@ import CustomerNotificationsScreen from "../screens/customer/CustomerNotificatio
 import AppointmentListScreen from "../screens/appointments/AppointmentListScreen";
 import BookingConfirmScreen from "../screens/home/BookingConfirmScreen";
 import BookingDateScreen from "../screens/home/BookingDateScreen";
+import BookingReviewPayScreen from "../screens/home/BookingReviewPayScreen";
 import BookingTimeScreen from "../screens/home/BookingTimeScreen";
 import HomeScreen from "../screens/home/HomeScreen";
 import ProviderMenuScreen from "../screens/home/ProviderMenuScreen";
@@ -48,6 +49,11 @@ function HomeNavigator() {
       <HomeStack.Screen name="BookingDate" component={BookingDateScreen} />
       <HomeStack.Screen name="BookingTime" component={BookingTimeScreen} />
       <HomeStack.Screen name="BookingConfirm" component={BookingConfirmScreen} />
+      <HomeStack.Screen
+        name="BookingReviewPay"
+        component={BookingReviewPayScreen}
+        options={{ title: "Review & Pay" }}
+      />
     </HomeStack.Navigator>
   );
 }

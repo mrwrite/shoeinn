@@ -73,7 +73,7 @@ def _post_webhook(client: TestClient, event: dict[str, object]) -> dict:
     settings = get_settings()
     timestamp = int(time.time())
     signed_payload = f"{timestamp}.{payload}"
-    signature = stripe.webhook.WebhookSignature._compute_signature(
+    signature = stripe.WebhookSignature._compute_signature(
         signed_payload, settings.stripe_webhook_secret
     )
     header = f"t={timestamp},v1={signature}"

@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { Alert, StyleSheet, Switch, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -15,11 +17,13 @@ import {
   useCustomerNotificationPreferences,
   updateMyNotificationPreferences,
 } from "../../hooks/useCustomerNotifications";
+import type { ProfileStackParamList } from "../../navigation/types";
 import { useAuthStore } from "../../state/authStore";
 import { useTheme } from "../../theme/theme";
 
 export default function ProfileScreen() {
   const theme = useTheme();
+  const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const tabBarHeight = useBottomTabBarHeight();
   const insets = useSafeAreaInsets();
   const { fullName, email, role, logout } = useAuthStore();
@@ -194,12 +198,21 @@ export default function ProfileScreen() {
       </Card>
       {role === "customer" ? (
         <Card>
-          <Text variant="subtitle" weight="semibold">
-            Notifications
-          </Text>
-          <Text color={theme.colors.mutedText} style={{ marginTop: 6 }}>
-            Keep push alerts useful by choosing which customer updates can reach your device.
-          </Text>
+          <View style={styles.notificationsHeader}>
+            <View style={{ flex: 1 }}>
+              <Text variant="subtitle" weight="semibold">
+                Notifications
+              </Text>
+              <Text color={theme.colors.mutedText} style={{ marginTop: 6 }}>
+                Keep push alerts useful by choosing which customer updates can reach your device.
+              </Text>
+            </View>
+            <Button
+              label="Open inbox"
+              variant="secondary"
+              onPress={() => navigation.navigate("CustomerNotifications")}
+            />
+          </View>
           <View style={{ marginTop: 14, gap: 14 }}>
             <PreferenceRow
               label="Push notifications"
@@ -292,6 +305,12 @@ const styles = StyleSheet.create({
   preferenceRow: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 12,
+  },
+  notificationsHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
     gap: 12,
   },
 });

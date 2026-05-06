@@ -30,6 +30,8 @@ export interface AppointmentHold {
 
 export type AppointmentStatus =
   | "requested"
+  | "pending_payment"
+  | "payment_failed"
   | "confirmed"
   | "en_route_pickup"
   | "picked_up"
@@ -61,6 +63,8 @@ export interface Appointment {
   payment_id?: string | null;
   payment_status?: "pending" | "requires_action" | "succeeded" | "failed" | "refunded" | "disputed" | null;
   payment_checkout_url?: string | null;
+  payment_mode?: "mock" | "service" | null;
+  payment_message?: string | null;
   payment_amount_expected?: number | null;
   payment_amount_received?: number | null;
   payment_currency?: string | null;
@@ -165,6 +169,47 @@ export interface ConfirmAppointmentPayload {
   customer_phone: string;
   customer_email?: string;
   idempotencyKey?: string;
+  type?: string;
+  address_line1?: string;
+  address_line2?: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+}
+
+export interface BookingCustomerDetails {
+  customer_name: string;
+  customer_phone: string;
+  customer_email?: string;
+  address_line1?: string;
+  address_line2?: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+  type?: string;
+}
+
+export interface AppointmentQuoteLineItem {
+  code: string;
+  label: string;
+  amount: number;
+  kind: string;
+}
+
+export interface AppointmentQuote {
+  service_id: string;
+  service_name: string;
+  currency: string;
+  line_items: AppointmentQuoteLineItem[];
+  subtotal: number;
+  fees: number;
+  estimated_tax: number;
+  total: number;
+}
+
+export interface AppointmentQuotePayload {
+  service_id: string;
+  start_time: string;
   type?: string;
   address_line1?: string;
   address_line2?: string;

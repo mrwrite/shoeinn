@@ -23,7 +23,7 @@ class PaymentStatus(str, enum.Enum):
     disputed = "disputed"
 
 class Appointment(Base):
-    """Represents a confirmed customer booking."""
+    """Represents a customer booking and its payment lifecycle."""
 
     __tablename__ = "appointments"
 

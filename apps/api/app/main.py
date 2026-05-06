@@ -21,6 +21,7 @@ from app.routers import (
     webhooks,
     push,
     users,
+    payment_return,
 )
 from app.workers.payment_sync import payment_sync_worker
 from pathlib import Path
@@ -61,6 +62,7 @@ app.include_router(slots.router)
 app.include_router(webhooks.router)
 app.include_router(push.router)
 app.include_router(users.router)
+app.include_router(payment_return.router)
 
 
 @app.on_event("startup")

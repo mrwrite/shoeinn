@@ -13,9 +13,10 @@ import {
   View,
 } from "react-native";
 
-import { confirmAppointment, getAppointment } from "../api/http";
+import { cancelAppointmentPayment, confirmAppointment, refreshAppointmentPayment } from "../api/http";
 import { useBooking } from "../state/bookingStore";
 import { useCompanyStore } from "../state/companyStore";
+import type { Appointment } from "../types/booking";
 
 interface Props {
   onConfirmed: () => void;
@@ -40,38 +41,8 @@ const CustomerInfoScreen: React.FC<Props> = ({ onConfirmed, onBack }) => {
   const [phone, setPhone] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
-  const [polling, setPolling] = React.useState(false);
-
-  const wait = React.useCallback(
-    (ms: number) => new Promise((resolve) => setTimeout(resolve, ms)),
-    []
-  );
-
-  const pollPaymentStatus = React.useCallback(
-    async (appointmentId: string) => {
-      setPolling(true);
-      try {
-        const maxAttempts = 20;
-        for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-          await wait(3000);
-          const latest = await getAppointment(appointmentId);
-          setAppointment(latest);
-          const status = latest.payment_status ?? "pending";
-          if (status === "succeeded") {
-            onConfirmed();
-            return;
-          }
-          if (status === "failed") {
-            throw new Error("Payment failed. Please try again.");
-          }
-        }
-        throw new Error("Timed out waiting for payment confirmation");
-      } finally {
-        setPolling(false);
-      }
-    },
-    [onConfirmed, setAppointment, wait]
-  );
+  const [servicePaymentAppointment, setServicePaymentAppointment] = React.useState<Appointment | null>(null);
+  const [servicePaymentBusy, setServicePaymentBusy] = React.useState(false);
 
   const handleSubmit = async () => {
     if (!hold || !name || !phone || !selectedCompany) {
@@ -90,21 +61,17 @@ const CustomerInfoScreen: React.FC<Props> = ({ onConfirmed, onBack }) => {
       console.log("[Booking] Appointment created", appointment.id);
       setAppointment(appointment);
 
+      const paymentMode = appointment.payment_mode ?? "mock";
       const paymentStatus = appointment.payment_status ?? "pending";
-      if (paymentStatus === "succeeded") {
+      if (paymentMode === "mock" || paymentStatus === "succeeded") {
         onConfirmed();
         return;
       }
 
-      if (appointment.payment_checkout_url) {
-        try {
-          await Linking.openURL(appointment.payment_checkout_url);
-        } catch (err) {
-          console.warn("[Booking] Unable to open checkout", err);
-        }
+      if (paymentMode === "service") {
+        setServicePaymentAppointment(appointment);
+        return;
       }
-
-      await pollPaymentStatus(appointment.id);
     } catch (error: any) {
       console.warn("[Booking] Confirmation failed", error);
       Alert.alert(
@@ -115,6 +82,65 @@ const CustomerInfoScreen: React.FC<Props> = ({ onConfirmed, onBack }) => {
       setSubmitting(false);
     }
   };
+
+  const openCheckout = React.useCallback(async () => {
+    if (!servicePaymentAppointment?.payment_checkout_url) {
+      Alert.alert("Checkout unavailable", "This booking does not have a checkout URL.");
+      return;
+    }
+    try {
+      await Linking.openURL(servicePaymentAppointment.payment_checkout_url);
+    } catch (error) {
+      console.warn("[Booking] Unable to open checkout", error);
+      Alert.alert("Unable to open checkout", "Please try again.");
+    }
+  }, [servicePaymentAppointment]);
+
+  const refreshPayment = React.useCallback(async () => {
+    if (!servicePaymentAppointment) {
+      return;
+    }
+    setServicePaymentBusy(true);
+    try {
+      const latest = await refreshAppointmentPayment(servicePaymentAppointment.id);
+      setAppointment(latest);
+      setServicePaymentAppointment(latest);
+
+      if (latest.payment_status === "succeeded") {
+        onConfirmed();
+        return;
+      }
+      if (latest.status === "cancelled" || latest.payment_status === "failed") {
+        Alert.alert("Payment incomplete", latest.payment_message ?? "This booking was not paid.");
+        return;
+      }
+      Alert.alert("Still waiting on payment", latest.payment_message ?? "Complete checkout, then check payment status again.");
+    } catch (error: any) {
+      console.warn("[Booking] Payment refresh failed", error);
+      Alert.alert("Unable to refresh payment", error?.message ?? "Please try again.");
+    } finally {
+      setServicePaymentBusy(false);
+    }
+  }, [onConfirmed, servicePaymentAppointment, setAppointment]);
+
+  const cancelServicePayment = React.useCallback(async () => {
+    if (!servicePaymentAppointment) {
+      return;
+    }
+    setServicePaymentBusy(true);
+    try {
+      const latest = await cancelAppointmentPayment(servicePaymentAppointment.id);
+      setAppointment(latest);
+      setServicePaymentAppointment(null);
+      Alert.alert("Booking canceled", "Your unpaid booking was canceled.");
+      onBack();
+    } catch (error: any) {
+      console.warn("[Booking] Payment cancellation failed", error);
+      Alert.alert("Unable to cancel booking", error?.message ?? "Please try again.");
+    } finally {
+      setServicePaymentBusy(false);
+    }
+  }, [onBack, servicePaymentAppointment, setAppointment]);
 
   if (!hold) {
     return (
@@ -127,7 +153,61 @@ const CustomerInfoScreen: React.FC<Props> = ({ onConfirmed, onBack }) => {
     );
   }
 
-  const disabled = submitting || polling || !name || !phone;
+  if (servicePaymentAppointment) {
+    return (
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <Text style={styles.heading}>Complete payment</Text>
+        <View style={styles.paymentCard}>
+          <Text style={styles.paymentTitle}>Secure checkout required</Text>
+          <Text style={styles.paymentBody}>
+            {servicePaymentAppointment.payment_message ?? "Open checkout to complete payment for this booking."}
+          </Text>
+          {selectedCompany ? (
+            <Text style={styles.paymentMeta}>Company: {selectedCompany.name}</Text>
+          ) : null}
+          <Text style={styles.paymentMeta}>
+            Status: {(servicePaymentAppointment.payment_status ?? "pending").replace("_", " ")}
+          </Text>
+        </View>
+        <TouchableOpacity
+          style={[styles.primaryButton, servicePaymentBusy && styles.disabledButton]}
+          onPress={openCheckout}
+          disabled={servicePaymentBusy}
+          accessibilityRole="button"
+        >
+          <Text style={styles.buttonText}>Open secure checkout</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.secondaryButton, servicePaymentBusy && styles.disabledButton]}
+          onPress={refreshPayment}
+          disabled={servicePaymentBusy}
+          accessibilityRole="button"
+        >
+          {servicePaymentBusy ? (
+            <ActivityIndicator color="#111827" />
+          ) : (
+            <Text style={styles.secondaryText}>Check payment status</Text>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.ghostButton, servicePaymentBusy && styles.disabledButton]}
+          onPress={cancelServicePayment}
+          disabled={servicePaymentBusy}
+          accessibilityRole="button"
+        >
+          <Text style={styles.ghostText}>Cancel unpaid booking</Text>
+        </TouchableOpacity>
+        <Text style={styles.helperText}>
+          After paying in Stripe Checkout, return to ShoeInn and check payment status.
+        </Text>
+      </KeyboardAvoidingView>
+    );
+  }
+
+  const disabled = submitting || !name || !phone;
 
   return (
     <KeyboardAvoidingView
@@ -171,12 +251,15 @@ const CustomerInfoScreen: React.FC<Props> = ({ onConfirmed, onBack }) => {
         disabled={disabled}
         accessibilityRole="button"
       >
-        {submitting || polling ? (
+        {submitting ? (
           <ActivityIndicator color="#f9fafb" />
         ) : (
           <Text style={styles.buttonText}>Confirm appointment</Text>
         )}
       </TouchableOpacity>
+      <Text style={styles.helperText}>
+        Demo and staging environments may simulate payment after confirmation.
+      </Text>
     </KeyboardAvoidingView>
   );
 };
@@ -220,6 +303,33 @@ const styles = StyleSheet.create({
   disabledButton: {
     opacity: 0.5,
   },
+  helperText: {
+    color: "#6b7280",
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  paymentCard: {
+    borderRadius: 14,
+    backgroundColor: "#f9fafb",
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    padding: 16,
+    gap: 8,
+  },
+  paymentTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#111827",
+  },
+  paymentBody: {
+    color: "#374151",
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  paymentMeta: {
+    color: "#6b7280",
+    fontSize: 13,
+  },
   center: {
     flex: 1,
     alignItems: "center",
@@ -235,6 +345,15 @@ const styles = StyleSheet.create({
   },
   secondaryText: {
     color: "#111827",
+    fontWeight: "600",
+  },
+  ghostButton: {
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  ghostText: {
+    color: "#b91c1c",
     fontWeight: "600",
   },
   lockedInput: {

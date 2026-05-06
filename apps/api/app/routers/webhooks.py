@@ -6,7 +6,12 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
+from app.enums import AppointmentStatus
+from app.models import Appointment
 from app.models.notification import Notification
+from app.models.appointment import PaymentStatus
+from app.services.payment_gateway import PaymentRecord
+from app.services.payment_reconciliation import reconcile_payment_record
 from app.utils.notification_dispatcher import compute_backoff_seconds
 from app.utils.notifications import record_notification_event
 
@@ -19,7 +24,44 @@ class ProviderCallback(BaseModel):
     error_message: str | None = None
 
 
+class PaymentCallback(BaseModel):
+    booking_id: UUID
+    status: PaymentStatus
+    amount_expected: int | None = None
+    amount_received: int | None = None
+    currency: str | None = None
+
+
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
+
+
+@router.post("/payments")
+def payment_status_callback(payload: PaymentCallback, db: Session = Depends(get_db)):
+    appointment = db.get(Appointment, payload.booking_id)
+    if not appointment:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+
+    previous_status = appointment.status
+    reconcile_payment_record(
+        db,
+        appointment,
+        PaymentRecord(
+            payment_id=appointment.payment_id or f"payment_{appointment.id}",
+            booking_id=str(appointment.id),
+            status=payload.status.value,
+            amount_expected=payload.amount_expected,
+            amount_received=payload.amount_received,
+            currency=payload.currency,
+        ),
+    )
+    db.add(appointment)
+    db.commit()
+    return {
+        "booking_id": str(appointment.id),
+        "previous_status": previous_status.value if isinstance(previous_status, AppointmentStatus) else str(previous_status),
+        "status": appointment.status.value,
+        "payment_status": appointment.payment_status.value if appointment.payment_status else None,
+    }
 
 
 @router.post("/{provider}")

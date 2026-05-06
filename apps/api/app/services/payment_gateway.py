@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from urllib.parse import urlparse
 
 import httpx
 
@@ -17,7 +18,7 @@ class PaymentGatewayError(RuntimeError):
 class CheckoutSession:
     payment_id: str
     checkout_session_id: str
-    checkout_url: str
+    checkout_url: str | None
     status: str
 
 
@@ -39,13 +40,70 @@ class PaymentGateway:
         self._timeout = timeout or settings.payment_service_timeout_seconds
 
     @property
+    def mode(self) -> str:
+        return settings.payment_mode
+
+    @property
     def enabled(self) -> bool:
-        return bool(self._base_url)
+        return self.mode == "service" and bool(self._base_url)
 
     def _client(self) -> httpx.Client:
-        if not self.enabled:
-            raise PaymentGatewayError("Payment service is not configured")
+        if self.mode != "service":
+            raise PaymentGatewayError("Payment service client is unavailable outside service mode")
+        if not self._base_url:
+            raise PaymentGatewayError("PAYMENT_MODE=service requires PAYMENT_SERVICE_BASE_URL")
         return httpx.Client(base_url=self._base_url, timeout=self._timeout)
+
+    @staticmethod
+    def _is_placeholder_checkout_url(value: str) -> bool:
+        lowered = value.strip().lower()
+        return any(
+            marker in lowered
+            for marker in (
+                "example.com",
+                "<your-lan-ip>",
+                "<your",
+                "changeme",
+                "replace-me",
+            )
+        )
+
+    @classmethod
+    def _is_valid_checkout_url(cls, value: str) -> bool:
+        parsed = urlparse(value.strip())
+        return bool(parsed.scheme in {"http", "https"} and parsed.netloc and not cls._is_placeholder_checkout_url(value))
+
+    def _validate_service_checkout_urls(self) -> None:
+        success_url = settings.payment_checkout_success_url.strip()
+        cancel_url = settings.payment_checkout_cancel_url.strip()
+        failures: list[str] = []
+
+        def _check(value: str, *, primary_env: str, alias_env: str) -> None:
+            env_names = f"{primary_env} (or {alias_env})"
+            if not value:
+                failures.append(f"{env_names} is missing")
+                return
+            if self._is_placeholder_checkout_url(value):
+                failures.append(f"{env_names} is still placeholder: {value}")
+                return
+            if not self._is_valid_checkout_url(value):
+                failures.append(f"{env_names} must be an absolute http(s) URL: {value}")
+
+        _check(
+            success_url,
+            primary_env="PAYMENT_CHECKOUT_SUCCESS_URL",
+            alias_env="PAYMENT_SUCCESS_URL",
+        )
+        _check(
+            cancel_url,
+            primary_env="PAYMENT_CHECKOUT_CANCEL_URL",
+            alias_env="PAYMENT_CANCEL_URL",
+        )
+
+        if failures:
+            raise PaymentGatewayError(
+                "PAYMENT_MODE=service requires valid checkout return URLs. " + "; ".join(failures)
+            )
 
     def create_checkout_session(
         self,
@@ -55,14 +113,19 @@ class PaymentGateway:
         currency: str,
         customer_email: str | None,
     ) -> CheckoutSession:
-        if not self.enabled:
+        if self.mode == "mock":
             return CheckoutSession(
                 payment_id=f"stub_{booking_id}",
                 checkout_session_id=f"stub_session_{booking_id}",
-                checkout_url="",
+                checkout_url=None,
                 status="succeeded",
             )
+        if self.mode != "service":
+            raise PaymentGatewayError(f"Unsupported payment mode: {self.mode}")
+        if not self._base_url:
+            raise PaymentGatewayError("PAYMENT_MODE=service requires PAYMENT_SERVICE_BASE_URL")
 
+        self._validate_service_checkout_urls()
         success_url = settings.payment_checkout_success_url
         cancel_url = settings.payment_checkout_cancel_url
         payload = {
@@ -90,6 +153,8 @@ class PaymentGateway:
         )
 
     def fetch_payment(self, *, booking_id: str) -> PaymentRecord:
+        if self.mode != "service":
+            raise PaymentGatewayError("Payment fetch is unavailable outside service mode")
         with self._client() as client:
             try:
                 response = client.get(f"/payments/{booking_id}")

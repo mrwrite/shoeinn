@@ -1,6 +1,7 @@
 import { ConfigContext, ExpoConfig } from "expo/config";
 
 const configuredApiUrl = process.env.EXPO_PUBLIC_API_URL;
+const showDemoLogins = process.env.SHOW_DEMO_LOGINS === "true";
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   name: "Shoeinn",
@@ -15,6 +16,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   extra: {
     ...config.extra,
     ...(configuredApiUrl ? { API_URL: configuredApiUrl } : {}),
+    SHOW_DEMO_LOGINS: showDemoLogins,
     eas: {
         "projectId": "1a753a1a-ae23-47e9-ba06-cc6148fb36ee"
       }

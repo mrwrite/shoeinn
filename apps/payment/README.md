@@ -6,8 +6,10 @@ You do not need this service for common backend/mobile flows such as provider ap
 
 Current behavior in the main API:
 
-- if `PAYMENT_SERVICE_BASE_URL` is unset, the backend uses stub payment behavior
-- the payment sync worker only starts when `PAYMENT_SERVICE_BASE_URL` is configured
+- local/demo API config should default to `PAYMENT_MODE=mock`
+- if `PAYMENT_MODE=service`, `PAYMENT_SERVICE_BASE_URL` must be configured
+- if `PAYMENT_MODE=service`, configure reachable non-placeholder return URLs with `PAYMENT_CHECKOUT_SUCCESS_URL` / `PAYMENT_CHECKOUT_CANCEL_URL` or the aliases `PAYMENT_SUCCESS_URL` / `PAYMENT_CANCEL_URL`
+- the payment sync worker only starts in `service` mode when `PAYMENT_SERVICE_BASE_URL` is configured
 
 ## Current documentation status
 
@@ -45,5 +47,12 @@ python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
 If you want the main API to talk to this service locally, set in `apps/api/.env`:
 
 ```env
+PAYMENT_MODE=service
 PAYMENT_SERVICE_BASE_URL=http://localhost:8001
+PAYMENT_CHECKOUT_SUCCESS_URL=http://<YOUR-LAN-IP>:8000/payment/return/success
+PAYMENT_CHECKOUT_CANCEL_URL=http://<YOUR-LAN-IP>:8000/payment/return/cancel
 ```
+
+If those return URLs are missing or still placeholder values, booking confirmation will fail in `service` mode by design.
+
+This is the smallest supported real demo path. The mobile app will open hosted Stripe Checkout, then the customer returns to ShoeInn to refresh payment status or cancel the unpaid booking. Refunds, disputes, and payouts remain deferred.

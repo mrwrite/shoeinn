@@ -9,10 +9,15 @@ import {
   View,
 } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { getMyAppointments } from "../../api/http";
+import {
+  getUnreadCustomerNotificationCount,
+  useCustomerNotifications,
+} from "../../hooks/useCustomerNotifications";
 import type { CustomerFlowStackParamList } from "../../navigation/types";
 import type { AppointmentSummary } from "../../types/booking";
 import { useAuthStore } from "../../state/authStore";
@@ -21,6 +26,8 @@ const formatDateTime = (value: string) => new Date(value).toLocaleString();
 
 const statusColors: Record<string, string> = {
   requested: "#e0f2fe",
+  pending_payment: "#ffedd5",
+  payment_failed: "#fee2e2",
   confirmed: "#dcfce7",
   en_route_pickup: "#dbeafe",
   picked_up: "#ede9fe",
@@ -34,6 +41,8 @@ const statusColors: Record<string, string> = {
 
 const statusTextColors: Record<string, string> = {
   requested: "#075985",
+  pending_payment: "#9a3412",
+  payment_failed: "#b91c1c",
   confirmed: "#166534",
   en_route_pickup: "#1d4ed8",
   picked_up: "#7c3aed",
@@ -49,6 +58,8 @@ type Props = NativeStackScreenProps<CustomerFlowStackParamList, "MyAppointments"
 
 export default function MyAppointmentsScreen({ navigation }: Props) {
   const logout = useAuthStore((s) => s.logout);
+  const notificationsQuery = useCustomerNotifications(true);
+  const unreadNotifications = getUnreadCustomerNotificationCount(notificationsQuery.data);
   const { data, isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: ["appointments", "mine"],
     queryFn: getMyAppointments,
@@ -83,6 +94,20 @@ export default function MyAppointmentsScreen({ navigation }: Props) {
           <Text style={styles.headerSubtitle}>Track and review your bookings</Text>
         </View>
         <View style={styles.headerActions}>
+          <Pressable
+            onPress={() => navigation.navigate("CustomerNotifications")}
+            style={styles.notificationButton}
+            accessibilityLabel="Notifications"
+          >
+            <Ionicons name="notifications-outline" size={18} color="#1d4ed8" />
+            {unreadNotifications > 0 ? (
+              <View style={styles.notificationBadge}>
+                <Text style={styles.notificationBadgeText}>
+                  {unreadNotifications > 9 ? "9+" : unreadNotifications}
+                </Text>
+              </View>
+            ) : null}
+          </Pressable>
           <Pressable onPress={() => navigation.navigate("CompanyPicker")} style={styles.linkButton}>
             <Text style={styles.linkText}>Book new</Text>
           </Pressable>
@@ -134,6 +159,32 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 22, fontWeight: "800" },
   headerSubtitle: { color: "#6b7280", marginTop: 2 },
   headerActions: { flexDirection: "row", gap: 12 },
+  notificationButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#eff6ff",
+    position: "relative",
+  },
+  notificationBadge: {
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    position: "absolute",
+    top: -2,
+    right: -2,
+    backgroundColor: "#dc2626",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  notificationBadgeText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "700",
+  },
   linkButton: { paddingHorizontal: 8, paddingVertical: 6 },
   linkText: { color: "#1d4ed8", fontWeight: "700" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },

@@ -5,6 +5,7 @@ import BookingScreen from "../screens/customer/BookingScreen";
 import CompanyPickerScreen from "../screens/customer/CompanyPickerScreen";
 import CompanyServicesScreen from "../screens/customer/CompanyServicesScreen";
 import AppointmentDetailScreen from "../screens/customer/AppointmentDetailScreen";
+import CustomerNotificationsScreen from "../screens/customer/CustomerNotificationsScreen";
 import MyAppointmentsScreen from "../screens/customer/MyAppointmentsScreen";
 import { BookingProvider } from "../state/bookingStore";
 import type { CustomerFlowStackParamList } from "./types";
@@ -19,6 +20,11 @@ export default function CustomerStack() {
       <Stack.Navigator initialRouteName="MyAppointments">
         <Stack.Screen name="MyAppointments" component={MyAppointmentsScreen} options={{ headerShown: false }} />
         <Stack.Screen name="AppointmentDetail" component={AppointmentDetailScreen} options={{ title: "Appointment" }} />
+        <Stack.Screen
+          name="CustomerNotifications"
+          component={CustomerNotificationsScreen}
+          options={{ title: "Notifications" }}
+        />
         <Stack.Screen name="CompanyPicker" component={CompanyPickerScreen} options={{ headerShown: true }} />
         <Stack.Screen name="CompanyServices" component={CompanyServicesScreen} options={{ headerShown: true }} />
         <Stack.Screen name="Booking" component={BookingScreen} options={{ headerShown: false }} />
