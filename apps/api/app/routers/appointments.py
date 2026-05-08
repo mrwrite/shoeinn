@@ -730,6 +730,7 @@ def confirm_hold(
             amount_cents=amount_cents,
             currency=currency,
             customer_email=payload.customer_email,
+            customer_name=payload.customer_name,
         )
     except PaymentGatewayError as exc:
         db.rollback()

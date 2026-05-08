@@ -48,6 +48,7 @@ def _default_payment_mode(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "payment_service_base_url", None)
     monkeypatch.setattr(settings, "payment_checkout_success_url", "")
     monkeypatch.setattr(settings, "payment_checkout_cancel_url", "")
+    monkeypatch.setattr(settings, "payment_mobile_redirect_base", "")
 
 
 @pytest.fixture()

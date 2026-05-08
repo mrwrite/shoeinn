@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from urllib.parse import urlparse
+import logging
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 import httpx
 
@@ -12,6 +13,9 @@ from app.core.config import settings
 
 class PaymentGatewayError(RuntimeError):
     """Raised when the payment service interaction fails."""
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -74,36 +78,53 @@ class PaymentGateway:
         return bool(parsed.scheme in {"http", "https"} and parsed.netloc and not cls._is_placeholder_checkout_url(value))
 
     def _validate_service_checkout_urls(self) -> None:
-        success_url = settings.payment_checkout_success_url.strip()
-        cancel_url = settings.payment_checkout_cancel_url.strip()
+        redirect_base = settings.payment_mobile_redirect_base.strip()
         failures: list[str] = []
 
-        def _check(value: str, *, primary_env: str, alias_env: str) -> None:
-            env_names = f"{primary_env} (or {alias_env})"
+        def _check(value: str, *, env_names: str) -> None:
             if not value:
                 failures.append(f"{env_names} is missing")
                 return
             if self._is_placeholder_checkout_url(value):
                 failures.append(f"{env_names} is still placeholder: {value}")
                 return
-            if not self._is_valid_checkout_url(value):
-                failures.append(f"{env_names} must be an absolute http(s) URL: {value}")
+            parsed = urlparse(value.strip())
+            if not parsed.scheme:
+                failures.append(f"{env_names} must include a URL scheme: {value}")
+                return
+            if not (parsed.netloc or parsed.path):
+                failures.append(f"{env_names} must be an absolute redirect base: {value}")
+                return
 
         _check(
-            success_url,
-            primary_env="PAYMENT_CHECKOUT_SUCCESS_URL",
-            alias_env="PAYMENT_SUCCESS_URL",
-        )
-        _check(
-            cancel_url,
-            primary_env="PAYMENT_CHECKOUT_CANCEL_URL",
-            alias_env="PAYMENT_CANCEL_URL",
+            redirect_base,
+            env_names="PAYMENT_MOBILE_REDIRECT_BASE (or PAYMENT_SUCCESS_URL_BASE / PAYMENT_RETURN_APP_URL)",
         )
 
         if failures:
             raise PaymentGatewayError(
-                "PAYMENT_MODE=service requires valid checkout return URLs. " + "; ".join(failures)
+                "PAYMENT_MODE=service requires a valid mobile/frontend redirect base. " + "; ".join(failures)
             )
+
+    @staticmethod
+    def _build_checkout_return_url(
+        *,
+        base_url: str,
+        booking_id: str,
+        outcome: str,
+        session_token: str | None,
+    ) -> str:
+        parsed = urlparse(base_url.strip())
+        query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+        query["booking_id"] = booking_id
+        if session_token:
+            query["session_id"] = session_token
+
+        base_path = parsed.path.rstrip("/")
+        if not base_path:
+            base_path = ""
+        final_path = f"{base_path}/payment/{outcome}"
+        return urlunparse(parsed._replace(path=final_path, query=urlencode(query)))
 
     def create_checkout_session(
         self,
@@ -112,6 +133,7 @@ class PaymentGateway:
         amount_cents: int,
         currency: str,
         customer_email: str | None,
+        customer_name: str | None,
     ) -> CheckoutSession:
         if self.mode == "mock":
             return CheckoutSession(
@@ -126,8 +148,18 @@ class PaymentGateway:
             raise PaymentGatewayError("PAYMENT_MODE=service requires PAYMENT_SERVICE_BASE_URL")
 
         self._validate_service_checkout_urls()
-        success_url = settings.payment_checkout_success_url
-        cancel_url = settings.payment_checkout_cancel_url
+        success_url = self._build_checkout_return_url(
+            base_url=settings.payment_mobile_redirect_base,
+            booking_id=booking_id,
+            outcome="success",
+            session_token="{CHECKOUT_SESSION_ID}",
+        )
+        cancel_url = self._build_checkout_return_url(
+            base_url=settings.payment_mobile_redirect_base,
+            booking_id=booking_id,
+            outcome="cancel",
+            session_token=None,
+        )
         payload = {
             "booking_id": booking_id,
             "amount": amount_cents,
@@ -135,7 +167,14 @@ class PaymentGateway:
             "success_url": success_url,
             "cancel_url": cancel_url,
             "customer_email": customer_email,
+            "customer_name": customer_name,
         }
+        logger.info(
+            "Generated Stripe Checkout redirect URLs for booking %s: success_url=%s cancel_url=%s",
+            booking_id,
+            success_url,
+            cancel_url,
+        )
 
         with self._client() as client:
             try:

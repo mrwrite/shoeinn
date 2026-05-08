@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import AppointmentDetailScreen from "../screens/customer/AppointmentDetailScreen";
 import CustomerNotificationsScreen from "../screens/customer/CustomerNotificationsScreen";
+import PaymentResultScreen from "../screens/customer/PaymentResultScreen";
 import AppointmentListScreen from "../screens/appointments/AppointmentListScreen";
 import BookingConfirmScreen from "../screens/home/BookingConfirmScreen";
 import BookingDateScreen from "../screens/home/BookingDateScreen";
@@ -62,6 +63,7 @@ function AppointmentNavigator() {
   return (
     <AppointmentStack.Navigator>
       <AppointmentStack.Screen name="AppointmentList" component={AppointmentListScreen} options={{ headerShown: false }} />
+      <AppointmentStack.Screen name="PaymentResult" component={PaymentResultScreen} options={{ title: "Payment update" }} />
       <AppointmentStack.Screen name="AppointmentDetail" component={AppointmentDetailScreen} options={{ title: "Appointment" }} />
       <AppointmentStack.Screen
         name="CustomerNotifications"

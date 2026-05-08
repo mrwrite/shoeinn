@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -143,9 +143,10 @@ const resolvePhotoUrl = (url?: string | null) => {
 };
 
 export default function AppointmentDetailScreen({ route }: Props) {
-  const { appointmentId, summary } = route.params;
+  const { appointmentId, summary, refreshPaymentOnOpen, paymentReturnStatus } = route.params;
   const navigation = useNavigation<NativeStackNavigationProp<AppointmentStackParamList>>();
   const [expandedPhotoUrl, setExpandedPhotoUrl] = useState<string | null>(null);
+  const handledAutoRefreshRef = useRef(false);
 
   const appointmentQuery = useQuery({
     queryKey: ["appointment", appointmentId],
@@ -238,11 +239,34 @@ export default function AppointmentDetailScreen({ route }: Props) {
     }
   };
 
-  const handleRefreshPayment = async () => {
+  const handleRefreshPayment = async (reason: "manual" | "return" = "manual") => {
     try {
-      await refreshAppointmentPayment(appointmentId);
+      const latest = await refreshAppointmentPayment(appointmentId);
       await appointmentQuery.refetch();
       await eventsQuery.refetch();
+
+      if (reason !== "return") {
+        return;
+      }
+
+      if (latest.payment_status === "succeeded") {
+        Alert.alert("Payment confirmed", latest.payment_message ?? "Your payment completed successfully.");
+        return;
+      }
+      if (latest.payment_status === "failed" || latest.status === "payment_failed" || latest.status === "cancelled") {
+        Alert.alert("Payment incomplete", latest.payment_message ?? "This booking still needs payment attention.");
+        return;
+      }
+
+      if (paymentReturnStatus === "cancel") {
+        Alert.alert("Checkout canceled", latest.payment_message ?? "No payment was completed for this booking.");
+        return;
+      }
+
+      Alert.alert(
+        "Payment submitted",
+        latest.payment_message ?? "We returned to ShoeInn, but Stripe has not marked this payment complete yet. You can refresh again if needed.",
+      );
     } catch (error: any) {
       Alert.alert("Unable to refresh payment", error?.message ?? "Please try again.");
     }
@@ -267,6 +291,14 @@ export default function AppointmentDetailScreen({ route }: Props) {
       void eventsQuery.refetch();
     },
   });
+
+  useEffect(() => {
+    if (!refreshPaymentOnOpen || handledAutoRefreshRef.current) {
+      return;
+    }
+    handledAutoRefreshRef.current = true;
+    void handleRefreshPayment("return");
+  }, [refreshPaymentOnOpen]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -330,7 +362,7 @@ export default function AppointmentDetailScreen({ route }: Props) {
                       <Text style={styles.paymentPrimaryText}>Open checkout</Text>
                     </Pressable>
                   ) : null}
-                  <Pressable style={styles.paymentSecondaryButton} onPress={() => void handleRefreshPayment()}>
+                  <Pressable style={styles.paymentSecondaryButton} onPress={() => void handleRefreshPayment("manual")}>
                     <Text style={styles.paymentSecondaryText}>Refresh payment</Text>
                   </Pressable>
                   {appointment.status === "pending_payment" ? (

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from urllib.parse import parse_qs, urlparse
 
 import httpx
 import pytest
@@ -14,6 +15,7 @@ def test_mock_mode_allows_checkout_without_real_return_urls(monkeypatch: pytest.
     monkeypatch.setattr(settings, "payment_service_base_url", None)
     monkeypatch.setattr(settings, "payment_checkout_success_url", "")
     monkeypatch.setattr(settings, "payment_checkout_cancel_url", "")
+    monkeypatch.setattr(settings, "payment_mobile_redirect_base", "")
 
     gateway = PaymentGateway()
 
@@ -22,6 +24,7 @@ def test_mock_mode_allows_checkout_without_real_return_urls(monkeypatch: pytest.
         amount_cents=1200,
         currency="usd",
         customer_email="demo@example.test",
+        customer_name="Demo User",
     )
 
     assert checkout.status == "succeeded"
@@ -29,22 +32,20 @@ def test_mock_mode_allows_checkout_without_real_return_urls(monkeypatch: pytest.
 
 
 @pytest.mark.parametrize(
-    ("success_url", "cancel_url", "expected_message"),
+    ("redirect_base", "expected_message"),
     [
-        ("", "", "is missing"),
-        ("https://example.com/payment/success", "https://example.com/payment/cancel", "is still placeholder"),
+        ("", "is missing"),
+        ("https://example.com/app", "is still placeholder"),
     ],
 )
 def test_service_mode_requires_real_return_urls(
     monkeypatch: pytest.MonkeyPatch,
-    success_url: str,
-    cancel_url: str,
+    redirect_base: str,
     expected_message: str,
 ) -> None:
     monkeypatch.setattr(settings, "payment_mode", "service")
     monkeypatch.setattr(settings, "payment_service_base_url", "http://payments.test")
-    monkeypatch.setattr(settings, "payment_checkout_success_url", success_url)
-    monkeypatch.setattr(settings, "payment_checkout_cancel_url", cancel_url)
+    monkeypatch.setattr(settings, "payment_mobile_redirect_base", redirect_base)
 
     gateway = PaymentGateway(base_url="http://payments.test")
 
@@ -54,20 +55,19 @@ def test_service_mode_requires_real_return_urls(
             amount_cents=1200,
             currency="usd",
             customer_email="service@example.test",
+            customer_name="Service User",
         )
 
     message = str(exc_info.value)
-    assert "PAYMENT_MODE=service requires valid checkout return URLs" in message
-    assert "PAYMENT_CHECKOUT_SUCCESS_URL" in message
-    assert "PAYMENT_CHECKOUT_CANCEL_URL" in message
+    assert "PAYMENT_MODE=service requires a valid mobile/frontend redirect base" in message
+    assert "PAYMENT_MOBILE_REDIRECT_BASE" in message
     assert expected_message in message
 
 
 def test_service_mode_succeeds_with_valid_return_urls(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "payment_mode", "service")
     monkeypatch.setattr(settings, "payment_service_base_url", "http://payments.test")
-    monkeypatch.setattr(settings, "payment_checkout_success_url", "http://127.0.0.1:8000/payment/return/success")
-    monkeypatch.setattr(settings, "payment_checkout_cancel_url", "http://127.0.0.1:8000/payment/return/cancel")
+    monkeypatch.setattr(settings, "payment_mobile_redirect_base", "shoeinn://app")
 
     captured_payload: dict[str, object] = {}
 
@@ -91,10 +91,28 @@ def test_service_mode_succeeds_with_valid_return_urls(monkeypatch: pytest.Monkey
         amount_cents=1200,
         currency="usd",
         customer_email="service@example.test",
+        customer_name="Service Customer",
     )
 
     assert checkout.payment_id == "pay_123"
     assert checkout.checkout_session_id == "cs_123"
     assert checkout.checkout_url == "https://checkout.stripe.test/cs_123"
-    assert captured_payload["success_url"] == "http://127.0.0.1:8000/payment/return/success"
-    assert captured_payload["cancel_url"] == "http://127.0.0.1:8000/payment/return/cancel"
+    assert captured_payload["customer_name"] == "Service Customer"
+
+    success_url = str(captured_payload["success_url"])
+    cancel_url = str(captured_payload["cancel_url"])
+    success_parts = urlparse(success_url)
+    cancel_parts = urlparse(cancel_url)
+    assert success_parts.scheme == "shoeinn"
+    assert success_parts.netloc == "app"
+    assert success_parts.path == "/payment/success"
+    assert cancel_parts.path == "/payment/cancel"
+    assert "/payments/" not in success_url
+    assert "/payments/" not in cancel_url
+
+    success_query = parse_qs(success_parts.query)
+    cancel_query = parse_qs(cancel_parts.query)
+    assert success_query["booking_id"] == ["booking-service"]
+    assert success_query["session_id"] == ["{CHECKOUT_SESSION_ID}"]
+    assert cancel_query["booking_id"] == ["booking-service"]
+    assert "session_id" not in cancel_query

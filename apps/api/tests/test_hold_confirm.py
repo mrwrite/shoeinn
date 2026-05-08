@@ -47,7 +47,9 @@ class FakeServiceGateway:
         amount_cents: int,
         currency: str,
         customer_email: str | None,
+        customer_name: str | None,
     ) -> CheckoutSession:
+        del customer_name
         return CheckoutSession(
             payment_id=f"pay_{booking_id}",
             checkout_session_id=f"cs_{booking_id}",
@@ -74,6 +76,7 @@ def test_hold_and_confirm_flow(
     monkeypatch.setattr(settings, "payment_mode", "mock")
     monkeypatch.setattr(settings, "payment_checkout_success_url", "")
     monkeypatch.setattr(settings, "payment_checkout_cancel_url", "")
+    monkeypatch.setattr(settings, "payment_mobile_redirect_base", "")
 
     service_id, company_id = _pick_service(client)
     start_time = datetime.now(timezone.utc).replace(hour=9, minute=0, second=0, microsecond=0) + timedelta(days=1)
@@ -194,8 +197,7 @@ def test_confirm_in_service_mode_requires_real_return_urls(
 
     monkeypatch.setattr(settings, "payment_mode", "service")
     monkeypatch.setattr(settings, "payment_service_base_url", "http://payments.test")
-    monkeypatch.setattr(settings, "payment_checkout_success_url", "https://example.com/payment/success")
-    monkeypatch.setattr(settings, "payment_checkout_cancel_url", "https://example.com/payment/cancel")
+    monkeypatch.setattr(settings, "payment_mobile_redirect_base", "https://example.com/app")
 
     hold_res = client.post(
         "/appointments/holds",
@@ -218,9 +220,8 @@ def test_confirm_in_service_mode_requires_real_return_urls(
     )
     assert confirm_res.status_code == 502
     detail = confirm_res.json()["detail"]
-    assert "PAYMENT_MODE=service requires valid checkout return URLs" in detail
-    assert "PAYMENT_CHECKOUT_SUCCESS_URL" in detail
-    assert "PAYMENT_CHECKOUT_CANCEL_URL" in detail
+    assert "PAYMENT_MODE=service requires a valid mobile/frontend redirect base" in detail
+    assert "PAYMENT_MOBILE_REDIRECT_BASE" in detail
     assert "placeholder" in detail
 
 
@@ -314,6 +315,61 @@ def test_service_mode_payment_refresh_and_unpaid_cancel_flow(
     assert cancelled["status"] == "payment_failed"
     assert cancelled["payment_status"] == "failed"
     assert cancelled["payment_checkout_url"] is None
+
+    client.app.dependency_overrides.pop(get_payment_gateway, None)
+
+
+def test_service_mode_payment_refresh_keeps_unpaid_session_pending(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service_id, company_id = _pick_service(client)
+    start_time = datetime.now(timezone.utc).replace(hour=15, minute=0, second=0, microsecond=0) + timedelta(days=1)
+
+    customer = User(
+        email="pending-session@example.com",
+        full_name="Pending Session Customer",
+        role="customer",
+        password_hash=hash_password("Password1!"),
+    )
+    db_session.add(customer)
+    db_session.commit()
+
+    gateway = FakeServiceGateway()
+    client.app.dependency_overrides[get_payment_gateway] = lambda: gateway
+    monkeypatch.setattr(settings, "payment_mode", "service")
+
+    hold_res = client.post(
+        "/appointments/holds",
+        json={
+            "service_id": str(service_id),
+            "start_time": start_time.isoformat(),
+            "customer_email": customer.email,
+        },
+    )
+    assert hold_res.status_code == 201, hold_res.text
+
+    confirm_res = client.post(
+        "/appointments/confirm",
+        json={
+            "hold_id": hold_res.json()["id"],
+            "company_id": str(company_id),
+            "customer_name": "Pending Session Customer",
+            "customer_phone": "1234567890",
+            "customer_email": customer.email,
+        },
+    )
+    assert confirm_res.status_code == 200, confirm_res.text
+    appointment = confirm_res.json()
+
+    gateway.payment_status = "requires_action"
+    refresh_res = client.post(f"/appointments/{appointment['id']}/payment/refresh", headers=_auth_header(customer))
+    assert refresh_res.status_code == 200, refresh_res.text
+    refreshed = refresh_res.json()
+    assert refreshed["status"] == "pending_payment"
+    assert refreshed["payment_status"] == "requires_action"
+    assert refreshed["payment_checkout_url"].startswith("https://checkout.stripe.test/")
 
     client.app.dependency_overrides.pop(get_payment_gateway, None)
 

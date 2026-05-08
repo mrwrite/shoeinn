@@ -3,7 +3,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from typing import Generator
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import Session, declarative_base, scoped_session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -38,6 +38,29 @@ def get_engine():
     if _ENGINE is None:
         _ENGINE = _create_engine()
     return _ENGINE
+
+
+def ensure_schema_compatibility() -> None:
+    engine = get_engine()
+    inspector = inspect(engine)
+    if "payments" not in inspector.get_table_names():
+        return
+
+    payment_columns = {column["name"] for column in inspector.get_columns("payments")}
+    statements: list[str] = []
+    if "customer_email" not in payment_columns:
+        statements.append("ALTER TABLE payments ADD COLUMN customer_email VARCHAR(255)")
+    if "stripe_customer_id" not in payment_columns:
+        statements.append("ALTER TABLE payments ADD COLUMN stripe_customer_id VARCHAR")
+
+    if not statements:
+        return
+
+    with engine.begin() as connection:
+        for statement in statements:
+            connection.execute(text(statement))
+        connection.execute(text("CREATE INDEX IF NOT EXISTS ix_payments_customer_email ON payments (customer_email)"))
+        connection.execute(text("CREATE INDEX IF NOT EXISTS ix_payments_stripe_customer_id ON payments (stripe_customer_id)"))
 
 
 SessionLocal = scoped_session(

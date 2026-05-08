@@ -67,3 +67,26 @@ The repository SHALL document that mock payment mode is the current recommended 
 - **WHEN** the API readiness endpoint is called in a demo or staging environment
 - **THEN** the response reports the active payment mode using the explicit payment-mode contract
 - **AND** operators can distinguish simulated mode from service-backed mode without guessing from infrastructure
+
+### Requirement: Service mode shall reconcile Stripe Checkout outcomes consistently
+The system SHALL map Stripe Checkout Session state into the internal payment contract consistently for both webhook-driven updates and manual payment refresh.
+
+#### Scenario: Paid checkout session is treated as succeeded
+- **WHEN** Stripe Checkout reports `payment_status=paid`
+- **THEN** the payment service maps that checkout session to internal status `succeeded`
+- **AND** the booking API can reconcile the appointment to a paid, confirmed state
+
+#### Scenario: Open unpaid checkout session stays non-terminal
+- **WHEN** a Stripe Checkout Session remains open and unpaid
+- **THEN** the payment service returns a non-terminal internal state such as `pending` or `requires_action`
+- **AND** the booking API does not mark the appointment payment as failed
+
+#### Scenario: Expired checkout session becomes failed
+- **WHEN** Stripe Checkout reports an expired session
+- **THEN** the payment service maps that session to internal status `failed`
+- **AND** the booking API can move the appointment into the failed-payment flow
+
+#### Scenario: Manual refresh still works without webhook delivery
+- **WHEN** local Stripe webhook forwarding is unavailable
+- **THEN** a manual payment refresh still reconciles the latest Checkout Session state from Stripe
+- **AND** local documentation explains the recommended Stripe CLI forwarding setup

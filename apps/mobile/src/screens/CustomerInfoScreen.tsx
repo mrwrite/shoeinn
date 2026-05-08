@@ -201,7 +201,7 @@ const CustomerInfoScreen: React.FC<Props> = ({ onConfirmed, onBack }) => {
           <Text style={styles.ghostText}>Cancel unpaid booking</Text>
         </TouchableOpacity>
         <Text style={styles.helperText}>
-          After paying in Stripe Checkout, return to ShoeInn and check payment status.
+          After paying in Stripe Checkout, ShoeInn should reopen automatically when supported. If it does not, return to the app and check payment status.
         </Text>
       </KeyboardAvoidingView>
     );

@@ -54,7 +54,10 @@ function getExpoHost(): string | undefined {
 
 function resolveApiUrl(): string {
   const configuredUrl =
+    (Constants.expoConfig?.extra as any)?.API_BASE_URL ??
     (Constants.expoConfig?.extra as any)?.API_URL ??
+    // eslint-disable-next-line no-process-env
+    (process.env.EXPO_PUBLIC_API_BASE_URL as string | undefined) ??
     // eslint-disable-next-line no-process-env
     (process.env.EXPO_PUBLIC_API_URL as string | undefined);
   if (configuredUrl) {

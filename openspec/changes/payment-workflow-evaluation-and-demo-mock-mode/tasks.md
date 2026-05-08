@@ -17,3 +17,9 @@
 - [x] 3.1 Update payment-related env examples and docs to recommend explicit mock mode for demos and staging while keeping `apps/payment` optional.
 - [x] 3.2 Add focused backend tests covering mock-mode booking confirmation and payment-state coherence.
 - [x] 3.3 Run relevant backend tests and the mobile typecheck, then summarize the remaining backlog for real payment hardening.
+
+## 4. Service-mode Stripe Checkout reconciliation hardening
+
+- [x] 4.1 Reconcile live Stripe Checkout Session state during service-mode payment refresh so `payment_status=paid` maps to internal `succeeded` even when webhooks are unavailable.
+- [x] 4.2 Keep open unpaid checkout sessions non-terminal and map expired checkout sessions to failed payment state without regressing mock mode.
+- [x] 4.3 Add focused tests and local Stripe CLI webhook-forwarding notes for the hardened service-mode flow.

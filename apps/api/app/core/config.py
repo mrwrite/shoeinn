@@ -27,6 +27,14 @@ class Settings(BaseSettings):
         default="",
         validation_alias=AliasChoices("PAYMENT_CHECKOUT_CANCEL_URL", "PAYMENT_CANCEL_URL"),
     )
+    payment_mobile_redirect_base: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "PAYMENT_MOBILE_REDIRECT_BASE",
+            "PAYMENT_SUCCESS_URL_BASE",
+            "PAYMENT_RETURN_APP_URL",
+        ),
+    )
     payment_service_timeout_seconds: float = 10.0
     payment_currency: str = "usd"
     enable_payment_sync_worker: bool = True
