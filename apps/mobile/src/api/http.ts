@@ -9,6 +9,8 @@ import type {
   AppointmentLocationUpdate,
   AppointmentLocationUpdatePayload,
   AppointmentProviderLocationResponse,
+  AppointmentQuote,
+  AppointmentQuotePayload,
   AppointmentSummary,
   AppointmentHold,
   AppointmentTracking,
@@ -52,7 +54,10 @@ function getExpoHost(): string | undefined {
 
 function resolveApiUrl(): string {
   const configuredUrl =
+    (Constants.expoConfig?.extra as any)?.API_BASE_URL ??
     (Constants.expoConfig?.extra as any)?.API_URL ??
+    // eslint-disable-next-line no-process-env
+    (process.env.EXPO_PUBLIC_API_BASE_URL as string | undefined) ??
     // eslint-disable-next-line no-process-env
     (process.env.EXPO_PUBLIC_API_URL as string | undefined);
   if (configuredUrl) {
@@ -203,8 +208,20 @@ export function confirmAppointment(payload: ConfirmAppointmentPayload): Promise<
   });
 }
 
+export function getAppointmentQuote(payload: AppointmentQuotePayload): Promise<AppointmentQuote> {
+  return request<AppointmentQuote>("POST", "/appointments/quote", payload);
+}
+
 export function getAppointment(id: string): Promise<Appointment> {
   return request<Appointment>("GET", `/appointments/${id}`, undefined, { auth: true });
+}
+
+export function refreshAppointmentPayment(id: string): Promise<Appointment> {
+  return request<Appointment>("POST", `/appointments/${id}/payment/refresh`, undefined, { auth: true });
+}
+
+export function cancelAppointmentPayment(id: string): Promise<Appointment> {
+  return request<Appointment>("POST", `/appointments/${id}/payment/cancel`, undefined, { auth: true });
 }
 
 export function getMyAppointments(): Promise<AppointmentSummary[]> {

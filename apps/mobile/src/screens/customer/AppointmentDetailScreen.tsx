@@ -1,7 +1,9 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
+  Linking,
   Modal,
   Pressable,
   ScrollView,
@@ -17,9 +19,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
   API_URL,
+  cancelAppointmentPayment,
   getAppointment,
   getAppointmentAssignment,
   getAppointmentEvents,
+  refreshAppointmentPayment,
 } from "../../api/http";
 import { CustomerTravelMapCard } from "../../components/CustomerTravelMapCard";
 import { useFocusedAutoRefresh } from "../../hooks/useFocusedAutoRefresh";
@@ -39,6 +43,8 @@ const photoVisibleStatuses = new Set(["ready", "out_for_delivery", "delivered", 
 
 const statusLabels: Record<string, string> = {
   requested: "Requested",
+  pending_payment: "Pending payment",
+  payment_failed: "Payment failed",
   confirmed: "Confirmed",
   en_route_pickup: "En route to pickup",
   picked_up: "Picked up",
@@ -52,6 +58,8 @@ const statusLabels: Record<string, string> = {
 
 const statusOrder = [
   "requested",
+  "pending_payment",
+  "payment_failed",
   "confirmed",
   "en_route_pickup",
   "picked_up",
@@ -135,9 +143,10 @@ const resolvePhotoUrl = (url?: string | null) => {
 };
 
 export default function AppointmentDetailScreen({ route }: Props) {
-  const { appointmentId, summary } = route.params;
+  const { appointmentId, summary, refreshPaymentOnOpen, paymentReturnStatus } = route.params;
   const navigation = useNavigation<NativeStackNavigationProp<AppointmentStackParamList>>();
   const [expandedPhotoUrl, setExpandedPhotoUrl] = useState<string | null>(null);
+  const handledAutoRefreshRef = useRef(false);
 
   const appointmentQuery = useQuery({
     queryKey: ["appointment", appointmentId],
@@ -162,6 +171,7 @@ export default function AppointmentDetailScreen({ route }: Props) {
 
   const appointment =
     appointmentQuery.data ?? (summary as AppointmentSummary | undefined);
+  const paymentAwareAppointment = appointmentQuery.data;
   const statusHistory = useMemo(
     () => buildStatusHistory(eventsQuery.data ?? [], appointment?.status),
     [eventsQuery.data, appointment?.status]
@@ -200,6 +210,8 @@ export default function AppointmentDetailScreen({ route }: Props) {
   const recentNotificationCopy = recentNotification ? getCustomerNotificationCopy(recentNotification) : null;
   const nextStepCopy: Record<string, string> = {
     requested: "Your appointment request has been received.",
+    pending_payment: "Payment is required before the booking can be confirmed.",
+    payment_failed: "Payment did not complete. You can retry checkout or place a new booking.",
     confirmed: "A provider can now prepare for pickup.",
     en_route_pickup: "Your provider is on the way to pick up your order.",
     picked_up: "Your items are with the provider.",
@@ -212,7 +224,63 @@ export default function AppointmentDetailScreen({ route }: Props) {
   };
   const isAppointmentLoading = appointmentQuery.isLoading && !appointment;
   const isLiveAppointment =
-    !!appointment && !["completed", "cancelled"].includes(appointment.status);
+    !!appointment && !["completed", "cancelled", "payment_failed"].includes(appointment.status);
+
+  const handleOpenCheckout = async () => {
+    const checkoutUrl = appointmentQuery.data?.payment_checkout_url;
+    if (!checkoutUrl) {
+      Alert.alert("Checkout unavailable", "This booking does not currently have a checkout URL.");
+      return;
+    }
+    try {
+      await Linking.openURL(checkoutUrl);
+    } catch {
+      Alert.alert("Checkout unavailable", "Unable to open checkout right now.");
+    }
+  };
+
+  const handleRefreshPayment = async (reason: "manual" | "return" = "manual") => {
+    try {
+      const latest = await refreshAppointmentPayment(appointmentId);
+      await appointmentQuery.refetch();
+      await eventsQuery.refetch();
+
+      if (reason !== "return") {
+        return;
+      }
+
+      if (latest.payment_status === "succeeded") {
+        Alert.alert("Payment confirmed", latest.payment_message ?? "Your payment completed successfully.");
+        return;
+      }
+      if (latest.payment_status === "failed" || latest.status === "payment_failed" || latest.status === "cancelled") {
+        Alert.alert("Payment incomplete", latest.payment_message ?? "This booking still needs payment attention.");
+        return;
+      }
+
+      if (paymentReturnStatus === "cancel") {
+        Alert.alert("Checkout canceled", latest.payment_message ?? "No payment was completed for this booking.");
+        return;
+      }
+
+      Alert.alert(
+        "Payment submitted",
+        latest.payment_message ?? "We returned to ShoeInn, but Stripe has not marked this payment complete yet. You can refresh again if needed.",
+      );
+    } catch (error: any) {
+      Alert.alert("Unable to refresh payment", error?.message ?? "Please try again.");
+    }
+  };
+
+  const handleCancelPendingPayment = async () => {
+    try {
+      await cancelAppointmentPayment(appointmentId);
+      await appointmentQuery.refetch();
+      await eventsQuery.refetch();
+    } catch (error: any) {
+      Alert.alert("Unable to cancel booking", error?.message ?? "Please try again.");
+    }
+  };
 
   useFocusedAutoRefresh({
     enabled: !!appointmentId,
@@ -223,6 +291,14 @@ export default function AppointmentDetailScreen({ route }: Props) {
       void eventsQuery.refetch();
     },
   });
+
+  useEffect(() => {
+    if (!refreshPaymentOnOpen || handledAutoRefreshRef.current) {
+      return;
+    }
+    handledAutoRefreshRef.current = true;
+    void handleRefreshPayment("return");
+  }, [refreshPaymentOnOpen]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -269,6 +345,34 @@ export default function AppointmentDetailScreen({ route }: Props) {
                 <Text style={styles.meta}>{assignmentState.detail}</Text>
               ) : null}
             </View>
+
+            {paymentAwareAppointment?.payment_mode === "service" &&
+            (appointment.status === "pending_payment" || appointment.status === "payment_failed") ? (
+              <View style={styles.card}>
+                <Text style={styles.sectionTitle}>Payment</Text>
+                <Text style={styles.value}>
+                  {appointment.status === "pending_payment" ? "Finish checkout to confirm" : "Payment needs attention"}
+                </Text>
+                <Text style={styles.meta}>
+                  {paymentAwareAppointment.payment_message ?? "Complete payment before this booking can move forward."}
+                </Text>
+                <View style={styles.paymentActions}>
+                  {paymentAwareAppointment.payment_checkout_url ? (
+                    <Pressable style={styles.paymentPrimaryButton} onPress={() => void handleOpenCheckout()}>
+                      <Text style={styles.paymentPrimaryText}>Open checkout</Text>
+                    </Pressable>
+                  ) : null}
+                  <Pressable style={styles.paymentSecondaryButton} onPress={() => void handleRefreshPayment("manual")}>
+                    <Text style={styles.paymentSecondaryText}>Refresh payment</Text>
+                  </Pressable>
+                  {appointment.status === "pending_payment" ? (
+                    <Pressable onPress={() => void handleCancelPendingPayment()}>
+                      <Text style={styles.paymentCancelText}>Cancel unpaid booking</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              </View>
+            ) : null}
 
             {recentNotificationCopy ? (
               <Pressable
@@ -457,6 +561,34 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
     gap: 8,
+  },
+  paymentActions: {
+    marginTop: 8,
+    gap: 10,
+  },
+  paymentPrimaryButton: {
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: "center",
+    backgroundColor: "#0F4C5C",
+  },
+  paymentPrimaryText: {
+    color: "#ffffff",
+    fontWeight: "700",
+  },
+  paymentSecondaryButton: {
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: "center",
+    backgroundColor: "#eff6ff",
+  },
+  paymentSecondaryText: {
+    color: "#1d4ed8",
+    fontWeight: "700",
+  },
+  paymentCancelText: {
+    color: "#b91c1c",
+    fontWeight: "600",
   },
   recentUpdateCard: {
     borderWidth: 1,

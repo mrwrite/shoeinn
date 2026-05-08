@@ -1,3 +1,4 @@
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -16,13 +17,38 @@ class Settings(BaseSettings):
     notification_backoff_seconds: int = 30
     enable_notification_dispatcher: bool = True
     db_auto_create: bool = False
+    payment_mode: str = "mock"
     payment_service_base_url: str | None = None
-    payment_checkout_success_url: str = "https://example.com/payment/success"
-    payment_checkout_cancel_url: str = "https://example.com/payment/cancel"
+    payment_checkout_success_url: str = Field(
+        default="",
+        validation_alias=AliasChoices("PAYMENT_CHECKOUT_SUCCESS_URL", "PAYMENT_SUCCESS_URL"),
+    )
+    payment_checkout_cancel_url: str = Field(
+        default="",
+        validation_alias=AliasChoices("PAYMENT_CHECKOUT_CANCEL_URL", "PAYMENT_CANCEL_URL"),
+    )
+    payment_mobile_redirect_base: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "PAYMENT_MOBILE_REDIRECT_BASE",
+            "PAYMENT_SUCCESS_URL_BASE",
+            "PAYMENT_RETURN_APP_URL",
+        ),
+    )
     payment_service_timeout_seconds: float = 10.0
     payment_currency: str = "usd"
     enable_payment_sync_worker: bool = True
     payment_sync_interval_seconds: int = 5
+
+    @field_validator("payment_mode", mode="before")
+    @classmethod
+    def normalize_payment_mode(cls, value: str | None) -> str:
+        normalized = (value or "mock").strip().lower()
+        if normalized == "stub":
+            normalized = "mock"
+        if normalized not in {"mock", "service"}:
+            raise ValueError("payment_mode must be one of: mock, service, stub")
+        return normalized
 
     class Config:
         env_file = ".env"

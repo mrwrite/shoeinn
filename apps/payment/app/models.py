@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, Enum, ForeignKey, Integer, String
+from sqlalchemy import Boolean, CheckConstraint, DateTime, Enum, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
@@ -31,6 +31,8 @@ class Payment(Base):
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
     amount_expected: Mapped[int] = mapped_column(Integer, nullable=False)
     amount_received: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    customer_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    stripe_customer_id: Mapped[Optional[str]] = mapped_column(String, nullable=True, index=True)
     stripe_checkout_session_id: Mapped[Optional[str]] = mapped_column(String, nullable=True, unique=True)
     stripe_payment_intent_id: Mapped[Optional[str]] = mapped_column(String, nullable=True, unique=True)
     status: Mapped[PaymentStatus] = mapped_column(Enum(PaymentStatus), default=PaymentStatus.pending)
@@ -53,6 +55,22 @@ class ProcessedStripeEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
 
+class PaymentCustomer(Base):
+    __tablename__ = "payment_customers"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    tenant_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    customer_email: Mapped[str] = mapped_column(String(255), nullable=False)
+    customer_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    stripe_customer_id: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "customer_email", name="uq_payment_customers_tenant_email"),
+    )
+
+
 class PaymentEventOutbox(Base):
     __tablename__ = "payment_events_outbox"
 
@@ -68,6 +86,7 @@ class PaymentEventOutbox(Base):
 
 __all__ = [
     "Payment",
+    "PaymentCustomer",
     "PaymentStatus",
     "ProcessedStripeEvent",
     "PaymentEventOutbox",

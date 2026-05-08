@@ -1,6 +1,6 @@
 import type { NavigatorScreenParams } from "@react-navigation/native";
 
-import type { AppointmentSummary, Service } from "../types/booking";
+import type { AppointmentSummary, BookingCustomerDetails, Service } from "../types/booking";
 import type { Company, ProviderAppointment } from "../types/company";
 
 export type HomeStackParamList = {
@@ -10,17 +10,34 @@ export type HomeStackParamList = {
   BookingDate: { service: Service };
   BookingTime: { service: Service; date: string };
   BookingConfirm: { service: Service; date: string; time: string };
+  BookingReviewPay: {
+    service: Service;
+    date: string;
+    time: string;
+    customerDetails: BookingCustomerDetails;
+  };
 };
 
 export type AppointmentStackParamList = {
   AppointmentList: undefined;
-  AppointmentDetail: { appointmentId: string; summary?: AppointmentSummary };
+  PaymentResult: {
+    bookingId: string;
+    sessionId?: string;
+    status: "success" | "cancel";
+  };
+  AppointmentDetail: {
+    appointmentId: string;
+    summary?: AppointmentSummary;
+    refreshPaymentOnOpen?: boolean;
+    paymentReturnStatus?: "success" | "cancel";
+  };
   CustomerNotifications: undefined;
 };
 
 export type CustomerFlowStackParamList = {
   MyAppointments: undefined;
   AppointmentDetail: { appointmentId: string; summary?: AppointmentSummary };
+  CustomerNotifications: undefined;
   CompanyPicker: undefined;
   CompanyServices: undefined;
   Booking: undefined;

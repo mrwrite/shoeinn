@@ -16,10 +16,17 @@ npx expo start --tunnel
 If you want to use LAN instead, make sure your phone and computer are on the same Wi-Fi network and set:
 
 ```bash
-EXPO_PUBLIC_API_URL=http://YOUR_COMPUTER_LAN_IP:8000
+EXPO_PUBLIC_API_BASE_URL=http://YOUR_COMPUTER_LAN_IP:8000
+EXPO_PUBLIC_MOBILE_REDIRECT_BASE=exp://YOUR_COMPUTER_LAN_IP:8081/--
 ```
 
-The mobile app now auto-detects the Expo host for local development when `EXPO_PUBLIC_API_URL` is not set, but explicit LAN configuration is still the safest option for demos.
+For a dev build or standalone app, use a custom scheme redirect base instead:
+
+```bash
+EXPO_PUBLIC_MOBILE_REDIRECT_BASE=shoeinn://app
+```
+
+The mobile app now auto-detects the Expo host for local development when `EXPO_PUBLIC_API_BASE_URL` is not set, but explicit LAN configuration is still the safest option for demos.
 
 ## Google Maps Directions API key
 

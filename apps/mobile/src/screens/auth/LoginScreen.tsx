@@ -15,18 +15,9 @@ import { useMutation } from "@tanstack/react-query";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { login } from "../../api/http";
+import { MT_JULIET_DEMO_ACCOUNTS, shouldShowDemoLogins } from "../../auth/demoLogins";
 import { AuthStackParamList } from "../../navigation/AuthStack";
 import { useAuthStore } from "../../state/authStore";
-
-const demoAccounts = [
-  { label: "Global Admin", email: "admin@shoeinn.com", password: "Password1!" },
-  { label: "Pelham Owner", email: "pelham.admin@shoeinn.com", password: "Password1!" },
-  { label: "Pelham Driver 1", email: "pelham.driver1@shoeinn.com", password: "Password1!" },
-  { label: "Pelham Driver 2", email: "pelham.driver2@shoeinn.com", password: "Password1!" },
-  { label: "Helena Owner", email: "helena.admin@shoeinn.com", password: "Password1!" },
-  { label: "Helena Driver", email: "helena.driver@shoeinn.com", password: "Password1!" },
-  { label: "Customer", email: "customer@shoeinn.com", password: "Password1!" },
-];
 
 type Props = NativeStackScreenProps<AuthStackParamList, "Login">;
 
@@ -37,6 +28,7 @@ export default function LoginScreen({ navigation }: Props) {
   const [email, setEmail] = useState("customer@shoeinn.com");
   const [password, setPassword] = useState("Password1!");
   const [error, setError] = useState<string | null>(null);
+  const showDemoLogins = shouldShowDemoLogins();
 
   const mutation = useMutation({
     mutationFn: login,
@@ -99,23 +91,28 @@ export default function LoginScreen({ navigation }: Props) {
             {mutation.isPending ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Sign in</Text>}
           </Pressable>
 
-          <Text style={styles.sectionTitle}>Quick demo logins</Text>
-          <View style={styles.demoRow}>
-            {demoAccounts.map((acct) => (
-              <Pressable
-                key={acct.email}
-                style={styles.demoButton}
-                onPress={() => {
-                  setEmail(acct.email);
-                  setPassword(acct.password);
-                  setError(null);
-                  mutation.mutate({ email: acct.email, password: acct.password });
-                }}
-              >
-                <Text style={styles.demoText}>{acct.label}</Text>
-              </Pressable>
-            ))}
-          </View>
+          {showDemoLogins ? (
+            <>
+              <Text style={styles.sectionTitle}>Demo Logins</Text>
+              <View style={styles.demoRow}>
+                {MT_JULIET_DEMO_ACCOUNTS.map((acct) => (
+                  <Pressable
+                    key={acct.email}
+                    style={styles.demoButton}
+                    onPress={() => {
+                      setEmail(acct.email);
+                      setPassword(acct.password);
+                      setError(null);
+                      mutation.mutate({ email: acct.email, password: acct.password });
+                    }}
+                  >
+                    <Text style={styles.demoText}>{acct.label}</Text>
+                    <Text style={styles.demoSubtext}>{acct.email}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </>
+          ) : null}
 
           <Pressable onPress={() => navigation.navigate("Register")}> 
             <Text style={styles.link}>Need an account? Register</Text>
@@ -185,11 +182,14 @@ const styles = StyleSheet.create({
   sectionTitle: { fontWeight: "700", marginTop: 6 },
   demoRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   demoButton: {
-    paddingVertical: 10,
+    minWidth: 150,
+    paddingVertical: 12,
     paddingHorizontal: 12,
     backgroundColor: "#e5e7eb",
-    borderRadius: 8,
+    borderRadius: 12,
+    gap: 4,
   },
   demoText: { fontWeight: "600" },
+  demoSubtext: { fontSize: 12, color: "#4b5563" },
   link: { color: "#1d4ed8", marginTop: 8, fontWeight: "600" },
 });

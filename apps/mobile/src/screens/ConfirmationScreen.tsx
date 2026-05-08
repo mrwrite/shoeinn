@@ -31,7 +31,12 @@ const ConfirmationScreen: React.FC<Props> = ({ onDone }) => {
   });
 
   const paymentStatus = appointment.payment_status ?? "pending";
+  const paymentMode = appointment.payment_mode ?? null;
+  const paymentMessage = appointment.payment_message ?? null;
   const paymentLabel = (() => {
+    if (paymentMode === "mock") {
+      return "Payment mode: Demo payment simulated";
+    }
     switch (paymentStatus) {
       case "succeeded":
         return "Payment status: Confirmed";
@@ -55,6 +60,9 @@ const ConfirmationScreen: React.FC<Props> = ({ onDone }) => {
           <Text style={styles.cardText}>Email: {appointment.customer_email}</Text>
         ) : null}
         <Text style={[styles.cardText, paymentStatus !== "succeeded" && styles.warningText]}>{paymentLabel}</Text>
+        {paymentMessage ? (
+          <Text style={[styles.cardText, paymentMode === "mock" && styles.mockText]}>{paymentMessage}</Text>
+        ) : null}
       </View>
       <TouchableOpacity style={styles.primaryButton} onPress={onDone} accessibilityRole="button">
         <Text style={styles.buttonText}>Book another cleaning</Text>
@@ -100,6 +108,9 @@ const styles = StyleSheet.create({
   warningText: {
     color: "#fbbf24",
     fontWeight: "600",
+  },
+  mockText: {
+    color: "#93c5fd",
   },
   primaryButton: {
     backgroundColor: "#2563eb",

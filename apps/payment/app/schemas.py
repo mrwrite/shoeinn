@@ -14,6 +14,7 @@ class CreateCheckoutSessionRequest(BaseModel):
     success_url: str
     cancel_url: str
     customer_email: Optional[str] = None
+    customer_name: Optional[str] = None
 
 
 class CreateCheckoutSessionResponse(BaseModel):
@@ -49,6 +50,8 @@ class PaymentRecord(BaseModel):
     currency: str
     amount_expected: int
     amount_received: Optional[int]
+    customer_email: Optional[str]
+    stripe_customer_id: Optional[str]
     stripe_checkout_session_id: Optional[str]
     stripe_payment_intent_id: Optional[str]
     status: PaymentStatus

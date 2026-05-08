@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     stripe_webhook_secret: str = Field(..., validation_alias="STRIPE_WEBHOOK_SECRET")
     tenant_id: str = Field(default="public", validation_alias="TENANT_ID")
     event_bus_topic: str = Field(default="payments", validation_alias="PAYMENT_EVENT_TOPIC")
+    booking_api_webhook_url: str | None = Field(default=None, validation_alias="BOOKING_API_WEBHOOK_URL")
+    booking_api_webhook_secret: str | None = Field(default=None, validation_alias="BOOKING_API_WEBHOOK_SECRET")
 
     default_currency: str = Field(default="usd", validation_alias="DEFAULT_CURRENCY")
     allow_test_clock: bool = Field(default=True, validation_alias="PAYMENT_ALLOW_TEST_CLOCK")

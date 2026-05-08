@@ -6,9 +6,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import AppointmentDetailScreen from "../screens/customer/AppointmentDetailScreen";
 import CustomerNotificationsScreen from "../screens/customer/CustomerNotificationsScreen";
+import PaymentResultScreen from "../screens/customer/PaymentResultScreen";
 import AppointmentListScreen from "../screens/appointments/AppointmentListScreen";
 import BookingConfirmScreen from "../screens/home/BookingConfirmScreen";
 import BookingDateScreen from "../screens/home/BookingDateScreen";
+import BookingReviewPayScreen from "../screens/home/BookingReviewPayScreen";
 import BookingTimeScreen from "../screens/home/BookingTimeScreen";
 import HomeScreen from "../screens/home/HomeScreen";
 import ProviderMenuScreen from "../screens/home/ProviderMenuScreen";
@@ -48,6 +50,11 @@ function HomeNavigator() {
       <HomeStack.Screen name="BookingDate" component={BookingDateScreen} />
       <HomeStack.Screen name="BookingTime" component={BookingTimeScreen} />
       <HomeStack.Screen name="BookingConfirm" component={BookingConfirmScreen} />
+      <HomeStack.Screen
+        name="BookingReviewPay"
+        component={BookingReviewPayScreen}
+        options={{ title: "Review & Pay" }}
+      />
     </HomeStack.Navigator>
   );
 }
@@ -56,6 +63,7 @@ function AppointmentNavigator() {
   return (
     <AppointmentStack.Navigator>
       <AppointmentStack.Screen name="AppointmentList" component={AppointmentListScreen} options={{ headerShown: false }} />
+      <AppointmentStack.Screen name="PaymentResult" component={PaymentResultScreen} options={{ title: "Payment update" }} />
       <AppointmentStack.Screen name="AppointmentDetail" component={AppointmentDetailScreen} options={{ title: "Appointment" }} />
       <AppointmentStack.Screen
         name="CustomerNotifications"

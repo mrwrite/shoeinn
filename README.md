@@ -440,9 +440,33 @@ Use Expo tunnel only for Metro connectivity if needed. It does not make your bac
 
 `apps/payment` is optional for most local development flows, including provider appointment claiming and assignment.
 
-- If `PAYMENT_SERVICE_BASE_URL` is unset, the main API uses stub payment behavior.
-- The payment sync worker only starts when `PAYMENT_SERVICE_BASE_URL` is configured.
+- Local/demo API config should default to `PAYMENT_MODE=mock`. Keep it that way unless you intentionally start `apps/payment` for a real checkout demo.
+- If `PAYMENT_MODE=service`, `PAYMENT_SERVICE_BASE_URL` must be configured for checkout and sync behavior.
+- If `PAYMENT_MODE=service`, set reachable non-placeholder checkout return URLs with `PAYMENT_CHECKOUT_SUCCESS_URL` / `PAYMENT_CHECKOUT_CANCEL_URL` or the aliases `PAYMENT_SUCCESS_URL` / `PAYMENT_CANCEL_URL`. The API exposes lightweight return pages at `/payment/return/success` and `/payment/return/cancel`.
+- The payment sync worker only starts in `service` mode when `PAYMENT_SERVICE_BASE_URL` is configured.
 - See `apps/payment/README.md` for the current minimum local startup notes.
+
+### Smallest real demo payment path
+
+The current narrow real-payment path is:
+
+1. Run `apps/payment` with Stripe test credentials.
+2. Set `PAYMENT_MODE=service` and `PAYMENT_SERVICE_BASE_URL` in `apps/api`.
+3. Set `PAYMENT_CHECKOUT_SUCCESS_URL` and `PAYMENT_CHECKOUT_CANCEL_URL` to reachable API return pages, for example:
+
+```env
+PAYMENT_CHECKOUT_SUCCESS_URL=http://<YOUR-LAN-IP>:8000/payment/return/success
+PAYMENT_CHECKOUT_CANCEL_URL=http://<YOUR-LAN-IP>:8000/payment/return/cancel
+```
+
+4. Start the API so the payment sync worker can reconcile service-backed payment status.
+5. In the mobile app, the customer can open hosted checkout, return to ShoeInn, and explicitly refresh payment status or cancel the unpaid booking.
+
+Deferred for later hardening:
+
+- refunds/disputes operator flows,
+- payouts or marketplace settlement,
+- broader reconciliation/backoffice tooling.
 
 ## Local Validation Checklist
 

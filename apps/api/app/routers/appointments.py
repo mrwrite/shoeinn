@@ -36,9 +36,13 @@ from app.services.notifications import (
 )
 from app.enums import AppointmentStatus
 from app.services.payment_gateway import PaymentGateway, PaymentGatewayError
+from app.services.payment_reconciliation import cancel_unpaid_appointment, reconcile_payment_record
+from app.services.pricing import BookingQuote, calculate_booking_quote
 from app.schemas.appointment import (
     AppointmentAssignmentRead,
     AppointmentConfirm,
+    AppointmentQuoteRead,
+    AppointmentQuoteRequest,
     AppointmentEventRead,
     AppointmentListItem,
     AppointmentRead,
@@ -114,6 +118,8 @@ def _serialize_hold(hold: AppointmentHold) -> HoldRead:
 
 
 def _serialize_appointment(appointment: Appointment) -> AppointmentRead:
+    payment_mode = settings.payment_mode
+    payment_message = _build_payment_message(appointment, payment_mode=payment_mode)
     return AppointmentRead.model_validate(
         {
             "id": appointment.id,
@@ -138,6 +144,8 @@ def _serialize_appointment(appointment: Appointment) -> AppointmentRead:
             "payment_id": appointment.payment_id,
             "payment_status": appointment.payment_status,
             "payment_checkout_url": appointment.payment_checkout_url,
+            "payment_mode": payment_mode,
+            "payment_message": payment_message,
             "payment_amount_expected": appointment.payment_amount_expected,
             "payment_amount_received": appointment.payment_amount_received,
             "payment_currency": appointment.payment_currency,
@@ -150,6 +158,49 @@ def _serialize_appointment(appointment: Appointment) -> AppointmentRead:
             "updated_at": _ensure_utc(appointment.updated_at),
         },
         from_attributes=True,
+    )
+
+
+def _build_payment_message(appointment: Appointment, *, payment_mode: str) -> str | None:
+    if payment_mode == "mock":
+        return "Demo payment simulated. No real charge was made."
+
+    payment_status = appointment.payment_status
+    if payment_status == PaymentStatus.succeeded:
+        return "Payment confirmed."
+    if payment_status == PaymentStatus.failed:
+        return "Payment failed. Please try again."
+    if appointment.status == AppointmentStatus.pending_payment:
+        if appointment.payment_checkout_url:
+            return "Review and complete payment to finish placing this booking."
+        return "Payment is still required before this booking can be confirmed."
+    if appointment.status == AppointmentStatus.payment_failed:
+        return "Payment did not complete. Update payment and try placing the booking again."
+    if appointment.payment_checkout_url:
+        return "Complete payment with the checkout link to confirm this booking."
+    if payment_status == PaymentStatus.pending:
+        return "Payment is pending."
+    return None
+
+
+def _serialize_quote(quote: BookingQuote) -> AppointmentQuoteRead:
+    return AppointmentQuoteRead(
+        service_id=UUID(quote.service_id),
+        service_name=quote.service_name,
+        currency=quote.currency,
+        line_items=[
+            {
+                "code": item.code,
+                "label": item.label,
+                "amount": item.amount,
+                "kind": item.kind,
+            }
+            for item in quote.line_items
+        ],
+        subtotal=quote.subtotal,
+        fees=quote.fees,
+        estimated_tax=quote.estimated_tax,
+        total=quote.total,
     )
 
 
@@ -337,8 +388,55 @@ def create_hold(payload: HoldCreate, db: Session = Depends(get_db)) -> HoldRead:
     return _serialize_hold(hold)
 
 
+@router.post("/quote", response_model=AppointmentQuoteRead)
+def create_quote(payload: AppointmentQuoteRequest, db: Session = Depends(get_db)) -> AppointmentQuoteRead:
+    service = db.query(Service).filter(Service.id == payload.service_id, Service.is_active.is_(True)).one_or_none()
+    if service is None:
+        raise HTTPException(status_code=400, detail="Invalid service_id")
+
+    quote = calculate_booking_quote(
+        service=service,
+        booking_type=payload.type,
+        currency=settings.payment_currency,
+    )
+    return _serialize_quote(quote)
+
+
 def get_payment_gateway() -> PaymentGateway:
     return PaymentGateway()
+
+
+def _current_user_company_id(db: Session, current_user) -> UUID | None:
+    if current_user.role not in {"company", "provider", "company_admin"}:
+        return None
+    company_user = db.query(CompanyUser).filter(CompanyUser.user_id == current_user.id).first()
+    return company_user.company_id if company_user else None
+
+
+def _refresh_service_mode_payment(
+    *,
+    db: Session,
+    appointment: Appointment,
+    gateway: PaymentGateway,
+) -> Appointment:
+    if gateway.mode != "service":
+        return appointment
+    if not appointment.payment_id:
+        return appointment
+    if appointment.payment_status in {
+        PaymentStatus.succeeded,
+        PaymentStatus.failed,
+        PaymentStatus.refunded,
+        PaymentStatus.disputed,
+    }:
+        return appointment
+
+    payment_record = gateway.fetch_payment(booking_id=str(appointment.id))
+    reconcile_payment_record(db, appointment, payment_record)
+    db.add(appointment)
+    db.commit()
+    db.refresh(appointment)
+    return appointment
 
 
 @router.get("/{appointment_id}", response_model=AppointmentRead)
@@ -351,10 +449,7 @@ def read_appointment(
     if appointment is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
 
-    company_id: UUID | None = None
-    if current_user.role in {"company", "provider", "company_admin"}:
-        company_user = db.query(CompanyUser).filter(CompanyUser.user_id == current_user.id).first()
-        company_id = company_user.company_id if company_user else None
+    company_id = _current_user_company_id(db, current_user)
 
     _ensure_appointment_read_access(appointment, current_user, company_id)
     return _serialize_appointment(appointment)
@@ -608,7 +703,7 @@ def confirm_hold(
         postal_code=resolved_address["postal_code"],
         start_time=hold_start,
         end_time=hold_end,
-        status=AppointmentStatus.requested,
+        status=AppointmentStatus.pending_payment,
     )
     db.add(appointment)
     db.flush()
@@ -621,10 +716,13 @@ def confirm_hold(
     )
 
     booking_id = str(appointment.id)
-    currency = settings.payment_currency
-    amount_cents = service.price_cents
-
-    using_stub = not gateway.enabled
+    quote = calculate_booking_quote(
+        service=service,
+        booking_type=payload.type,
+        currency=settings.payment_currency,
+    )
+    currency = quote.currency
+    amount_cents = quote.total
 
     try:
         checkout = gateway.create_checkout_session(
@@ -632,6 +730,7 @@ def confirm_hold(
             amount_cents=amount_cents,
             currency=currency,
             customer_email=payload.customer_email,
+            customer_name=payload.customer_name,
         )
     except PaymentGatewayError as exc:
         db.rollback()
@@ -659,9 +758,10 @@ def confirm_hold(
     appointment.payment_amount_expected = amount_cents
     appointment.payment_currency = currency
 
-    if appointment.payment_status == PaymentStatus.succeeded and using_stub:
+    if appointment.payment_status == PaymentStatus.succeeded and gateway.mode == "mock":
         previous_status = appointment.status
         appointment.status = AppointmentStatus.confirmed
+        appointment.confirmed_time = _utcnow()
         appointment.payment_amount_received = appointment.payment_amount_expected
         hold.status = HoldStatus.CONFIRMED
         enqueue_customer_notification(db, appointment, APPOINTMENT_CONFIRMED)
@@ -700,6 +800,59 @@ def confirm_hold(
     if idempotency_key:
         _store_idempotent_payload(idempotency_key, response.model_dump())
     return response
+
+
+@router.post("/{appointment_id}/payment/refresh", response_model=AppointmentRead)
+def refresh_appointment_payment(
+    appointment_id: UUID,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+    gateway: PaymentGateway = Depends(get_payment_gateway),
+) -> AppointmentRead:
+    appointment = db.get(Appointment, appointment_id)
+    if appointment is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
+
+    company_id = _current_user_company_id(db, current_user)
+    _ensure_appointment_read_access(appointment, current_user, company_id)
+
+    if gateway.mode != "service":
+        return _serialize_appointment(appointment)
+    if not appointment.payment_id:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Appointment has no payment to refresh")
+
+    try:
+        appointment = _refresh_service_mode_payment(db=db, appointment=appointment, gateway=gateway)
+    except PaymentGatewayError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+    return _serialize_appointment(appointment)
+
+
+@router.post("/{appointment_id}/payment/cancel", response_model=AppointmentRead)
+def cancel_appointment_payment(
+    appointment_id: UUID,
+    current_customer=Depends(get_current_customer),
+    db: Session = Depends(get_db),
+) -> AppointmentRead:
+    appointment = db.get(Appointment, appointment_id)
+    if appointment is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
+
+    _ensure_customer_access(appointment, current_customer)
+
+    if settings.payment_mode != "service":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Payment cancellation is only available in service mode")
+    if appointment.payment_status == PaymentStatus.succeeded:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Paid appointments cannot be cancelled through the unpaid payment flow")
+    if appointment.status == AppointmentStatus.cancelled:
+        return _serialize_appointment(appointment)
+
+    cancel_unpaid_appointment(db, appointment)
+    db.add(appointment)
+    db.commit()
+    db.refresh(appointment)
+    return _serialize_appointment(appointment)
 
 
 @router.post("/holds/expire")

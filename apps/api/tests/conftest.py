@@ -8,6 +8,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.core.config import settings
 from app.core.db import Base
 from app.main import app
 from app.core.db import get_db
@@ -39,6 +40,15 @@ def db_session() -> Generator[Session, None, None]:
         session.close()
         Base.metadata.drop_all(bind=engine)
         engine.dispose()
+
+
+@pytest.fixture(autouse=True)
+def _default_payment_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "payment_mode", "mock")
+    monkeypatch.setattr(settings, "payment_service_base_url", None)
+    monkeypatch.setattr(settings, "payment_checkout_success_url", "")
+    monkeypatch.setattr(settings, "payment_checkout_cancel_url", "")
+    monkeypatch.setattr(settings, "payment_mobile_redirect_base", "")
 
 
 @pytest.fixture()

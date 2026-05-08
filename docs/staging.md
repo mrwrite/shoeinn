@@ -10,7 +10,7 @@ Staging v1 supports:
 - one PostgreSQL database
 - one notification worker process
 - mobile clients pointed at the staging API
-- payment in declared **stub mode**
+- payment in declared **mock mode**
 
 Staging v1 does **not** support multi-instance websocket fanout. Live events in the current code are process-local, so staging must remain single-instance until a shared transport is introduced.
 
@@ -73,7 +73,7 @@ Expected response shape:
   "database": "ok",
   "migrations": "ok",
   "notification_outbox": "ok",
-  "payment_mode": "stub",
+  "payment_mode": "mock",
   "live_events_mode": "single_instance"
 }
 ```
@@ -143,6 +143,6 @@ Run these checks before calling staging usable:
 
 ## Notes
 
-- Payment remains intentionally simulated in staging v1.
+- Payment remains intentionally simulated in staging v1 via `PAYMENT_MODE=mock`. If staging is later switched to `service`, `PAYMENT_SERVICE_BASE_URL` plus `PAYMENT_CHECKOUT_SUCCESS_URL` / `PAYMENT_CHECKOUT_CANCEL_URL` (or `PAYMENT_SUCCESS_URL` / `PAYMENT_CANCEL_URL`) must be set to real reachable return URLs.
 - Live websocket fanout is **single-instance only** in staging v1.
 - If staging later needs multiple API instances, live-event transport must move off in-memory process state.
