@@ -29,7 +29,7 @@ try {
     Write-Host "API: $ApiBaseUrl"
 
     if ($Tunnel) {
-        npx expo start --tunnel
+        npm start -- --tunnel
     } else {
         npm start
     }
