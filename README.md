@@ -52,6 +52,9 @@ Common variants:
 
 # Physical device on the same LAN
 .\scripts\start-local.ps1 -ApiBaseUrl "http://<YOUR-LAN-IP>:8000"
+
+# Physical device with Expo tunnel, matching npm start -- --tunnel
+.\scripts\start-local.ps1 -ApiBaseUrl "http://192.168.1.14:8000" -Tunnel
 ```
 
 You can also start each side independently:
@@ -95,7 +98,7 @@ Useful options:
 
 - `-ApiBaseUrl "http://10.0.2.2:8000"` for Android emulator
 - `-ApiBaseUrl "http://<YOUR-LAN-IP>:8000"` for a physical device
-- `-Tunnel` to run `npx expo start --tunnel`
+- `-Tunnel` to run `npm start -- --tunnel`
 - `-SkipInstall` to skip `npm install`
 
 `scripts/start-local.ps1` opens the API script in a separate PowerShell window, waits briefly, then starts Expo in the current window.
