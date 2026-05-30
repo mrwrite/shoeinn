@@ -1,368 +1,117 @@
-# ShoeInn 👟
-**Sneaker Care Scheduling & Notification Platform**
+# ShoeInn
 
-ShoeInn is a full-stack appointment scheduling platform designed for sneaker care businesses. It supports customer bookings, provider workflows, and multi-channel notifications including **in-app**, **email**, and **push notifications**.
+Sneaker care scheduling, provider dispatch, notifications, and payment workflow demo.
 
----
+This repository is a small monorepo. Run each app from its own folder:
 
-## 🧱 Tech Stack
+- `apps/api` - FastAPI backend, Postgres schema, demo seed, workers
+- `apps/mobile` - Expo React Native app
+- `apps/payment` - optional Stripe-backed payment service
 
-### Backend (API)
-- FastAPI
-- PostgreSQL
-- SQLAlchemy
-- Alembic
-- JWT Authentication
-- Background workers (notification outbox pattern)
+The local workflow below is Windows PowerShell first because that is the current development environment. macOS/Linux equivalents are mostly the same, except virtual environment activation paths and shell environment-variable syntax.
 
-### Mobile App
-- Expo (React Native)
-- Expo Notifications
-- EAS (Expo Application Services)
+## Prerequisites
 
----
+- Python 3.11+
+- Node.js and npm
+- Docker Desktop
+- Expo Go for device testing, or an Android/iOS simulator
+- Optional: Stripe CLI and Stripe test credentials for real payment-service testing
+- Optional: Google Directions API key for route polylines and ETA cards
 
-## ✨ Core Features
+## Quick Start
 
-### 👤 Authentication
-- Email + password login
-- JWT access & refresh tokens
-- Role-based access control:
-  - Customer
-  - Provider
-  - Admin
+Start Postgres and the API:
 
-### 📅 Appointments
-- Customers can:
-  - Create appointment holds
-  - Confirm appointments
-  - View appointment history and status
-- Providers can:
-  - View open appointments
-  - Update appointment status
-  - Receive notifications on changes
-
-### 🏢 Companies
-- Providers belong to companies
-- Appointments are scoped to companies
-- Admin users can:
-  - Create companies
-  - Manage company users
-  - Assign provider roles
-
----
-
-## 🔔 Notifications System
-
-ShoeInn uses a **reliable outbox-based notification system** to guarantee delivery and avoid race conditions.
-
-### Supported Channels
-- In-app
-- Email
-- Push (Expo)
-
-### Notification Types
-- `NEW_APPOINTMENT`
-- `APPOINTMENT_CONFIRMED`
-- `APPOINTMENT_STATUS_CHANGED`
-
----
-
-## 📤 Notification Outbox Pattern
-
-Notifications are processed in three distinct steps:
-
-1. Business logic creates a notification record
-2. A corresponding outbox entry is created
-3. A background worker delivers the notification
-
-### Benefits
-- Guaranteed delivery
-- Retry support
-- Dead-letter handling
-- Decoupled business logic
-
----
-
-## 🔁 Notification Worker
-
-The notification worker is responsible for dispatching queued notifications.
-
-### Run the worker manually
-
-```bash
-python -m app.workers.notification_worker
-```
-
----
-
-## 🧠 Worker Responsibilities
-
-- Fetch pending outbox records
-- Lock records to prevent duplicate processing
-- Dispatch notifications by channel (email, push, in-app)
-- Mark records as completed or failed
-- Retry failed deliveries
-- Move unrecoverable failures to dead-letter state
-
----
-
-## 📲 Push Notifications (Expo)
-
-Push notifications are delivered using **Expo Push Notifications**.
-
-### Who receives push notifications
-- Customers receive appointment confirmations and status updates
-- Providers receive new appointment and status change alerts
-
----
-
-## 🔧 Push Notification Setup
-
-### Install EAS CLI
-
-```bash
-npm install -g eas-cli
-```
-
-### Initialize EAS
-
-```bash
-cd apps/mobile
-eas init
-```
-
-### Configure `app.json`
-
-```json
-{
-  "expo": {
-    "extra": {
-      "eas": {
-        "projectId": "YOUR_EAS_PROJECT_ID"
-      }
-    }
-  }
-}
-```
-
-### Register Push Token (Mobile)
-
-```ts
-import * as Notifications from "expo-notifications";
-import Constants from "expo-constants";
-
-const token = await Notifications.getExpoPushTokenAsync({
-  projectId: Constants.expoConfig?.extra?.eas?.projectId,
-});
-```
-
----
-
-## 📁 Project Structure
-
-```
-shoeinn/
-├── apps/
-│   ├── api/
-│   │   ├── app/
-│   │   │   ├── models/
-│   │   │   ├── routers/
-│   │   │   ├── services/
-│   │   │   ├── workers/
-│   │   │   └── utils/
-│   │   ├── alembic/
-│   │   ├── main.py
-│   │   └── requirements.txt
-│   └── mobile/
-│       ├── app.json
-│       ├── eas.json
-│       ├── src/
-│       └── package.json
-```
-
----
-
-## 🚀 Getting Started (Local Development)
-
-### Backend Setup
-
-```bash
-cd apps/api
-python -m venv .venv
-```
-
-Activate the virtual environment:
-
-```bash
-# macOS / Linux
-source .venv/bin/activate
-
-# Windows
+```powershell
+cd .\apps\api
+docker compose up -d
+py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
+pip install -r ..\..\requirements.txt
+pip install -e .
+Copy-Item .env.example .env
 ```
 
-Install dependencies:
+Edit `apps/api/.env` for host-to-Docker development:
 
-```bash
-pip install -r requirements.txt
+```env
+DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/shoeinn
+JWT_SECRET=changeme
+ALLOWED_ORIGINS=*
+PAYMENT_MODE=mock
+PAYMENT_SERVICE_BASE_URL=
+PAYMENT_MOBILE_REDIRECT_BASE=
 ```
 
-Create `.env`:
+Run migrations and start the API:
 
-```
-DATABASE_URL=postgresql://user:password@localhost:5432/shoeinn
-JWT_SECRET=your-secret-key
-```
-
-Run migrations:
-
-```bash
-alembic upgrade head
+```powershell
+python -m alembic upgrade head
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Start the API:
+In a second PowerShell window, seed demo data:
 
-```bash
-make dev
+```powershell
+Invoke-RestMethod -Method Post "http://localhost:8000/dev/seed?reset=true"
 ```
 
-or
+Start the mobile app:
 
-```bash
-python -m uvicorn app.main:app --reload
-```
-
----
-
-## 📱 Mobile App Setup
-
-```bash
-cd apps/mobile
+```powershell
+cd .\apps\mobile
 npm install
-$env:EXPO_PUBLIC_API_URL="http://192.168.1.131:8000"; npm start -- --tunnel
+$env:EXPO_PUBLIC_API_BASE_URL="http://localhost:8000"
+$env:EXPO_PUBLIC_API_URL=$env:EXPO_PUBLIC_API_BASE_URL
+npm start
 ```
 
-> Push notifications require a physical device.
+For an Android emulator, use `http://10.0.2.2:8000` instead of `localhost`. For a physical device, use your computer's LAN IP, for example `http://192.168.1.25:8000`.
 
----
+## API Local Development
 
-## 🗄 Database Overview
-
-### notifications
-- Stores logical notification records
-- Tracks user-visible notification state
-
-### notification_outbox
-- Asynchronous delivery queue
-- Processed by notification worker
-
-### push_tokens
-- Stores Expo push tokens
-- One user can have multiple devices
-
----
-
-## 🧪 Troubleshooting
-
-### Push warning: `No projectId found`
-- Run `eas init`
-- Ensure `extra.eas.projectId` exists in `app.json`
-
-### SQLAlchemy error: `failed to locate a name ('RefreshToken')`
-- Ensure all models are imported in `app/models/__init__.py`
-- Or remove unused relationships
-
-### Notifications not sending
-- Ensure the notification worker is running
-- Check `notification_outbox.status`
-- Verify push tokens exist for users
-
----
-
-## 🛣 Roadmap
-
-- Admin notification dashboard
-- Notification preferences per user
-- SMS notifications
-- Delivery analytics
-- Provider availability scheduling
-
----
-
-## 📄 License
-
-MIT
-
-## UI Redesign (Peacock Theme)
-- Location: `apps/mobile`
-- Run: `cd apps/mobile && npm install && npm start`
-- Screens included: Customer Home, Service Detail, Booking Date/Time/Confirm, Provider Dashboard, Provider Appointment Detail.
-- Design system: Peacock color palette, reusable components (headers, search, chips, cards, buttons) with safe area support and sticky CTAs.
-
-## Local Development (Windows PowerShell)
-
-This repo is a monorepo. Do not try to run it from the repository root as a single app.
-
-Active runtime surfaces:
-
-- `apps/api` - main FastAPI backend
-- `apps/mobile` - Expo mobile app
-- `apps/payment` - optional payment service for payment-specific flows
-
-### Startup order
-
-1. Start Postgres from `apps/api`
-2. Start the backend API from `apps/api`
-3. Seed demo data
-4. Start the mobile app from `apps/mobile`
-5. Start the notification worker only if you need queued delivery validation
-
-### Postgres
-
-`apps/api/docker-compose.yml` only starts Postgres.
+`apps/api/docker-compose.yml` runs Postgres only:
 
 ```powershell
 cd .\apps\api
 docker compose up -d
 ```
 
-If your Docker install only supports the older command, use `docker-compose up -d`.
+If your Docker install only supports the old command, use `docker-compose up -d`.
 
-### Backend (`apps/api`)
-
-Create and activate a Windows virtual environment:
+Create and install the backend environment:
 
 ```powershell
 cd .\apps\api
 py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
-```
-
-Install dependencies:
-
-```powershell
 pip install -r ..\..\requirements.txt
 pip install -e .
 ```
 
-Create `.env` from `.env.example`:
+Create `.env`:
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-If the API runs on the Windows host and Postgres runs in Docker, change `DATABASE_URL` to use `localhost` instead of `db`:
+Important local database setting:
+
+- Use `localhost` in `DATABASE_URL` when the API runs directly on Windows and Postgres runs in Docker.
+- Use `db` only from another container on the same Docker network.
+
+Known-good Windows host value:
 
 ```env
 DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/shoeinn
-JWT_SECRET=changeme
-ALLOWED_ORIGINS=*
 ```
 
-Run migrations:
+If you previously started Postgres with different credentials, the Docker volume keeps them. To reset the local DB and delete all local data:
 
 ```powershell
+docker compose down -v
+docker compose up -d
 python -m alembic upgrade head
 ```
 
@@ -372,37 +121,49 @@ Start the API:
 python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Seed demo data:
+Health checks:
+
+```powershell
+Invoke-RestMethod http://localhost:8000/health
+Invoke-RestMethod http://localhost:8000/ready
+```
+
+`/health` only confirms the process is alive. `/ready` also checks the database, migration heads, and required notification table.
+
+## Demo Seed
+
+Seed the default Shelby County, Alabama demo:
 
 ```powershell
 Invoke-RestMethod -Method Post "http://localhost:8000/dev/seed?reset=true"
 ```
 
-The owner-demo seed is tuned for Helena/Pelham conversations and returns a repeatable local scenario:
-
-- `Pelham Pickup & Press` owner: `pelham.admin@shoeinn.com` / `Password1!`
-- Pelham providers: `pelham.driver1@shoeinn.com` / `Password1!`, `pelham.driver2@shoeinn.com` / `Password1!`
-- `Helena Shoe & Dry Care` owner: `helena.admin@shoeinn.com` / `Password1!`
-- Customer: `customer@shoeinn.com` / `Password1!`
-
-The Pelham company is the primary live-demo story. It seeds:
-
-- one confirmed unassigned job,
-- multiple assigned in-progress jobs,
-- one ready-for-delivery job,
-- owner and provider roles that make dispatch value obvious immediately.
-
-### Optional notification worker
-
-The API does not start the notification worker automatically. Start it only if you need queued email/push/sms delivery validation:
+Seed the Mt. Juliet, Tennessee demo:
 
 ```powershell
-cd .\apps\api
-.\.venv\Scripts\Activate.ps1
-python -m app.workers.notification_worker
+Invoke-RestMethod -Method Post "http://localhost:8000/dev/seed?reset=true&demo_market=mt_juliet"
 ```
 
-### Mobile (`apps/mobile`)
+Default demo logins all use `Password1!`:
+
+- Global admin: `admin@shoeinn.com`
+- Customer: `customer@shoeinn.com`
+- Pelham owner: `pelham.admin@shoeinn.com`
+- Pelham providers: `pelham.driver1@shoeinn.com`, `pelham.driver2@shoeinn.com`
+- Helena owner: `helena.admin@shoeinn.com`
+- Helena provider: `helena.driver@shoeinn.com`
+- Alabaster owner: `alabaster.admin@shoeinn.com`
+- Alabaster provider: `alabaster.driver@shoeinn.com`
+
+Mt. Juliet quick-demo logins use `Password123!`:
+
+- Customer: `customer.mtjuliet@shoeinn.demo`
+- Provider: `provider.mtjuliet@shoeinn.demo`
+- Company admin: `admin.mtjuliet@shoeinn.demo`
+
+The seed response also returns the current login list and generated company IDs.
+
+## Mobile Local Development
 
 Install dependencies:
 
@@ -411,86 +172,214 @@ cd .\apps\mobile
 npm install
 ```
 
-Set `EXPO_PUBLIC_API_URL` before starting Expo. The active mobile API client depends on this value.
+Set the API base URL before starting Expo. Set both names for now: most code reads `EXPO_PUBLIC_API_BASE_URL`, while a service-admin helper still reads `EXPO_PUBLIC_API_URL`.
+
+Windows host or iOS simulator:
+
+```powershell
+$env:EXPO_PUBLIC_API_BASE_URL="http://localhost:8000"
+$env:EXPO_PUBLIC_API_URL=$env:EXPO_PUBLIC_API_BASE_URL
+npm start
+```
 
 Android emulator:
 
 ```powershell
-$env:EXPO_PUBLIC_API_URL="http://10.0.2.2:8000"
-npm start
-```
-
-iOS simulator:
-
-```powershell
-$env:EXPO_PUBLIC_API_URL="http://localhost:8000"
+$env:EXPO_PUBLIC_API_BASE_URL="http://10.0.2.2:8000"
+$env:EXPO_PUBLIC_API_URL=$env:EXPO_PUBLIC_API_BASE_URL
 npm start
 ```
 
 Physical device on the same LAN:
 
 ```powershell
-$env:EXPO_PUBLIC_API_URL="http://<YOUR-LAN-IP>:8000"
+$env:EXPO_PUBLIC_API_BASE_URL="http://<YOUR-LAN-IP>:8000"
+$env:EXPO_PUBLIC_API_URL=$env:EXPO_PUBLIC_API_BASE_URL
 npm start
 ```
 
-Use Expo tunnel only for Metro connectivity if needed. It does not make your backend reachable from the device.
+Use Expo tunnel only for Metro connectivity if needed:
 
-### Optional payment service (`apps/payment`)
-
-`apps/payment` is optional for most local development flows, including provider appointment claiming and assignment.
-
-- Local/demo API config should default to `PAYMENT_MODE=mock`. Keep it that way unless you intentionally start `apps/payment` for a real checkout demo.
-- If `PAYMENT_MODE=service`, `PAYMENT_SERVICE_BASE_URL` must be configured for checkout and sync behavior.
-- If `PAYMENT_MODE=service`, set reachable non-placeholder checkout return URLs with `PAYMENT_CHECKOUT_SUCCESS_URL` / `PAYMENT_CHECKOUT_CANCEL_URL` or the aliases `PAYMENT_SUCCESS_URL` / `PAYMENT_CANCEL_URL`. The API exposes lightweight return pages at `/payment/return/success` and `/payment/return/cancel`.
-- The payment sync worker only starts in `service` mode when `PAYMENT_SERVICE_BASE_URL` is configured.
-- See `apps/payment/README.md` for the current minimum local startup notes.
-
-### Smallest real demo payment path
-
-The current narrow real-payment path is:
-
-1. Run `apps/payment` with Stripe test credentials.
-2. Set `PAYMENT_MODE=service` and `PAYMENT_SERVICE_BASE_URL` in `apps/api`.
-3. Set `PAYMENT_CHECKOUT_SUCCESS_URL` and `PAYMENT_CHECKOUT_CANCEL_URL` to reachable API return pages, for example:
-
-```env
-PAYMENT_CHECKOUT_SUCCESS_URL=http://<YOUR-LAN-IP>:8000/payment/return/success
-PAYMENT_CHECKOUT_CANCEL_URL=http://<YOUR-LAN-IP>:8000/payment/return/cancel
+```powershell
+npx expo start --tunnel
 ```
 
-4. Start the API so the payment sync worker can reconcile service-backed payment status.
-5. In the mobile app, the customer can open hosted checkout, return to ShoeInn, and explicitly refresh payment status or cancel the unpaid booking.
+Tunnel mode does not automatically expose the backend API. A phone still needs an API URL it can reach.
 
-Deferred for later hardening:
+Optional mobile environment values:
 
-- refunds/disputes operator flows,
-- payouts or marketplace settlement,
-- broader reconciliation/backoffice tooling.
+```powershell
+$env:EXPO_PUBLIC_GOOGLE_MAPS_API_KEY="your-google-directions-api-key"
+$env:EXPO_PUBLIC_MOBILE_REDIRECT_BASE="exp://<YOUR-LAN-IP>:8081/--"
+```
 
-## Local Validation Checklist
+Use `EXPO_PUBLIC_MOBILE_REDIRECT_BASE="shoeinn://app"` for a dev build or standalone app that supports the custom scheme.
 
-Use this checklist for provider appointment claiming and assignment validation:
+## Optional Payment Service
 
-1. Start Postgres from `apps/api/docker-compose.yml`
-2. Activate the backend venv and install dependencies
-3. Run `python -m alembic upgrade head`
-4. Start the API with `python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
-5. Seed demo data with `POST /dev/seed`
-6. Run focused backend tests:
+Most local development should keep the API in mock payment mode:
+
+```env
+PAYMENT_MODE=mock
+PAYMENT_SERVICE_BASE_URL=
+PAYMENT_MOBILE_REDIRECT_BASE=
+```
+
+Only start `apps/payment` when validating the Stripe-hosted checkout path.
+
+Start the payment service:
+
+```powershell
+cd .\apps\payment
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -e .
+$env:STRIPE_API_KEY="sk_test_..."
+$env:STRIPE_WEBHOOK_SECRET="whsec_..."
+$env:DATABASE_URL="sqlite:///./payment.db"
+$env:TENANT_ID="public"
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
+```
+
+Then set these API values in `apps/api/.env`:
+
+```env
+PAYMENT_MODE=service
+PAYMENT_SERVICE_BASE_URL=http://localhost:8001
+PAYMENT_MOBILE_REDIRECT_BASE=shoeinn://app
+```
+
+For Expo Go return-flow testing, use an explicit Expo URL instead:
+
+```env
+PAYMENT_MOBILE_REDIRECT_BASE=exp://<YOUR-LAN-IP>:8081/--
+```
+
+Forward Stripe webhooks in a separate shell when testing automatic reconciliation:
+
+```powershell
+stripe listen --forward-to http://localhost:8001/payments/webhooks/stripe
+```
+
+If you want the payment service to push status back to the booking API:
+
+```powershell
+$env:BOOKING_API_WEBHOOK_URL="http://localhost:8000/webhooks/payments"
+```
+
+## Workers
+
+The API process starts the payment sync worker only when:
+
+- `PAYMENT_MODE=service`
+- `PAYMENT_SERVICE_BASE_URL` is configured
+- `ENABLE_PAYMENT_SYNC_WORKER` is not disabled
+
+The notification worker is manual:
 
 ```powershell
 cd .\apps\api
-.\venv\Scripts\python.exe -m pytest tests\test_assignment_claiming.py -q
+.\.venv\Scripts\Activate.ps1
+python -m app.workers.notification_worker
 ```
 
-7. Start the mobile app with the correct `EXPO_PUBLIC_API_URL`
-8. Validate that:
-   - a provider can claim a confirmed appointment
-   - a duplicate claim returns `409`
-   - a company admin can reassign an active appointment
-   - a company admin sees the owner command center instead of the provider queue
-   - a company admin can assign an unassigned confirmed appointment from the owner detail flow
-   - terminal appointments cannot be reassigned
-   - customer detail shows the assigned provider
-   - customer detail keeps the status timeline visible
+Start it only when you need queued email, push, or in-app delivery validation.
+
+## Testing
+
+Run backend tests:
+
+```powershell
+cd .\apps\api
+.\.venv\Scripts\Activate.ps1
+python -m pytest tests -q
+```
+
+Run a focused backend test file:
+
+```powershell
+python -m pytest tests\test_assignment_claiming.py -q
+```
+
+The backend tests use in-memory SQLite through `apps/api/tests/conftest.py`, so they do not require local Postgres, migrations, or seeded data.
+
+Run mobile tests and type checks:
+
+```powershell
+cd .\apps\mobile
+npm test -- --runInBand
+npm run typecheck
+```
+
+Run payment service tests:
+
+```powershell
+cd .\apps\payment
+.\.venv\Scripts\Activate.ps1
+python -m pytest tests -q
+```
+
+Recommended pre-demo validation:
+
+```powershell
+cd .\apps\api
+python -m pytest tests\test_assignment_claiming.py tests\test_dev_seed.py tests\test_payment_gateway.py -q
+
+cd ..\mobile
+npm test -- --runInBand
+npm run typecheck
+```
+
+## Troubleshooting
+
+`password authentication failed for user`
+
+The Postgres Docker volume likely has credentials from an older run. Reset it from `apps/api`:
+
+```powershell
+docker compose down -v
+docker compose up -d
+python -m alembic upgrade head
+```
+
+Mobile cannot reach the API
+
+- Android emulator should use `http://10.0.2.2:8000`.
+- Physical devices should use `http://<YOUR-LAN-IP>:8000`.
+- Confirm the API is bound to `0.0.0.0`.
+- Confirm Windows Firewall allows inbound traffic to port `8000` when using a physical device.
+
+Payment confirmation fails in service mode
+
+- Confirm `PAYMENT_SERVICE_BASE_URL` is set.
+- Confirm `PAYMENT_MOBILE_REDIRECT_BASE` is not blank or placeholder.
+- Keep `PAYMENT_MODE=mock` if the payment service is not intentionally running.
+
+Push warning: `No projectId found`
+
+- Run `eas init` in `apps/mobile`.
+- Ensure `extra.eas.projectId` is configured in the Expo app config.
+
+Notifications are not sending
+
+- Confirm the notification worker is running.
+- Check `notification_outbox.status`.
+- Verify push tokens exist for the target users.
+
+## Useful Endpoints
+
+- `GET /health` - process health
+- `GET /ready` - database and migration readiness
+- `POST /dev/seed?reset=true` - reset and seed default demo data
+- `POST /dev/seed?reset=true&demo_market=mt_juliet` - reset and seed Mt. Juliet demo data
+- `GET /companies` - list companies
+- `GET /services` - list services
+- `POST /auth/login` - login
+
+Example login:
+
+```powershell
+Invoke-RestMethod -Method Post "http://localhost:8000/auth/login" `
+  -ContentType "application/json" `
+  -Body '{"email":"customer@shoeinn.com","password":"Password1!"}'
+```
