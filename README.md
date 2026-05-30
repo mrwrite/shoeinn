@@ -21,53 +21,84 @@ The local workflow below is Windows PowerShell first because that is the current
 
 ## Quick Start
 
-Start Postgres and the API:
+The simplest local startup is:
 
 ```powershell
-cd .\apps\api
-docker compose up -d
-py -3.11 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r ..\..\requirements.txt
-pip install -e .
-Copy-Item .env.example .env
+.\scripts\start-local.ps1
 ```
 
-Edit `apps/api/.env` for host-to-Docker development:
+That command:
 
-```env
-DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/shoeinn
-JWT_SECRET=changeme
-ALLOWED_ORIGINS=*
-PAYMENT_MODE=mock
-PAYMENT_SERVICE_BASE_URL=
-PAYMENT_MOBILE_REDIRECT_BASE=
-```
+- starts Postgres with Docker Compose
+- creates `apps/api/.venv` if needed
+- creates and normalizes `apps/api/.env` for Windows host-to-Docker development
+- installs API dependencies unless `-SkipInstall` is passed
+- runs Alembic migrations
+- starts the API in a separate PowerShell window
+- seeds demo data
+- starts Expo in the current window
 
-Run migrations and start the API:
+Common variants:
 
 ```powershell
-python -m alembic upgrade head
-python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+# Use the Mt. Juliet demo seed
+.\scripts\start-local.ps1 -DemoMarket mt_juliet
+
+# Use Expo tunnel for Metro connectivity
+.\scripts\start-local.ps1 -Tunnel
+
+# Skip dependency installation on repeat startups
+.\scripts\start-local.ps1 -SkipInstall
+
+# Physical device on the same LAN
+.\scripts\start-local.ps1 -ApiBaseUrl "http://<YOUR-LAN-IP>:8000"
 ```
 
-In a second PowerShell window, seed demo data:
+You can also start each side independently:
 
 ```powershell
-Invoke-RestMethod -Method Post "http://localhost:8000/dev/seed?reset=true"
+.\scripts\start-api.ps1
+.\scripts\start-mobile.ps1
 ```
 
-Start the mobile app:
+For an Android emulator, point mobile at the emulator host bridge:
 
 ```powershell
-cd .\apps\mobile
-npm install
-$env:EXPO_PUBLIC_API_BASE_URL="http://localhost:8000"
-$env:EXPO_PUBLIC_API_URL=$env:EXPO_PUBLIC_API_BASE_URL
-npm start
+.\scripts\start-mobile.ps1 -ApiBaseUrl "http://10.0.2.2:8000"
 ```
 
-For an Android emulator, use `http://10.0.2.2:8000` instead of `localhost`. For a physical device, use your computer's LAN IP, for example `http://192.168.1.25:8000`.
+Manual setup commands are below for troubleshooting and non-Windows shells.
+
+## Local Scripts
+
+`scripts/start-api.ps1` prepares and runs the backend stack:
+
+```powershell
+.\scripts\start-api.ps1
+```
+
+Useful options:
+
+- `-DemoMarket shelby` or `-DemoMarket mt_juliet`
+- `-NoSeed` to skip the `POST /dev/seed` call
+- `-ResetDb` to run `docker compose down -v` before starting Postgres
+- `-SkipInstall` to skip `pip install`
+- `-Port 8000` to override the API port
+
+`scripts/start-mobile.ps1` prepares Expo environment variables and starts the mobile app:
+
+```powershell
+.\scripts\start-mobile.ps1 -ApiBaseUrl "http://localhost:8000"
+```
+
+Useful options:
+
+- `-ApiBaseUrl "http://10.0.2.2:8000"` for Android emulator
+- `-ApiBaseUrl "http://<YOUR-LAN-IP>:8000"` for a physical device
+- `-Tunnel` to run `npx expo start --tunnel`
+- `-SkipInstall` to skip `npm install`
+
+`scripts/start-local.ps1` opens the API script in a separate PowerShell window, waits briefly, then starts Expo in the current window.
 
 ## API Local Development
 
