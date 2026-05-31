@@ -2,6 +2,12 @@ import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { getLiveEventsWebSocketUrl } from "../api/http";
+import {
+  appointmentAssignmentQueryKey,
+  appointmentEventsQueryKey,
+  appointmentQueryKey,
+  customerAppointmentsQueryKey,
+} from "../query/keys";
 import { useAuthStore } from "../state/authStore";
 
 type LiveEvent =
@@ -65,16 +71,16 @@ export function useLiveAppointmentEvents() {
       }
 
       if (role === "customer") {
-        void queryClient.invalidateQueries({ queryKey: ["appointments", "mine"] });
+        void queryClient.invalidateQueries({ queryKey: customerAppointmentsQueryKey });
         void queryClient.invalidateQueries({ queryKey: ["me", "notifications"] });
       } else {
         void queryClient.invalidateQueries({ queryKey: ["provider", "open"] });
         void queryClient.invalidateQueries({ queryKey: ["provider", "my"] });
       }
 
-      void queryClient.invalidateQueries({ queryKey: ["appointment", appointmentId] });
-      void queryClient.invalidateQueries({ queryKey: ["appointment", appointmentId, "assignment"] });
-      void queryClient.invalidateQueries({ queryKey: ["appointment", appointmentId, "events"] });
+      void queryClient.invalidateQueries({ queryKey: appointmentQueryKey(appointmentId) });
+      void queryClient.invalidateQueries({ queryKey: appointmentAssignmentQueryKey(appointmentId) });
+      void queryClient.invalidateQueries({ queryKey: appointmentEventsQueryKey(appointmentId) });
     };
 
     const connect = () => {

@@ -7,6 +7,7 @@ import { getAppointment, refreshAppointmentPayment } from "../../api/http";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { Text } from "../../components/ui/Text";
 import type { AppointmentStackParamList } from "../../navigation/types";
+import { appointmentQueryKey, customerAppointmentsQueryKey } from "../../query/keys";
 
 type Props = NativeStackScreenProps<AppointmentStackParamList, "PaymentResult">;
 
@@ -42,8 +43,8 @@ export default function PaymentResultScreen({ navigation, route }: Props) {
         if (!active) {
           return;
         }
-        queryClient.setQueryData(["appointment", bookingId], appointment);
-        await queryClient.invalidateQueries({ queryKey: ["appointments", "mine"] });
+        queryClient.setQueryData(appointmentQueryKey(bookingId), appointment);
+        await queryClient.invalidateQueries({ queryKey: customerAppointmentsQueryKey });
         setState({ kind: "loaded", appointment });
       } catch (error: any) {
         if (!active) {
@@ -159,8 +160,8 @@ export default function PaymentResultScreen({ navigation, route }: Props) {
             void (async () => {
               try {
                 const latest = await refreshAppointmentPayment(bookingId);
-                queryClient.setQueryData(["appointment", bookingId], latest);
-                await queryClient.invalidateQueries({ queryKey: ["appointments", "mine"] });
+                queryClient.setQueryData(appointmentQueryKey(bookingId), latest);
+                await queryClient.invalidateQueries({ queryKey: customerAppointmentsQueryKey });
                 setState({ kind: "loaded", appointment: latest });
               } catch (error: any) {
                 Alert.alert("Unable to refresh", error?.message ?? "Please try again.");

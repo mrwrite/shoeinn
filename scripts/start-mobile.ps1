@@ -1,6 +1,8 @@
 param(
     [string]$ApiBaseUrl = "http://localhost:8000",
     [string]$MobileRedirectBase = "",
+    [ValidateSet("", "mock", "service")]
+    [string]$ExpectedPaymentMode = "",
     [switch]$Tunnel,
     [switch]$SkipApiCheck,
     [switch]$SkipInstall
@@ -38,7 +40,25 @@ try {
                 throw "Unexpected health response: $($health | ConvertTo-Json -Compress)"
             }
         } catch {
-            throw "Could not reach the ShoeInn API at $healthUrl. Check the LAN IP, make sure the API is running on port 8000, and confirm Windows Firewall allows inbound connections."
+            $apiPort = "the configured port"
+            try {
+                $apiPort = ([uri]$ApiBaseUrl).Port
+            } catch {
+            }
+            throw "Could not reach the ShoeInn API at $healthUrl. Check the API window for startup errors, confirm the API is running on port $apiPort, verify the LAN IP in -ApiBaseUrl, and confirm Windows Firewall allows inbound connections."
+        }
+
+        if ($ExpectedPaymentMode) {
+            $readyUrl = "$($ApiBaseUrl.TrimEnd('/'))/ready"
+            Write-Host "==> Checking API payment mode at $readyUrl"
+            try {
+                $ready = Invoke-RestMethod $readyUrl
+                if ($ready.payment_mode -ne $ExpectedPaymentMode) {
+                    throw "Expected payment_mode=$ExpectedPaymentMode but API reported payment_mode=$($ready.payment_mode)"
+                }
+            } catch {
+                throw "API payment mode check failed. $($_.Exception.Message)"
+            }
         }
     }
 

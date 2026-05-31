@@ -33,6 +33,12 @@ import {
   useCustomerNotifications,
 } from "../../hooks/useCustomerNotifications";
 import type { AppointmentStackParamList } from "../../navigation/types";
+import {
+  appointmentAssignmentQueryKey,
+  appointmentEventsQueryKey,
+  appointmentQueryKey,
+  customerAppointmentsQueryKey,
+} from "../../query/keys";
 import type {
   AppointmentEvent,
   AppointmentSummary,
@@ -150,18 +156,18 @@ export default function AppointmentDetailScreen({ route }: Props) {
   const handledAutoRefreshRef = useRef(false);
 
   const appointmentQuery = useQuery({
-    queryKey: ["appointment", appointmentId],
+    queryKey: appointmentQueryKey(appointmentId),
     queryFn: () => getAppointment(appointmentId),
   });
 
   const eventsQuery = useQuery({
-    queryKey: ["appointment", appointmentId, "events"],
+    queryKey: appointmentEventsQueryKey(appointmentId),
     queryFn: () => getAppointmentEvents(appointmentId),
     enabled: !!appointmentId,
   });
 
   const assignmentQuery = useQuery({
-    queryKey: ["appointment", appointmentId, "assignment"],
+    queryKey: appointmentAssignmentQueryKey(appointmentId),
     queryFn: () => getAppointmentAssignment(appointmentId),
     retry: false,
   });
@@ -243,8 +249,8 @@ export default function AppointmentDetailScreen({ route }: Props) {
   const handleRefreshPayment = async (reason: "manual" | "return" = "manual") => {
     try {
       const latest = await refreshAppointmentPayment(appointmentId);
-      queryClient.setQueryData(["appointment", appointmentId], latest);
-      await queryClient.invalidateQueries({ queryKey: ["appointments", "mine"] });
+      queryClient.setQueryData(appointmentQueryKey(appointmentId), latest);
+      await queryClient.invalidateQueries({ queryKey: customerAppointmentsQueryKey });
       await appointmentQuery.refetch();
       await eventsQuery.refetch();
 
@@ -278,8 +284,8 @@ export default function AppointmentDetailScreen({ route }: Props) {
   const handleCancelPendingPayment = async () => {
     try {
       const latest = await cancelAppointmentPayment(appointmentId);
-      queryClient.setQueryData(["appointment", appointmentId], latest);
-      await queryClient.invalidateQueries({ queryKey: ["appointments", "mine"] });
+      queryClient.setQueryData(appointmentQueryKey(appointmentId), latest);
+      await queryClient.invalidateQueries({ queryKey: customerAppointmentsQueryKey });
       await appointmentQuery.refetch();
       await eventsQuery.refetch();
     } catch (error: any) {

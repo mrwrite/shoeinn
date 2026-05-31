@@ -56,6 +56,12 @@ def test_create_checkout_session(client: TestClient, db_session: Session) -> Non
     assert session_kwargs["saved_payment_method_options"]["payment_method_save"] == "enabled"
 
 
+def test_health(client: TestClient) -> None:
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+
+
 def test_create_checkout_session_reuses_existing_stripe_customer(client: TestClient, db_session: Session) -> None:
     first_response = client.post(
         "/payments/checkout-session",

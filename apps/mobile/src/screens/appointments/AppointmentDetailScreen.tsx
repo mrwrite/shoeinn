@@ -10,6 +10,7 @@ import { Card } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { Text } from "../../components/ui/Text";
 import type { AppointmentStackParamList } from "../../navigation/types";
+import { appointmentAssignmentQueryKey, appointmentEventsQueryKey, appointmentQueryKey } from "../../query/keys";
 import { useAuthStore } from "../../state/authStore";
 import { useTheme } from "../../theme/theme";
 
@@ -33,20 +34,20 @@ export default function AppointmentDetailScreen() {
   const isCustomer = role === "customer";
 
   const appointmentQuery = useQuery({
-    queryKey: ["appointment", appointmentId],
+    queryKey: appointmentQueryKey(appointmentId),
     queryFn: () => getAppointment(appointmentId),
     initialData: summary as any,
     enabled: isCustomer,
   });
 
   const eventsQuery = useQuery({
-    queryKey: ["appointment", appointmentId, "events"],
+    queryKey: appointmentEventsQueryKey(appointmentId),
     queryFn: () => getAppointmentEvents(appointmentId),
     enabled: isCustomer,
   });
 
   const assignmentQuery = useQuery({
-    queryKey: ["appointment", appointmentId, "assignment"],
+    queryKey: appointmentAssignmentQueryKey(appointmentId),
     queryFn: () => getAppointmentAssignment(appointmentId),
     retry: false,
     enabled: isCustomer,

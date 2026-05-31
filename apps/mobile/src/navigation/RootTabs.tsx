@@ -28,10 +28,6 @@ import type {
   RootTabParamList,
 } from "./types";
 import { useAuthStore } from "../state/authStore";
-import {
-  getUnreadCustomerNotificationCount,
-  useCustomerNotifications,
-} from "../hooks/useCustomerNotifications";
 import { useTheme } from "../theme/theme";
 
 const HomeStack = createNativeStackNavigator<HomeStackParamList>();
@@ -112,8 +108,6 @@ export default function RootTabs() {
   const usesOperationalHome = role === "provider" || role === "company_admin";
   const showProviderTab = role === "company";
   const homeTabComponent = usesOperationalHome ? ProviderNavigator : HomeNavigator;
-  const notificationsQuery = useCustomerNotifications(role === "customer");
-  const unreadNotifications = getUnreadCustomerNotificationCount(notificationsQuery.data);
   const insets = useSafeAreaInsets();
   const bottomPadding = Math.max(insets.bottom, 8);
 
@@ -144,8 +138,13 @@ export default function RootTabs() {
           component={AppointmentNavigator}
           options={{
             title: "Appointments",
-            tabBarBadge: unreadNotifications > 0 ? unreadNotifications : undefined,
           }}
+          listeners={({ navigation }) => ({
+            tabPress: (event) => {
+              event.preventDefault();
+              navigation.navigate("AppointmentsTab", { screen: "AppointmentList" });
+            },
+          })}
         />
       ) : null}
       {showProviderTab ? (

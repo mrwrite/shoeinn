@@ -11,6 +11,7 @@ import { Card } from "../../components/ui/Card";
 import { Text } from "../../components/ui/Text";
 import { buildQuoteDisplayRows, formatMoney, getImmediateCheckoutUrl } from "../../features/bookingCheckout";
 import type { HomeStackParamList } from "../../navigation/types";
+import { appointmentQueryKey, customerAppointmentsQueryKey } from "../../query/keys";
 import { useAuthStore } from "../../state/authStore";
 import { useTheme } from "../../theme/theme";
 
@@ -86,7 +87,7 @@ export default function BookingReviewPayScreen() {
         payment_checkout_url: appointment.payment_checkout_url,
         selected_payment_method: paymentMethod,
       });
-      queryClient.setQueryData(["appointment", appointment.id], appointment);
+      queryClient.setQueryData(appointmentQueryKey(appointment.id), appointment);
 
       const navigateToAppointment = () => {
         navigation.getParent()?.navigate("AppointmentsTab", {
@@ -104,14 +105,14 @@ export default function BookingReviewPayScreen() {
           console.warn("[Booking] Unable to open Stripe Checkout", error);
           Alert.alert("Checkout unavailable", "Unable to open Stripe checkout right now. Open this appointment to continue payment.");
         } finally {
-          await queryClient.invalidateQueries({ queryKey: ["appointments", "mine"] });
+          await queryClient.invalidateQueries({ queryKey: customerAppointmentsQueryKey });
           navigateToAppointment();
         }
         return;
       }
 
       if (appointment.payment_mode === "service" && paymentMethod === "stripe_checkout") {
-        await queryClient.invalidateQueries({ queryKey: ["appointments", "mine"] });
+        await queryClient.invalidateQueries({ queryKey: customerAppointmentsQueryKey });
         if (!checkoutUrl) {
           Alert.alert(
             "Checkout link missing",
@@ -122,7 +123,7 @@ export default function BookingReviewPayScreen() {
         }
       }
 
-      await queryClient.invalidateQueries({ queryKey: ["appointments", "mine"] });
+      await queryClient.invalidateQueries({ queryKey: customerAppointmentsQueryKey });
       navigateToAppointment();
     },
     onError: (error: Error) => Alert.alert("Booking failed", error.message),

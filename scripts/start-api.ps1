@@ -4,6 +4,10 @@ param(
     [switch]$NoSeed,
     [switch]$ResetDb,
     [switch]$SkipInstall,
+    [ValidateSet("", "mock", "service")]
+    [string]$PaymentMode = "",
+    [string]$PaymentServiceBaseUrl = "",
+    [string]$MobileRedirectBase = "",
     [int]$Port = 8000
 )
 
@@ -55,6 +59,24 @@ function Set-DotEnvValue {
     Set-Content -Path $Path -Value $content -NoNewline
 }
 
+function Get-DotEnvValue {
+    param(
+        [string]$Path,
+        [string]$Name
+    )
+
+    if (-not (Test-Path $Path)) {
+        return ""
+    }
+
+    $match = Select-String -Path $Path -Pattern "^$([regex]::Escape($Name))=(.*)$" | Select-Object -First 1
+    if (-not $match) {
+        return ""
+    }
+
+    return $match.Matches[0].Groups[1].Value.Trim()
+}
+
 Push-Location $ApiDir
 try {
     Invoke-Step "Starting Postgres" {
@@ -71,16 +93,65 @@ try {
     }
 
     Invoke-Step "Preparing API .env" {
+        $createdEnv = $false
         if (-not (Test-Path $EnvPath)) {
             Copy-Item $EnvExamplePath $EnvPath
+            $createdEnv = $true
+        }
+
+        $existingPaymentMode = Get-DotEnvValue $EnvPath "PAYMENT_MODE"
+        $effectivePaymentMode = if ($PaymentMode) {
+            $PaymentMode
+        } elseif (-not $createdEnv -and $existingPaymentMode) {
+            $existingPaymentMode
+        } else {
+            "mock"
+        }
+
+        $existingPaymentServiceBaseUrl = Get-DotEnvValue $EnvPath "PAYMENT_SERVICE_BASE_URL"
+        $effectivePaymentServiceBaseUrl = if ($PaymentServiceBaseUrl) {
+            $PaymentServiceBaseUrl
+        } elseif ($existingPaymentServiceBaseUrl) {
+            $existingPaymentServiceBaseUrl
+        } else {
+            ""
+        }
+
+        $existingMobileRedirectBase = Get-DotEnvValue $EnvPath "PAYMENT_MOBILE_REDIRECT_BASE"
+        $effectiveMobileRedirectBase = if ($MobileRedirectBase) {
+            $MobileRedirectBase
+        } elseif ($existingMobileRedirectBase) {
+            $existingMobileRedirectBase
+        } else {
+            ""
+        }
+
+        if ($effectivePaymentMode -eq "service") {
+            if (-not $effectivePaymentServiceBaseUrl) {
+                $effectivePaymentServiceBaseUrl = "http://localhost:8001"
+            }
+            if (-not $effectiveMobileRedirectBase) {
+                throw "PAYMENT_MODE=service requires -MobileRedirectBase, for example exp://<YOUR-LAN-IP>:8081/-- for Expo Go or shoeinn://app for a dev build."
+            }
+            try {
+                Invoke-RestMethod "$($effectivePaymentServiceBaseUrl.TrimEnd('/'))/health" | Out-Null
+            } catch {
+                throw "PAYMENT_MODE=service requires the payment service to be reachable at $effectivePaymentServiceBaseUrl. Start apps/payment first, then rerun this script."
+            }
         }
 
         Set-DotEnvValue $EnvPath "DATABASE_URL" "postgresql+psycopg://postgres:postgres@localhost:5432/shoeinn"
         Set-DotEnvValue $EnvPath "API_HOST" "0.0.0.0"
         Set-DotEnvValue $EnvPath "API_PORT" "$Port"
-        Set-DotEnvValue $EnvPath "PAYMENT_MODE" "mock"
-        Set-DotEnvValue $EnvPath "PAYMENT_SERVICE_BASE_URL" ""
-        Set-DotEnvValue $EnvPath "PAYMENT_MOBILE_REDIRECT_BASE" ""
+        Set-DotEnvValue $EnvPath "PAYMENT_MODE" $effectivePaymentMode
+        Set-DotEnvValue $EnvPath "PAYMENT_SERVICE_BASE_URL" $effectivePaymentServiceBaseUrl
+        Set-DotEnvValue $EnvPath "PAYMENT_MOBILE_REDIRECT_BASE" $effectiveMobileRedirectBase
+
+        Write-Host "Payment mode: $effectivePaymentMode"
+        if ($effectivePaymentMode -eq "service") {
+            Write-Host "Payment service: $effectivePaymentServiceBaseUrl"
+            Write-Host "Mobile redirect base: $effectiveMobileRedirectBase"
+        }
     }
 
     if (-not $SkipInstall) {
@@ -95,6 +166,17 @@ try {
     }
 
     Invoke-Step "Starting API on http://localhost:$Port" {
+        $existingReadyUrl = "http://localhost:$Port/ready"
+        try {
+            $existingReady = Invoke-RestMethod $existingReadyUrl
+            $existingMode = $existingReady.payment_mode
+            throw "An API is already running on port $Port with payment_mode=$existingMode. Stop that process before starting a new API instance, or use a different -Port."
+        } catch {
+            if ($_.Exception.Message -like "An API is already running on port*") {
+                throw
+            }
+        }
+
         $apiArgs = @(
             "-m", "uvicorn",
             "app.main:app",

@@ -333,6 +333,83 @@ def test_service_mode_payment_refresh_and_unpaid_cancel_flow(
     client.app.dependency_overrides.pop(get_payment_gateway, None)
 
 
+def test_consecutive_service_mode_bookings_remain_in_customer_appointments(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service_id, company_id = _pick_service(client)
+    start_time = datetime.now(timezone.utc).replace(hour=10, minute=0, second=0, microsecond=0) + timedelta(days=2)
+
+    customer = User(
+        email="consecutive-service-customer@example.com",
+        full_name="Consecutive Service Customer",
+        role="customer",
+        password_hash=hash_password("Password1!"),
+    )
+    db_session.add(customer)
+    db_session.commit()
+
+    gateway = FakeServiceGateway()
+    client.app.dependency_overrides[get_payment_gateway] = lambda: gateway
+    monkeypatch.setattr(settings, "payment_mode", "service")
+
+    headers = _auth_header(customer)
+    appointment_ids: list[str] = []
+
+    for offset in range(2):
+        hold_res = client.post(
+            "/appointments/holds",
+            json={
+                "service_id": str(service_id),
+                "start_time": (start_time + timedelta(hours=offset)).isoformat(),
+                "customer_email": customer.email,
+            },
+        )
+        assert hold_res.status_code == 201, hold_res.text
+
+        confirm_res = client.post(
+            "/appointments/confirm",
+            json={
+                "hold_id": hold_res.json()["id"],
+                "company_id": str(company_id),
+                "customer_name": "Consecutive Service Customer",
+                "customer_phone": "1234567890",
+                "customer_email": customer.email,
+            },
+        )
+        assert confirm_res.status_code == 200, confirm_res.text
+        appointment = confirm_res.json()
+        assert appointment["status"] == "pending_payment"
+        assert appointment["payment_status"] == "pending"
+        assert appointment["payment_mode"] == "service"
+        assert appointment["payment_checkout_url"].startswith("https://checkout.stripe.test/")
+        appointment_ids.append(appointment["id"])
+
+    pending_mine_res = client.get("/appointments/mine", headers=headers)
+    assert pending_mine_res.status_code == 200, pending_mine_res.text
+    pending_items = {item["id"]: item for item in pending_mine_res.json()}
+    assert set(appointment_ids).issubset(pending_items)
+    assert all(pending_items[appointment_id]["payment_status"] == "pending" for appointment_id in appointment_ids)
+    assert all(pending_items[appointment_id]["payment_mode"] == "service" for appointment_id in appointment_ids)
+
+    gateway.payment_status = "succeeded"
+    for appointment_id in appointment_ids:
+        refresh_res = client.post(f"/appointments/{appointment_id}/payment/refresh", headers=headers)
+        assert refresh_res.status_code == 200, refresh_res.text
+        assert refresh_res.json()["payment_status"] == "succeeded"
+
+    paid_mine_res = client.get("/appointments/mine", headers=headers)
+    assert paid_mine_res.status_code == 200, paid_mine_res.text
+    paid_items = {item["id"]: item for item in paid_mine_res.json()}
+    assert set(appointment_ids).issubset(paid_items)
+    assert all(paid_items[appointment_id]["status"] == "confirmed" for appointment_id in appointment_ids)
+    assert all(paid_items[appointment_id]["payment_status"] == "succeeded" for appointment_id in appointment_ids)
+    assert all(paid_items[appointment_id]["payment_mode"] == "service" for appointment_id in appointment_ids)
+
+    client.app.dependency_overrides.pop(get_payment_gateway, None)
+
+
 def test_service_mode_payment_refresh_keeps_unpaid_session_pending(
     client: TestClient,
     db_session: Session,
