@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { getAppointment, refreshAppointmentPayment } from "../../api/http";
 import { ScreenContainer } from "../../components/ScreenContainer";
@@ -27,6 +28,7 @@ function formatMoney(amount: number | null | undefined, currency: string | null 
 export default function PaymentResultScreen({ navigation, route }: Props) {
   const { bookingId, sessionId, status } = route.params;
   const [state, setState] = useState<LoadState>({ kind: "loading" });
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     let active = true;
@@ -40,6 +42,8 @@ export default function PaymentResultScreen({ navigation, route }: Props) {
         if (!active) {
           return;
         }
+        queryClient.setQueryData(["appointment", bookingId], appointment);
+        await queryClient.invalidateQueries({ queryKey: ["appointments", "mine"] });
         setState({ kind: "loaded", appointment });
       } catch (error: any) {
         if (!active) {
@@ -53,7 +57,7 @@ export default function PaymentResultScreen({ navigation, route }: Props) {
     return () => {
       active = false;
     };
-  }, [bookingId, status]);
+  }, [bookingId, queryClient, status]);
 
   const appointment = state.kind === "loaded" ? state.appointment : null;
   const statusTitle = useMemo(() => {
@@ -155,6 +159,8 @@ export default function PaymentResultScreen({ navigation, route }: Props) {
             void (async () => {
               try {
                 const latest = await refreshAppointmentPayment(bookingId);
+                queryClient.setQueryData(["appointment", bookingId], latest);
+                await queryClient.invalidateQueries({ queryKey: ["appointments", "mine"] });
                 setState({ kind: "loaded", appointment: latest });
               } catch (error: any) {
                 Alert.alert("Unable to refresh", error?.message ?? "Please try again.");

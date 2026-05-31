@@ -151,6 +151,10 @@ class AppointmentListItem(BaseModel):
     postal_code: str | None = None
     start_time: datetime
     status: AppointmentStatus
+    payment_status: PaymentStatus | None = None
+    payment_checkout_url: str | None = None
+    payment_mode: str | None = None
+    payment_message: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -272,8 +272,18 @@ def test_service_mode_payment_refresh_and_unpaid_cancel_flow(
     assert appointment["payment_status"] == "pending"
     assert appointment["payment_mode"] == "service"
     assert appointment["payment_checkout_url"].startswith("https://checkout.stripe.test/")
+    assert appointment["payment_message"]
 
     headers = _auth_header(customer)
+    mine_res = client.get("/appointments/mine", headers=headers)
+    assert mine_res.status_code == 200, mine_res.text
+    mine_items = mine_res.json()
+    pending_item = next((item for item in mine_items if item["id"] == appointment["id"]), None)
+    assert pending_item is not None
+    assert pending_item["status"] == "pending_payment"
+    assert pending_item["payment_status"] == "pending"
+    assert pending_item["payment_mode"] == "service"
+    assert pending_item["payment_checkout_url"].startswith("https://checkout.stripe.test/")
 
     gateway.payment_status = "succeeded"
     refresh_res = client.post(f"/appointments/{appointment['id']}/payment/refresh", headers=headers)
@@ -312,9 +322,13 @@ def test_service_mode_payment_refresh_and_unpaid_cancel_flow(
     cancel_res = client.post(f"/appointments/{second_confirm.json()['id']}/payment/cancel", headers=headers)
     assert cancel_res.status_code == 200, cancel_res.text
     cancelled = cancel_res.json()
-    assert cancelled["status"] == "payment_failed"
+    assert cancelled["status"] == "cancelled"
     assert cancelled["payment_status"] == "failed"
     assert cancelled["payment_checkout_url"] is None
+
+    mine_after_cancel = client.get("/appointments/mine", headers=headers)
+    assert mine_after_cancel.status_code == 200, mine_after_cancel.text
+    assert all(item["id"] != second_confirm.json()["id"] for item in mine_after_cancel.json())
 
     client.app.dependency_overrides.pop(get_payment_gateway, None)
 

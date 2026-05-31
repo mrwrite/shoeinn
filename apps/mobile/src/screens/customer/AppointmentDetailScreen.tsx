@@ -12,7 +12,7 @@ import {
   View,
 } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -145,6 +145,7 @@ const resolvePhotoUrl = (url?: string | null) => {
 export default function AppointmentDetailScreen({ route }: Props) {
   const { appointmentId, summary, refreshPaymentOnOpen, paymentReturnStatus } = route.params;
   const navigation = useNavigation<NativeStackNavigationProp<AppointmentStackParamList>>();
+  const queryClient = useQueryClient();
   const [expandedPhotoUrl, setExpandedPhotoUrl] = useState<string | null>(null);
   const handledAutoRefreshRef = useRef(false);
 
@@ -242,6 +243,8 @@ export default function AppointmentDetailScreen({ route }: Props) {
   const handleRefreshPayment = async (reason: "manual" | "return" = "manual") => {
     try {
       const latest = await refreshAppointmentPayment(appointmentId);
+      queryClient.setQueryData(["appointment", appointmentId], latest);
+      await queryClient.invalidateQueries({ queryKey: ["appointments", "mine"] });
       await appointmentQuery.refetch();
       await eventsQuery.refetch();
 
@@ -274,7 +277,9 @@ export default function AppointmentDetailScreen({ route }: Props) {
 
   const handleCancelPendingPayment = async () => {
     try {
-      await cancelAppointmentPayment(appointmentId);
+      const latest = await cancelAppointmentPayment(appointmentId);
+      queryClient.setQueryData(["appointment", appointmentId], latest);
+      await queryClient.invalidateQueries({ queryKey: ["appointments", "mine"] });
       await appointmentQuery.refetch();
       await eventsQuery.refetch();
     } catch (error: any) {
@@ -359,11 +364,11 @@ export default function AppointmentDetailScreen({ route }: Props) {
                 <View style={styles.paymentActions}>
                   {paymentAwareAppointment.payment_checkout_url ? (
                     <Pressable style={styles.paymentPrimaryButton} onPress={() => void handleOpenCheckout()}>
-                      <Text style={styles.paymentPrimaryText}>Open checkout</Text>
+                      <Text style={styles.paymentPrimaryText}>Open secure checkout</Text>
                     </Pressable>
                   ) : null}
                   <Pressable style={styles.paymentSecondaryButton} onPress={() => void handleRefreshPayment("manual")}>
-                    <Text style={styles.paymentSecondaryText}>Refresh payment</Text>
+                    <Text style={styles.paymentSecondaryText}>Check payment status</Text>
                   </Pressable>
                   {appointment.status === "pending_payment" ? (
                     <Pressable onPress={() => void handleCancelPendingPayment()}>

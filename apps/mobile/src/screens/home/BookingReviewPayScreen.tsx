@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Alert, Linking, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { confirmAppointment, createHold, getAppointmentQuote } from "../../api/http";
 import { ScreenContainer } from "../../components/ScreenContainer";
@@ -23,6 +23,7 @@ export default function BookingReviewPayScreen() {
   const { service, date, time, customerDetails } = route.params;
   const { companyId } = useAuthStore();
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodOption>("saved_card");
+  const queryClient = useQueryClient();
 
   const quoteQuery = useQuery({
     queryKey: ["appointment-quote", service.id, time, customerDetails.type],
@@ -76,18 +77,36 @@ export default function BookingReviewPayScreen() {
       });
     },
     onSuccess: async (appointment) => {
-      if (appointment.payment_mode === "service" && appointment.payment_checkout_url) {
+      queryClient.setQueryData(["appointment", appointment.id], appointment);
+      await queryClient.invalidateQueries({ queryKey: ["appointments", "mine"] });
+
+      const navigateToAppointment = () => {
+        navigation.getParent()?.navigate("AppointmentsTab", {
+          screen: "AppointmentDetail",
+          params: { appointmentId: appointment.id },
+        } as never);
+      };
+
+      if (appointment.payment_mode === "service" && paymentMethod === "stripe_checkout") {
+        if (!appointment.payment_checkout_url) {
+          Alert.alert(
+            "Checkout link missing",
+            appointment.payment_message ?? "The booking was created, but Stripe Checkout was not returned. Open the appointment to check payment status or cancel the unpaid booking.",
+          );
+          navigateToAppointment();
+          return;
+        }
+
+        navigateToAppointment();
         try {
           await Linking.openURL(appointment.payment_checkout_url);
         } catch (error) {
           Alert.alert("Checkout unavailable", "Unable to open Stripe checkout right now.");
         }
+        return;
       }
 
-      navigation.getParent()?.navigate("AppointmentsTab", {
-        screen: "AppointmentDetail",
-        params: { appointmentId: appointment.id },
-      } as never);
+      navigateToAppointment();
     },
     onError: (error: Error) => Alert.alert("Booking failed", error.message),
   });

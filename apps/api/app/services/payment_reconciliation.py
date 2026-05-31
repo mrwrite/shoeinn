@@ -65,7 +65,7 @@ def reconcile_payment_record(session: Session, appointment: Appointment, payment
 
 def cancel_unpaid_appointment(session: Session, appointment: Appointment) -> None:
     previous_status = appointment.status
-    appointment.status = AppointmentStatus.payment_failed
+    appointment.status = AppointmentStatus.cancelled
     if appointment.payment_status != PaymentStatus.succeeded:
         appointment.payment_status = PaymentStatus.failed
     appointment.payment_checkout_url = None
