@@ -15,6 +15,23 @@ services:
       timeout: 5s
       retries: 10
 
+  payment:
+    build:
+      context: ../..
+      dockerfile: apps/payment/Dockerfile
+    env_file:
+      - ../payment/.env.staging
+    ports:
+      - "8001:8001"
+    command: >
+      sh -c "python -m uvicorn app.main:app --host 0.0.0.0 --port 8001"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=5)\""]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   api:
     build:
       context: ../..
@@ -26,6 +43,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      payment:
+        condition: service_started
     command: >
       sh -c "python -m alembic upgrade heads &&
       python -m uvicorn app.main:app --host 0.0.0.0 --port 8000"
@@ -34,6 +53,7 @@ services:
       interval: 15s
       timeout: 5s
       retries: 10
+    restart: unless-stopped
 
   notification-worker:
     build:
