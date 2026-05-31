@@ -50,11 +50,31 @@ Common variants:
 # Skip dependency installation on repeat startups
 .\scripts\start-local.ps1 -SkipInstall
 
+# Use another API port if 8000 is already occupied
+.\scripts\start-local.ps1 -Port 8002 -ApiBaseUrl "http://<YOUR-LAN-IP>:8002"
+
 # Physical device on the same LAN
 .\scripts\start-local.ps1 -ApiBaseUrl "http://<YOUR-LAN-IP>:8000"
 
 # Physical device with Expo tunnel, matching npm start -- --tunnel
 .\scripts\start-local.ps1 -ApiBaseUrl "http://192.168.1.14:8000" -Tunnel
+
+# Service payment mode with local payment service and Expo Go return URL
+.\scripts\start-local.ps1 `
+  -ApiBaseUrl "http://192.168.1.14:8000" `
+  -DemoMarket mt_juliet `
+  -Tunnel `
+  -PaymentMode service `
+  -MobileRedirectBase "exp://192.168.1.14:8081/--"
+
+# Same service-mode startup, but with API on port 8002
+.\scripts\start-local.ps1 `
+  -Port 8002 `
+  -ApiBaseUrl "http://192.168.1.14:8002" `
+  -DemoMarket mt_juliet `
+  -Tunnel `
+  -PaymentMode service `
+  -MobileRedirectBase "exp://192.168.1.14:8081/--"
 ```
 
 You can also start each side independently:
@@ -86,7 +106,12 @@ Useful options:
 - `-NoSeed` to skip the `POST /dev/seed` call
 - `-ResetDb` to run `docker compose down -v` before starting Postgres
 - `-SkipInstall` to skip `pip install`
+- `-PaymentMode mock` or `-PaymentMode service`
+- `-PaymentServiceBaseUrl "http://localhost:8001"` for service payment mode
+- `-MobileRedirectBase "exp://<YOUR-LAN-IP>:8081/--"` for Expo Go returns, or `shoeinn://app` for a dev build
 - `-Port 8000` to override the API port
+
+If `apps/api/.env` already exists, the scripts preserve existing payment settings unless you explicitly pass `-PaymentMode`, `-PaymentServiceBaseUrl`, or `-MobileRedirectBase`.
 
 `scripts/start-mobile.ps1` prepares Expo environment variables and starts the mobile app:
 
@@ -98,10 +123,35 @@ Useful options:
 
 - `-ApiBaseUrl "http://10.0.2.2:8000"` for Android emulator
 - `-ApiBaseUrl "http://<YOUR-LAN-IP>:8000"` for a physical device
+- `-ExpectedPaymentMode service` to fail fast if the API is not actually running in service payment mode
 - `-Tunnel` to run `npm start -- --tunnel`
+- `-SkipApiCheck` to skip the preflight `GET /health` check
 - `-SkipInstall` to skip `npm install`
 
+`scripts/start-payment.ps1` prepares and runs the optional Stripe payment service:
+
+```powershell
+.\scripts\start-payment.ps1
+```
+
+Useful options:
+
+- `-Port 8001` to override the payment service port
+- `-SkipInstall` to skip `pip install -e .`
+
+The payment script expects `apps/payment/.env` to contain `STRIPE_API_KEY` and `STRIPE_WEBHOOK_SECRET`.
+
 `scripts/start-local.ps1` opens the API script in a separate PowerShell window, waits briefly, then starts Expo in the current window.
+
+When `-PaymentMode service` is passed, `start-local.ps1` also starts `apps/payment` in a separate PowerShell window before starting the API. The local payment service defaults to `http://localhost:8001`.
+
+Useful options:
+
+- `-Port 8002` to pass a non-default API port through to `start-api.ps1`
+- `-ApiBaseUrl "http://<YOUR-LAN-IP>:8002"` to point Expo at that same API port on a physical device
+- `-PaymentPort 8001` to override the local payment service port
+- `-PaymentServiceBaseUrl "http://localhost:8001"` to point the API at a specific payment service URL
+- `-SkipPaymentService` to use an already-running payment service without auto-starting one
 
 ## API Local Development
 
@@ -196,6 +246,8 @@ Mt. Juliet quick-demo logins use `Password123!`:
 - Company admin: `admin.mtjuliet@shoeinn.demo`
 
 The seed response also returns the current login list and generated company IDs.
+
+When `reset=true` is used, the seed endpoint clears all known demo markets before creating the requested market. That keeps Shelby/Helena records from showing up after reseeding Mt. Juliet.
 
 ## Mobile Local Development
 
@@ -301,6 +353,19 @@ If you want the payment service to push status back to the booking API:
 $env:BOOKING_API_WEBHOOK_URL="http://localhost:8000/webhooks/payments"
 ```
 
+### Service-mode booking validation
+
+Use this path when validating real Stripe Checkout from mobile:
+
+1. Start `apps/payment` with Stripe test keys.
+2. Start `apps/api` with `PAYMENT_MODE=service`, `PAYMENT_SERVICE_BASE_URL`, and `PAYMENT_MOBILE_REDIRECT_BASE`.
+3. Start mobile with the correct LAN API URL.
+4. Select `Add new card in secure checkout`.
+5. Tap `Place Booking` and verify Stripe Checkout opens immediately.
+6. Cancel Checkout and verify the appointment remains visible as payment pending.
+7. Reopen the appointment and use `Open secure checkout`, `Check payment status`, or `Cancel unpaid booking`.
+8. Complete payment and verify return or `Check payment status` moves the appointment to paid/confirmed.
+
 ## Workers
 
 The API process starts the payment sync worker only when:
@@ -382,6 +447,8 @@ Mobile cannot reach the API
 - Physical devices should use `http://<YOUR-LAN-IP>:8000`.
 - Confirm the API is bound to `0.0.0.0`.
 - Confirm Windows Firewall allows inbound traffic to port `8000` when using a physical device.
+- If using `-Port 8002`, update both values: `-Port 8002 -ApiBaseUrl "http://<YOUR-LAN-IP>:8002"`.
+- If `http://localhost:<PORT>/health` works but `http://<YOUR-LAN-IP>:<PORT>/health` does not work from the same machine, the issue is the LAN IP or Windows Firewall rule for that port.
 
 Payment confirmation fails in service mode
 

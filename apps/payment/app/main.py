@@ -14,6 +14,10 @@ def create_app() -> FastAPI:
     Base.metadata.create_all(bind=get_engine())
     ensure_schema_compatibility()
 
+    @app.get("/health")
+    def health() -> dict[str, str]:
+        return {"status": "ok", "service": settings.app_name}
+
     app.include_router(payments.router)
     return app
 

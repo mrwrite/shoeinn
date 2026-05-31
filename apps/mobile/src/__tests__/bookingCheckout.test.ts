@@ -1,4 +1,4 @@
-import { buildQuoteDisplayRows } from "../features/bookingCheckout";
+import { buildQuoteDisplayRows, getImmediateCheckoutUrl } from "../features/bookingCheckout";
 
 describe("buildQuoteDisplayRows", () => {
   it("includes all payment summary fields from the backend quote", () => {
@@ -24,5 +24,21 @@ describe("buildQuoteDisplayRows", () => {
       "Estimated tax",
       "Total",
     ]);
+  });
+});
+
+describe("getImmediateCheckoutUrl", () => {
+  it("opens service-mode checkout when the confirm response includes a URL", () => {
+    expect(
+      getImmediateCheckoutUrl({
+        payment_mode: "service",
+        payment_checkout_url: "https://checkout.stripe.com/c/pay/cs_test_123",
+      }),
+    ).toBe("https://checkout.stripe.com/c/pay/cs_test_123");
+  });
+
+  it("does not open checkout for mock mode or missing service checkout URLs", () => {
+    expect(getImmediateCheckoutUrl({ payment_mode: "mock", payment_checkout_url: "https://checkout.stripe.test" })).toBeNull();
+    expect(getImmediateCheckoutUrl({ payment_mode: "service", payment_checkout_url: null })).toBeNull();
   });
 });

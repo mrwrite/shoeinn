@@ -1,7 +1,10 @@
 param(
     [string]$ApiBaseUrl = "http://localhost:8000",
     [string]$MobileRedirectBase = "",
+    [ValidateSet("", "mock", "service")]
+    [string]$ExpectedPaymentMode = "",
     [switch]$Tunnel,
+    [switch]$SkipApiCheck,
     [switch]$SkipInstall
 )
 
@@ -27,6 +30,37 @@ try {
     Write-Host ""
     Write-Host "==> Starting Expo"
     Write-Host "API: $ApiBaseUrl"
+
+    if (-not $SkipApiCheck) {
+        $healthUrl = "$($ApiBaseUrl.TrimEnd('/'))/health"
+        Write-Host "==> Checking API at $healthUrl"
+        try {
+            $health = Invoke-RestMethod $healthUrl
+            if ($health.status -ne "ok") {
+                throw "Unexpected health response: $($health | ConvertTo-Json -Compress)"
+            }
+        } catch {
+            $apiPort = "the configured port"
+            try {
+                $apiPort = ([uri]$ApiBaseUrl).Port
+            } catch {
+            }
+            throw "Could not reach the ShoeInn API at $healthUrl. Check the API window for startup errors, confirm the API is running on port $apiPort, verify the LAN IP in -ApiBaseUrl, and confirm Windows Firewall allows inbound connections."
+        }
+
+        if ($ExpectedPaymentMode) {
+            $readyUrl = "$($ApiBaseUrl.TrimEnd('/'))/ready"
+            Write-Host "==> Checking API payment mode at $readyUrl"
+            try {
+                $ready = Invoke-RestMethod $readyUrl
+                if ($ready.payment_mode -ne $ExpectedPaymentMode) {
+                    throw "Expected payment_mode=$ExpectedPaymentMode but API reported payment_mode=$($ready.payment_mode)"
+                }
+            } catch {
+                throw "API payment mode check failed. $($_.Exception.Message)"
+            }
+        }
+    }
 
     if ($Tunnel) {
         npm start -- --tunnel

@@ -283,6 +283,10 @@ def list_my_appointments(
                     "postal_code": appt.postal_code,
                     "start_time": _ensure_utc(appt.start_time),
                     "status": appt.status,
+                    "payment_status": appt.payment_status,
+                    "payment_checkout_url": appt.payment_checkout_url,
+                    "payment_mode": settings.payment_mode,
+                    "payment_message": _build_payment_message(appt, payment_mode=settings.payment_mode),
                 }
             )
         )

@@ -437,6 +437,25 @@ DEMO_MARKETS: dict[str, SeedMarket] = {
 DEFAULT_DEMO_MARKET = "shelby"
 
 
+def _all_demo_company_names() -> set[str]:
+    return {
+        company["name"]
+        for demo_market in DEMO_MARKETS.values()
+        for company in demo_market["companies"]
+    }
+
+
+def _all_demo_emails() -> set[str]:
+    emails = {"admin@shoeinn.com"}
+    for demo_market in DEMO_MARKETS.values():
+        emails.add(demo_market["customer"]["email"])
+        emails.update(user["email"] for user in demo_market["quick_demo_users"].values())
+        for company in demo_market["companies"]:
+            emails.add(company["admin"]["email"])
+            emails.update(provider["email"] for provider in company["providers"])
+    return emails
+
+
 def _select_cluster_address(market: SeedMarket, index: int) -> SeedAddress:
     addresses = market["customer_job_addresses"]
     return addresses[index % len(addresses)]
@@ -463,17 +482,9 @@ def seed(
         "assignments": 0,
     }
 
-    demo_company_names = {company["name"] for company in market["companies"]}
-    demo_emails = {
-        "admin@shoeinn.com",
-    }
-    demo_emails.add(market["customer"]["email"])
-    demo_emails.update(user["email"] for user in market["quick_demo_users"].values())
-    for company in market["companies"]:
-        demo_emails.add(company["admin"]["email"])
-        demo_emails.update(provider["email"] for provider in company["providers"])
-
     if reset:
+        demo_company_names = _all_demo_company_names()
+        demo_emails = _all_demo_emails()
         demo_users = db.query(User).filter(User.email.in_(demo_emails)).all()
         demo_user_ids = [user.id for user in demo_users]
         demo_companies = db.query(Company).filter(Company.name.in_(demo_company_names)).all()

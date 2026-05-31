@@ -35,6 +35,8 @@ def test_create_checkout_session(client: TestClient, db_session: Session) -> Non
 
     fake_stripe = client.app.state.fake_stripe
     assert data["checkout_session_id"] in fake_stripe.checkout_sessions
+    assert data["checkout_url"].startswith("https://stripe.test/checkout/")
+    assert data["status"] == "pending"
 
     payment = db_session.scalar(select(Payment).where(Payment.booking_id == payload["booking_id"]))
     assert payment is not None
@@ -52,6 +54,12 @@ def test_create_checkout_session(client: TestClient, db_session: Session) -> Non
     assert session_kwargs["customer"] == payment.stripe_customer_id
     assert "customer_email" not in session_kwargs
     assert session_kwargs["saved_payment_method_options"]["payment_method_save"] == "enabled"
+
+
+def test_health(client: TestClient) -> None:
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
 
 
 def test_create_checkout_session_reuses_existing_stripe_customer(client: TestClient, db_session: Session) -> None:

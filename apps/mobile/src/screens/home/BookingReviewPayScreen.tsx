@@ -2,15 +2,16 @@ import React, { useMemo, useState } from "react";
 import { Alert, Linking, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { confirmAppointment, createHold, getAppointmentQuote } from "../../api/http";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { Text } from "../../components/ui/Text";
-import { buildQuoteDisplayRows, formatMoney } from "../../features/bookingCheckout";
+import { buildQuoteDisplayRows, formatMoney, getImmediateCheckoutUrl } from "../../features/bookingCheckout";
 import type { HomeStackParamList } from "../../navigation/types";
+import { appointmentQueryKey, customerAppointmentsQueryKey } from "../../query/keys";
 import { useAuthStore } from "../../state/authStore";
 import { useTheme } from "../../theme/theme";
 
@@ -23,6 +24,7 @@ export default function BookingReviewPayScreen() {
   const { service, date, time, customerDetails } = route.params;
   const { companyId } = useAuthStore();
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodOption>("saved_card");
+  const queryClient = useQueryClient();
 
   const quoteQuery = useQuery({
     queryKey: ["appointment-quote", service.id, time, customerDetails.type],
@@ -76,18 +78,53 @@ export default function BookingReviewPayScreen() {
       });
     },
     onSuccess: async (appointment) => {
-      if (appointment.payment_mode === "service" && appointment.payment_checkout_url) {
+      console.log("[Booking] Confirm response", {
+        id: appointment.id,
+        status: appointment.status,
+        payment_mode: appointment.payment_mode,
+        payment_status: appointment.payment_status,
+        has_checkout_url: Boolean(appointment.payment_checkout_url),
+        payment_checkout_url: appointment.payment_checkout_url,
+        selected_payment_method: paymentMethod,
+      });
+      queryClient.setQueryData(appointmentQueryKey(appointment.id), appointment);
+
+      const navigateToAppointment = () => {
+        navigation.getParent()?.navigate("AppointmentsTab", {
+          screen: "AppointmentDetail",
+          params: { appointmentId: appointment.id },
+        } as never);
+      };
+
+      const checkoutUrl = getImmediateCheckoutUrl(appointment);
+      if (checkoutUrl) {
         try {
-          await Linking.openURL(appointment.payment_checkout_url);
+          console.log("[Booking] Opening Stripe Checkout", checkoutUrl);
+          await Linking.openURL(checkoutUrl);
         } catch (error) {
-          Alert.alert("Checkout unavailable", "Unable to open Stripe checkout right now.");
+          console.warn("[Booking] Unable to open Stripe Checkout", error);
+          Alert.alert("Checkout unavailable", "Unable to open Stripe checkout right now. Open this appointment to continue payment.");
+        } finally {
+          await queryClient.invalidateQueries({ queryKey: customerAppointmentsQueryKey });
+          navigateToAppointment();
+        }
+        return;
+      }
+
+      if (appointment.payment_mode === "service" && paymentMethod === "stripe_checkout") {
+        await queryClient.invalidateQueries({ queryKey: customerAppointmentsQueryKey });
+        if (!checkoutUrl) {
+          Alert.alert(
+            "Checkout link missing",
+            appointment.payment_message ?? "The booking was created, but Stripe Checkout was not returned. Open the appointment to check payment status or cancel the unpaid booking.",
+          );
+          navigateToAppointment();
+          return;
         }
       }
 
-      navigation.getParent()?.navigate("AppointmentsTab", {
-        screen: "AppointmentDetail",
-        params: { appointmentId: appointment.id },
-      } as never);
+      await queryClient.invalidateQueries({ queryKey: customerAppointmentsQueryKey });
+      navigateToAppointment();
     },
     onError: (error: Error) => Alert.alert("Booking failed", error.message),
   });

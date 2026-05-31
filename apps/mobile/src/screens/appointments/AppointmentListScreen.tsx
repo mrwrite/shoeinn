@@ -14,7 +14,9 @@ import {
   getUnreadCustomerNotificationCount,
   useCustomerNotifications,
 } from "../../hooks/useCustomerNotifications";
+import { useFocusedAutoRefresh } from "../../hooks/useFocusedAutoRefresh";
 import type { AppointmentStackParamList } from "../../navigation/types";
+import { customerAppointmentsQueryKey } from "../../query/keys";
 import { useAuthStore } from "../../state/authStore";
 import { useTheme } from "../../theme/theme";
 import type { AppointmentSummary } from "../../types/booking";
@@ -27,9 +29,16 @@ export default function AppointmentListScreen() {
   const notificationsQuery = useCustomerNotifications(isCustomer);
   const unreadCount = getUnreadCustomerNotificationCount(notificationsQuery.data);
   const { data, isLoading, isError, refetch, isRefetching } = useQuery({
-    queryKey: ["appointments", "mine"],
+    queryKey: customerAppointmentsQueryKey,
     queryFn: getMyAppointments,
     enabled: isCustomer,
+  });
+
+  useFocusedAutoRefresh({
+    enabled: isCustomer,
+    onRefresh: () => {
+      void refetch();
+    },
   });
 
   const renderItem = ({ item }: { item: AppointmentSummary }) => (

@@ -89,6 +89,10 @@ export interface AppointmentSummary {
   service_name?: string | null;
   start_time: string;
   status: AppointmentStatus;
+  payment_status?: "pending" | "requires_action" | "succeeded" | "failed" | "refunded" | "disputed" | null;
+  payment_checkout_url?: string | null;
+  payment_mode?: "mock" | "service" | null;
+  payment_message?: string | null;
 }
 
 export interface AppointmentEvent {

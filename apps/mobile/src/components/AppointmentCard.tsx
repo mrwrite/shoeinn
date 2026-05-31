@@ -42,6 +42,34 @@ export function AppointmentCard({
 }: Props) {
   const theme = useTheme();
   const statusColor = statusColors[appointment.status] ?? theme.colors.mutedText;
+  const paymentStatus = appointment.payment_status ?? null;
+  const paymentLabel = (() => {
+    if (appointment.payment_mode !== "service") {
+      return null;
+    }
+    if (paymentStatus === "succeeded") {
+      return "Paid";
+    }
+    if (paymentStatus === "failed" || appointment.status === "payment_failed") {
+      return "Payment failed";
+    }
+    if (paymentStatus === "requires_action" || appointment.status === "pending_payment") {
+      return appointment.payment_checkout_url ? "Complete payment" : "Payment pending";
+    }
+    if (paymentStatus === "pending") {
+      return "Payment pending";
+    }
+    return null;
+  })();
+  const paymentTone = (() => {
+    if (paymentLabel === "Paid") {
+      return { backgroundColor: "#ecfdf5", borderColor: "#86efac", color: "#166534" };
+    }
+    if (paymentLabel === "Payment failed") {
+      return { backgroundColor: "#fef2f2", borderColor: "#fecaca", color: "#b91c1c" };
+    }
+    return { backgroundColor: "#fffbeb", borderColor: "#fde68a", color: "#92400e" };
+  })();
   const actionTone = {
     actionable: { background: "#ecfdf5", border: "#86efac", text: "#166534", accent: "#0f766e" },
     owned: { background: "#eff6ff", border: "#93c5fd", text: "#1d4ed8", accent: "#1d4ed8" },
@@ -79,6 +107,13 @@ export function AppointmentCard({
                   {appointment.status.replace(/_/g, " ")}
                 </Text>
               </View>
+              {paymentLabel ? (
+                <View style={[styles.statusPill, paymentTone]}>
+                  <Text weight="semibold" style={{ color: paymentTone.color }}>
+                    {paymentLabel}
+                  </Text>
+                </View>
+              ) : null}
             </View>
             <Text variant="subtitle" weight="semibold" style={{ marginTop: 12 }}>
               {appointment.service_name ?? "Appointment"}
