@@ -35,6 +35,8 @@ def test_create_checkout_session(client: TestClient, db_session: Session) -> Non
 
     fake_stripe = client.app.state.fake_stripe
     assert data["checkout_session_id"] in fake_stripe.checkout_sessions
+    assert data["checkout_url"].startswith("https://stripe.test/checkout/")
+    assert data["status"] == "pending"
 
     payment = db_session.scalar(select(Payment).where(Payment.booking_id == payload["booking_id"]))
     assert payment is not None

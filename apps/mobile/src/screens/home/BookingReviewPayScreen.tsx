@@ -9,7 +9,7 @@ import { ScreenContainer } from "../../components/ScreenContainer";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { Text } from "../../components/ui/Text";
-import { buildQuoteDisplayRows, formatMoney } from "../../features/bookingCheckout";
+import { buildQuoteDisplayRows, formatMoney, getImmediateCheckoutUrl } from "../../features/bookingCheckout";
 import type { HomeStackParamList } from "../../navigation/types";
 import { useAuthStore } from "../../state/authStore";
 import { useTheme } from "../../theme/theme";
@@ -77,8 +77,16 @@ export default function BookingReviewPayScreen() {
       });
     },
     onSuccess: async (appointment) => {
+      console.log("[Booking] Confirm response", {
+        id: appointment.id,
+        status: appointment.status,
+        payment_mode: appointment.payment_mode,
+        payment_status: appointment.payment_status,
+        has_checkout_url: Boolean(appointment.payment_checkout_url),
+        payment_checkout_url: appointment.payment_checkout_url,
+        selected_payment_method: paymentMethod,
+      });
       queryClient.setQueryData(["appointment", appointment.id], appointment);
-      await queryClient.invalidateQueries({ queryKey: ["appointments", "mine"] });
 
       const navigateToAppointment = () => {
         navigation.getParent()?.navigate("AppointmentsTab", {
@@ -87,8 +95,24 @@ export default function BookingReviewPayScreen() {
         } as never);
       };
 
+      const checkoutUrl = getImmediateCheckoutUrl(appointment);
+      if (checkoutUrl) {
+        try {
+          console.log("[Booking] Opening Stripe Checkout", checkoutUrl);
+          await Linking.openURL(checkoutUrl);
+        } catch (error) {
+          console.warn("[Booking] Unable to open Stripe Checkout", error);
+          Alert.alert("Checkout unavailable", "Unable to open Stripe checkout right now. Open this appointment to continue payment.");
+        } finally {
+          await queryClient.invalidateQueries({ queryKey: ["appointments", "mine"] });
+          navigateToAppointment();
+        }
+        return;
+      }
+
       if (appointment.payment_mode === "service" && paymentMethod === "stripe_checkout") {
-        if (!appointment.payment_checkout_url) {
+        await queryClient.invalidateQueries({ queryKey: ["appointments", "mine"] });
+        if (!checkoutUrl) {
           Alert.alert(
             "Checkout link missing",
             appointment.payment_message ?? "The booking was created, but Stripe Checkout was not returned. Open the appointment to check payment status or cancel the unpaid booking.",
@@ -96,16 +120,9 @@ export default function BookingReviewPayScreen() {
           navigateToAppointment();
           return;
         }
-
-        navigateToAppointment();
-        try {
-          await Linking.openURL(appointment.payment_checkout_url);
-        } catch (error) {
-          Alert.alert("Checkout unavailable", "Unable to open Stripe checkout right now.");
-        }
-        return;
       }
 
+      await queryClient.invalidateQueries({ queryKey: ["appointments", "mine"] });
       navigateToAppointment();
     },
     onError: (error: Error) => Alert.alert("Booking failed", error.message),
