@@ -131,7 +131,7 @@ def test_dev_seed_populates_realistic_city_aligned_addresses(
     assert customer.address_line1 in distinct_appointment_addresses
 
 
-def test_dev_seed_mt_juliet_selector_preserves_default_market_and_rotates_selected_pool(
+def test_dev_seed_mt_juliet_selector_resets_other_demo_markets_and_rotates_selected_pool(
     db_session: Session,
     client: TestClient,
 ) -> None:
@@ -146,11 +146,7 @@ def test_dev_seed_mt_juliet_selector_preserves_default_market_and_rotates_select
     default_companies = db_session.query(Company).filter(
         Company.name.in_(EXPECTED_COMPANY_ADDRESSES.keys())
     ).all()
-    assert len(default_companies) == 3
-    assert {
-        company.name: (company.address_line1, company.city, company.state, company.postal_code)
-        for company in default_companies
-    } == EXPECTED_COMPANY_ADDRESSES
+    assert default_companies == []
 
     customer = db_session.query(User).filter(User.email == "mtjuliet.customer@shoeinn.com").one()
     assert customer.address_line1 == "3005 Willow Bend Dr"

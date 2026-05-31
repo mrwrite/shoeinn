@@ -2,6 +2,7 @@ param(
     [string]$ApiBaseUrl = "http://localhost:8000",
     [string]$MobileRedirectBase = "",
     [switch]$Tunnel,
+    [switch]$SkipApiCheck,
     [switch]$SkipInstall
 )
 
@@ -27,6 +28,19 @@ try {
     Write-Host ""
     Write-Host "==> Starting Expo"
     Write-Host "API: $ApiBaseUrl"
+
+    if (-not $SkipApiCheck) {
+        $healthUrl = "$($ApiBaseUrl.TrimEnd('/'))/health"
+        Write-Host "==> Checking API at $healthUrl"
+        try {
+            $health = Invoke-RestMethod $healthUrl
+            if ($health.status -ne "ok") {
+                throw "Unexpected health response: $($health | ConvertTo-Json -Compress)"
+            }
+        } catch {
+            throw "Could not reach the ShoeInn API at $healthUrl. Check the LAN IP, make sure the API is running on port 8000, and confirm Windows Firewall allows inbound connections."
+        }
+    }
 
     if ($Tunnel) {
         npm start -- --tunnel

@@ -99,6 +99,7 @@ Useful options:
 - `-ApiBaseUrl "http://10.0.2.2:8000"` for Android emulator
 - `-ApiBaseUrl "http://<YOUR-LAN-IP>:8000"` for a physical device
 - `-Tunnel` to run `npm start -- --tunnel`
+- `-SkipApiCheck` to skip the preflight `GET /health` check
 - `-SkipInstall` to skip `npm install`
 
 `scripts/start-local.ps1` opens the API script in a separate PowerShell window, waits briefly, then starts Expo in the current window.
@@ -196,6 +197,8 @@ Mt. Juliet quick-demo logins use `Password123!`:
 - Company admin: `admin.mtjuliet@shoeinn.demo`
 
 The seed response also returns the current login list and generated company IDs.
+
+When `reset=true` is used, the seed endpoint clears all known demo markets before creating the requested market. That keeps Shelby/Helena records from showing up after reseeding Mt. Juliet.
 
 ## Mobile Local Development
 
@@ -300,6 +303,19 @@ If you want the payment service to push status back to the booking API:
 ```powershell
 $env:BOOKING_API_WEBHOOK_URL="http://localhost:8000/webhooks/payments"
 ```
+
+### Service-mode booking validation
+
+Use this path when validating real Stripe Checkout from mobile:
+
+1. Start `apps/payment` with Stripe test keys.
+2. Start `apps/api` with `PAYMENT_MODE=service`, `PAYMENT_SERVICE_BASE_URL`, and `PAYMENT_MOBILE_REDIRECT_BASE`.
+3. Start mobile with the correct LAN API URL.
+4. Select `Add new card in secure checkout`.
+5. Tap `Place Booking` and verify Stripe Checkout opens immediately.
+6. Cancel Checkout and verify the appointment remains visible as payment pending.
+7. Reopen the appointment and use `Open secure checkout`, `Check payment status`, or `Cancel unpaid booking`.
+8. Complete payment and verify return or `Check payment status` moves the appointment to paid/confirmed.
 
 ## Workers
 

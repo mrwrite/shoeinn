@@ -3,6 +3,7 @@ param(
     [string]$DemoMarket = "shelby",
     [string]$ApiBaseUrl = "http://localhost:8000",
     [switch]$Tunnel,
+    [switch]$SkipApiCheck,
     [switch]$SkipInstall
 )
 
@@ -37,6 +38,9 @@ $mobileArgs = @(
 
 if ($Tunnel) {
     $mobileArgs += "-Tunnel"
+}
+if ($SkipApiCheck) {
+    $mobileArgs += "-SkipApiCheck"
 }
 if ($SkipInstall) {
     $mobileArgs += "-SkipInstall"
