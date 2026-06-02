@@ -2,30 +2,8 @@ import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { getLiveEventsWebSocketUrl } from "../api/http";
-import {
-  appointmentAssignmentQueryKey,
-  appointmentEventsQueryKey,
-  appointmentQueryKey,
-  customerAppointmentsQueryKey,
-} from "../query/keys";
+import { handleLiveAppointmentEvent, type LiveEvent } from "./liveAppointmentEventHandler";
 import { useAuthStore } from "../state/authStore";
-
-type LiveEvent =
-  | {
-      type: "assignment_changed";
-      appointment_id: string;
-      event_kind: string;
-      company_id?: string | null;
-      assignment_action?: string;
-    }
-  | {
-      type: "appointment_status_changed";
-      appointment_id: string;
-      event_kind: string;
-      company_id?: string | null;
-      status?: string;
-      previous_status?: string | null;
-    };
 
 const LIVE_ENABLED_ROLES = new Set(["customer", "company", "provider", "company_admin"]);
 const RECONNECT_DELAY_MS = 2000;
@@ -64,25 +42,6 @@ export function useLiveAppointmentEvents() {
       }
     };
 
-    const invalidateForEvent = (event: LiveEvent) => {
-      const appointmentId = event.appointment_id;
-      if (!appointmentId) {
-        return;
-      }
-
-      if (role === "customer") {
-        void queryClient.invalidateQueries({ queryKey: customerAppointmentsQueryKey });
-        void queryClient.invalidateQueries({ queryKey: ["me", "notifications"] });
-      } else {
-        void queryClient.invalidateQueries({ queryKey: ["provider", "open"] });
-        void queryClient.invalidateQueries({ queryKey: ["provider", "my"] });
-      }
-
-      void queryClient.invalidateQueries({ queryKey: appointmentQueryKey(appointmentId) });
-      void queryClient.invalidateQueries({ queryKey: appointmentAssignmentQueryKey(appointmentId) });
-      void queryClient.invalidateQueries({ queryKey: appointmentEventsQueryKey(appointmentId) });
-    };
-
     const connect = () => {
       if (!isEnabled || socketRef.current) {
         return;
@@ -107,7 +66,7 @@ export function useLiveAppointmentEvents() {
       socket.onmessage = (message) => {
         try {
           const event = JSON.parse(message.data) as LiveEvent;
-          invalidateForEvent(event);
+          handleLiveAppointmentEvent(queryClient, role, event);
         } catch (error) {
           console.warn("[LiveEvents] Failed to parse event", error);
         }

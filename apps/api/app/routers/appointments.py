@@ -10,6 +10,7 @@ from typing import Dict, Tuple
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Header, HTTPException, Request, UploadFile, status
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -256,11 +257,17 @@ def list_my_appointments(
     current_customer=Depends(get_current_customer), db: Session = Depends(get_db)
 ) -> list[AppointmentListItem]:
     items: list[AppointmentListItem] = []
+    owner_filters = []
+    if hasattr(Appointment, "customer_id"):
+        owner_filters.append(Appointment.customer_id == current_customer.id)
+    if current_customer.email:
+        owner_filters.append(func.lower(Appointment.customer_email) == current_customer.email.lower())
+    if not owner_filters:
+        return []
+
     q = (
         db.query(Appointment)
-        .filter(Appointment.customer_email == current_customer.email)
-        .filter(Appointment.status != AppointmentStatus.cancelled)
-        .filter(Appointment.status != AppointmentStatus.completed)
+        .filter(or_(*owner_filters))
         .order_by(Appointment.start_time.desc())
     )
     for appt in q.all():
@@ -297,10 +304,12 @@ def _ensure_company_access(appointment: Appointment, company_id) -> None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
 def _ensure_customer_access(appointment: Appointment, current_customer) -> None:
-    if not appointment.customer_email:
-        raise HTTPException(status_code=403, detail="Forbidden")
-    if appointment.customer_email.lower() != current_customer.email.lower():
-        raise HTTPException(status_code=403, detail="Forbidden")
+    if hasattr(appointment, "customer_id") and appointment.customer_id == current_customer.id:
+        return
+    if appointment.customer_email and current_customer.email:
+        if appointment.customer_email.lower() == current_customer.email.lower():
+            return
+    raise HTTPException(status_code=403, detail="Forbidden")
 
 def _provider_display_name(user: User | None) -> str | None:
     if not user or not user.full_name:

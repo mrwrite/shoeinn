@@ -29,6 +29,7 @@ import type {
 } from "./types";
 import { useAuthStore } from "../state/authStore";
 import { useTheme } from "../theme/theme";
+import { appointmentsTabOptions } from "./rootTabsOptions";
 
 const HomeStack = createNativeStackNavigator<HomeStackParamList>();
 const AppointmentStack = createNativeStackNavigator<AppointmentStackParamList>();
@@ -136,9 +137,7 @@ export default function RootTabs() {
         <Tab.Screen
           name="AppointmentsTab"
           component={AppointmentNavigator}
-          options={{
-            title: "Appointments",
-          }}
+          options={appointmentsTabOptions}
           listeners={({ navigation }) => ({
             tabPress: (event) => {
               event.preventDefault();

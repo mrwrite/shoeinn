@@ -40,5 +40,6 @@ describe('services cache hydration', () => {
 
     const hydrated = queryClient.getQueryData<Service[]>(servicesQueryKey);
     expect(hydrated).toEqual(sampleServices);
+    queryClient.clear();
   });
 });

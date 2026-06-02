@@ -67,7 +67,13 @@ export function usePushNotifications() {
     }
 
     Notifications.setNotificationHandler({
-      handleNotification: async () => ({ shouldShowAlert: true, shouldPlaySound: false, shouldSetBadge: false }),
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+      }),
     });
 
     const responseListener = Notifications.addNotificationResponseReceivedListener((response) => {

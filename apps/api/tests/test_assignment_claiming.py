@@ -510,3 +510,240 @@ def test_status_update_publishes_live_status_event_to_customer_clients(db_sessio
         assert payload["appointment_id"] == str(appointment.id)
         assert payload["previous_status"] == "confirmed"
         assert payload["status"] == "en_route_pickup"
+        assert payload["actor_role"] == "provider"
+
+
+def test_customer_appointment_list_includes_appointment_after_provider_claim(
+    db_session: Session,
+    client: TestClient,
+) -> None:
+    company = _make_company(db_session, name="Customer Claim Visibility Co")
+    service = _make_service(db_session, company)
+    provider = _make_user(
+        db_session,
+        email="claim-visible-provider@example.com",
+        role="provider",
+        full_name="Claim Visible Provider",
+    )
+    customer = _make_user(
+        db_session,
+        email="claim-visible-customer@example.com",
+        role="customer",
+        full_name="Claim Visible Customer",
+    )
+    db_session.add(CompanyUser(user_id=provider.id, company_id=company.id))
+    appointment = _make_appointment(db_session, company=company, service=service, email=customer.email)
+    db_session.commit()
+
+    claim_response = client.post(
+        f"/company/appointments/{appointment.id}/claim",
+        headers=_auth_header(provider, company_id=company.id),
+    )
+    assert claim_response.status_code == 201, claim_response.text
+
+    mine_response = client.get("/appointments/mine", headers=_auth_header(customer))
+
+    assert mine_response.status_code == 200, mine_response.text
+    ids = {item["id"] for item in mine_response.json()}
+    assert str(appointment.id) in ids
+
+
+def test_customer_appointment_list_includes_appointment_after_provider_status_update(
+    db_session: Session,
+    client: TestClient,
+) -> None:
+    company = _make_company(db_session, name="Customer Status Visibility Co")
+    service = _make_service(db_session, company)
+    provider = _make_user(
+        db_session,
+        email="status-visible-provider@example.com",
+        role="provider",
+        full_name="Status Visible Provider",
+    )
+    customer = _make_user(
+        db_session,
+        email="status-visible-customer@example.com",
+        role="customer",
+        full_name="Status Visible Customer",
+    )
+    db_session.add(CompanyUser(user_id=provider.id, company_id=company.id))
+    appointment = _make_appointment(db_session, company=company, service=service, email=customer.email)
+    db_session.add(
+        AppointmentAssignment(
+            appointment_id=appointment.id,
+            user_id=provider.id,
+            is_active=True,
+        )
+    )
+    db_session.commit()
+
+    status_response = client.post(
+        f"/company/appointments/{appointment.id}/status",
+        json={"status": "en_route_pickup"},
+        headers=_auth_header(provider, company_id=company.id),
+    )
+    assert status_response.status_code == 200, status_response.text
+
+    mine_response = client.get("/appointments/mine", headers=_auth_header(customer))
+
+    assert mine_response.status_code == 200, mine_response.text
+    item = next(item for item in mine_response.json() if item["id"] == str(appointment.id))
+    assert item["status"] == "en_route_pickup"
+
+
+def test_customer_appointment_list_includes_completed_appointment_by_default(
+    db_session: Session,
+    client: TestClient,
+) -> None:
+    company = _make_company(db_session, name="Customer Completed Visibility Co")
+    service = _make_service(db_session, company)
+    customer = _make_user(
+        db_session,
+        email="completed-visible-customer@example.com",
+        role="customer",
+        full_name="Completed Visible Customer",
+    )
+    appointment = _make_appointment(
+        db_session,
+        company=company,
+        service=service,
+        email=customer.email,
+        status=AppointmentStatus.completed,
+    )
+    db_session.commit()
+
+    mine_response = client.get("/appointments/mine", headers=_auth_header(customer))
+
+    assert mine_response.status_code == 200, mine_response.text
+    assert str(appointment.id) in {item["id"] for item in mine_response.json()}
+
+
+def test_provider_status_update_creates_customer_status_notification(
+    db_session: Session,
+    client: TestClient,
+) -> None:
+    company = _make_company(db_session, name="Status Notification Co")
+    service = _make_service(db_session, company)
+    provider = _make_user(
+        db_session,
+        email="notify-status-provider@example.com",
+        role="provider",
+        full_name="Notify Status Provider",
+    )
+    customer = _make_user(
+        db_session,
+        email="notify-status-customer@example.com",
+        role="customer",
+        full_name="Notify Status Customer",
+    )
+    db_session.add(CompanyUser(user_id=provider.id, company_id=company.id))
+    appointment = _make_appointment(db_session, company=company, service=service, email=customer.email)
+    db_session.add(
+        AppointmentAssignment(
+            appointment_id=appointment.id,
+            user_id=provider.id,
+            is_active=True,
+        )
+    )
+    db_session.commit()
+
+    response = client.post(
+        f"/company/appointments/{appointment.id}/status",
+        json={"status": "en_route_pickup"},
+        headers=_auth_header(provider, company_id=company.id),
+    )
+    assert response.status_code == 200, response.text
+
+    notification = (
+        db_session.query(Notification)
+        .filter(
+            Notification.appointment_id == appointment.id,
+            Notification.kind == "APPOINTMENT_STATUS_CHANGED",
+            Notification.channel == "in_app",
+            Notification.target == str(customer.id),
+        )
+        .one()
+    )
+    assert notification.payload_json["appointment_id"] == str(appointment.id)
+    assert notification.payload_json["old_status"] == "confirmed"
+    assert notification.payload_json["new_status"] == "en_route_pickup"
+
+    event = (
+        db_session.query(AppointmentEvent)
+        .filter(
+            AppointmentEvent.appointment_id == appointment.id,
+            AppointmentEvent.kind == "status_change",
+        )
+        .one()
+    )
+    assert event.payload["status"] == "en_route_pickup"
+
+
+def test_provider_and_company_admin_views_remain_correct_after_status_update(
+    db_session: Session,
+    client: TestClient,
+) -> None:
+    company = _make_company(db_session, name="Provider Admin Visibility Co")
+    service = _make_service(db_session, company)
+    provider = _make_user(
+        db_session,
+        email="provider-admin-visible@example.com",
+        role="provider",
+        full_name="Provider Admin Visible",
+    )
+    other_provider = _make_user(
+        db_session,
+        email="other-admin-visible@example.com",
+        role="provider",
+        full_name="Other Admin Visible",
+    )
+    admin = _make_user(
+        db_session,
+        email="admin-visible@example.com",
+        role="company_admin",
+        full_name="Admin Visible",
+    )
+    db_session.add_all(
+        [
+            CompanyUser(user_id=provider.id, company_id=company.id),
+            CompanyUser(user_id=other_provider.id, company_id=company.id),
+            CompanyUser(user_id=admin.id, company_id=company.id),
+        ]
+    )
+    appointment = _make_appointment(db_session, company=company, service=service)
+    claim_response = client.post(
+        f"/company/appointments/{appointment.id}/claim",
+        headers=_auth_header(provider, company_id=company.id),
+    )
+    assert claim_response.status_code == 201, claim_response.text
+
+    status_response = client.post(
+        f"/company/appointments/{appointment.id}/status",
+        json={"status": "en_route_pickup"},
+        headers=_auth_header(provider, company_id=company.id),
+    )
+    assert status_response.status_code == 200, status_response.text
+
+    open_response = client.get(
+        "/company/appointments/open",
+        headers=_auth_header(other_provider, company_id=company.id),
+    )
+    assert open_response.status_code == 200, open_response.text
+    assert str(appointment.id) not in {item["id"] for item in open_response.json()}
+
+    my_response = client.get(
+        "/company/appointments/my",
+        headers=_auth_header(provider, company_id=company.id),
+    )
+    assert my_response.status_code == 200, my_response.text
+    my_item = next(item for item in my_response.json() if item["id"] == str(appointment.id))
+    assert my_item["status"] == "en_route_pickup"
+
+    admin_response = client.get(
+        "/company/appointments/open",
+        headers=_auth_header(admin, company_id=company.id),
+    )
+    assert admin_response.status_code == 200, admin_response.text
+    admin_item = next(item for item in admin_response.json() if item["id"] == str(appointment.id))
+    assert admin_item["status"] == "en_route_pickup"
+    assert admin_item["provider_name"] == "Provider Admin Visible"

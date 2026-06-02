@@ -1,3 +1,11 @@
+jest.mock("../api/http", () => ({
+  ackAllMyNotifications: jest.fn(),
+  ackMyNotification: jest.fn(),
+  fetchMyNotifications: jest.fn(),
+  getMyNotificationPreferences: jest.fn(),
+  updateMyNotificationPreferences: jest.fn(),
+}));
+
 import {
   getLatestNotificationForAppointment,
   groupCustomerNotifications,
