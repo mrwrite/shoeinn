@@ -33,7 +33,7 @@ The current customer list route uses customer email matching and excludes `cance
 
 - Treat active lifecycle statuses as customer-visible by default.
 
-  Customer list filtering should not exclude `requested`, `pending_payment`, `payment_failed`, `confirmed`, `en_route_pickup`, `picked_up`, `cleaning`, `ready`, `out_for_delivery`, `delivered`, or `completed` unless the request explicitly asks for historical filtering. The only unconditional exclusions should be records that are deleted/archived by an explicit data model, and cancellation should remain visible unless the product intentionally asks for cancelled appointments to be hidden.
+  Customer list filtering should not exclude `requested`, `pending_payment`, `payment_failed`, `confirmed`, `en_route_pickup`, `picked_up`, `cleaning`, `ready`, `out_for_delivery`, `delivered`, or `completed` unless the request explicitly asks for historical filtering. Cancelled appointments remain excluded from the default list to preserve the existing unpaid-cancel behavior, and deleted/archived records should remain excluded when such a data model exists.
 
   Alternative considered: keep excluding `completed` to make the default list "active only". That conflicts with the requested full lifecycle visibility and makes status changes look like data loss.
 
@@ -70,7 +70,7 @@ The current customer list route uses customer email matching and excludes `cance
 ## Risks / Trade-offs
 
 - [Risk] Older appointments may not have `customer_id`. -> Mitigation: support a limited email fallback while preferring `customer_id`, and add tests for the owned-row path.
-- [Risk] Returning completed and cancelled appointments may increase list length. -> Mitigation: order consistently by appointment time and leave explicit historical filtering as a future product option if needed.
+- [Risk] Returning completed appointments may increase list length. -> Mitigation: order consistently by appointment time and leave explicit historical filtering as a future product option if needed.
 - [Risk] Immediate cache patching can diverge from server data if payloads are incomplete. -> Mitigation: patch only the status field for the matching appointment id, then invalidate/refetch the canonical queries.
 - [Risk] Customer and provider/company live event audiences overlap. -> Mitigation: keep role-specific mobile invalidation branches and test provider/company lists after status updates.
 - [Risk] Status notification fanout could duplicate existing payment-driven status notifications. -> Mitigation: only assert provider status update commands create the provider-originated status notification and avoid adding duplicate notifications in read/list code.
@@ -83,5 +83,5 @@ Rollback is straightforward: mobile cache patching can be removed without server
 
 ## Open Questions
 
-- Should cancelled appointments remain visible in the default customer Appointments list, or should they require an explicit historical filter? The stated lifecycle list names do not include cancelled, but the ownership rule says only archived/deleted should be excluded.
+- Cancelled appointments remain hidden in the default customer Appointments list to preserve existing unpaid-cancel behavior; future historical/archive filtering can expose them intentionally if the product needs that view.
 - Does staging data consistently populate `appointment.customer_id`, or should this change include a one-time data repair for customer-owned appointments created before that field was populated?

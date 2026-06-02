@@ -268,6 +268,7 @@ def list_my_appointments(
     q = (
         db.query(Appointment)
         .filter(or_(*owner_filters))
+        .filter(Appointment.status != AppointmentStatus.cancelled)
         .order_by(Appointment.start_time.desc())
     )
     for appt in q.all():
