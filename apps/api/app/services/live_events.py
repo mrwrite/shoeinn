@@ -138,6 +138,7 @@ def publish_status_changed(
     *,
     appointment: Appointment,
     previous_status: str | None,
+    actor_role: str | None = None,
 ) -> None:
     user_ids = {
         str(company_user.user_id)
@@ -156,6 +157,7 @@ def publish_status_changed(
         {
             "status": appointment.status.value,
             "previous_status": previous_status,
+            "actor_role": actor_role,
         }
     )
     live_event_manager.publish(event, user_ids=user_ids, company_id=str(appointment.company_id))

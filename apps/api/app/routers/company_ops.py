@@ -911,6 +911,7 @@ async def set_ready_with_photo(
         db,
         appointment=appt,
         previous_status=previous_status.value if previous_status else None,
+        actor_role=current_user.role,
     )
 
     ready_photo_url = appt.ready_photo_url
@@ -931,7 +932,7 @@ def update_status(
     current=Depends(get_current_company_user),
     db: Session = Depends(get_db),
 ):
-    _, company_id = current
+    current_user, company_id = current
     appt = db.get(Appointment, appointment_id)
     if not appt:
         raise HTTPException(status_code=404, detail="Not found")
@@ -979,6 +980,7 @@ def update_status(
         db,
         appointment=appt,
         previous_status=previous_status.value if previous_status else None,
+        actor_role=current_user.role,
     )
     return {"id": appt.id, "status": appt.status}
 

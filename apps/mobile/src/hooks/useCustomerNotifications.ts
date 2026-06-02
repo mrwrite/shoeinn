@@ -11,8 +11,9 @@ import {
 } from "../api/http";
 import type { Notification } from "../types/notification";
 import type { NotificationPreferences } from "../types/user";
+import { customerNotificationsQueryKey } from "../query/keys";
 
-export const customerNotificationsQueryKey = ["me", "notifications"] as const;
+export { customerNotificationsQueryKey };
 export const customerNotificationPreferencesQueryKey = ["me", "notification-preferences"] as const;
 
 const statusLabels: Record<string, string> = {
