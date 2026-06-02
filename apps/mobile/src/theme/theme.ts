@@ -1,5 +1,4 @@
 import { StyleSheet } from "react-native";
-import { useColorScheme } from "react-native";
 
 export const colors = {
   peacockPrimary: "#0F4C5C",
@@ -74,8 +73,7 @@ export const shadows = {
 };
 
 export function useTheme() {
-  const scheme = useColorScheme();
-  const palette = scheme === "dark" ? darkColors : colors;
+  const palette = colors;
 
   return {
     colors: palette,
@@ -83,7 +81,7 @@ export function useTheme() {
     radii,
     textStyles,
     shadows,
-    scheme: scheme ?? "light",
+    scheme: "light",
   } as const;
 }
 
