@@ -1,0 +1,13 @@
+../../apps/payment/
+../../apps/api/
+../../apps/payment/.pytest_cache/
+../../apps/payment/pytest-cache-files-*/
+../../apps/api/.pytest_cache/
+../../apps/api/pytest-cache-files-*/
+**/.pytest_cache/
+**/pytest-cache-files-*/
+**/__pycache__/
+**/*.pyc
+**/.venv/
+**/venv/
+**/node_modules/

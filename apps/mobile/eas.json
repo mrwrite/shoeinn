@@ -1,0 +1,34 @@
+{
+  "cli": {
+    "version": ">= 12.0.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api-shoeinn.mrwrite.dev",
+        "EXPO_PUBLIC_APP_ENV": "staging",
+        "EXPO_PUBLIC_ENABLE_DEMO_LOGINS": "true"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api-shoeinn.mrwrite.dev",
+        "EXPO_PUBLIC_APP_ENV": "staging",
+        "EXPO_PUBLIC_ENABLE_DEMO_LOGINS": "true"
+      }
+    },
+    "production": {
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api-shoeinn.mrwrite.dev",
+        "EXPO_PUBLIC_APP_ENV": "production",
+        "EXPO_PUBLIC_ENABLE_DEMO_LOGINS": "false"
+      }
+    }
+  }
+}
