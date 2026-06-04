@@ -37,39 +37,47 @@ export function OwnerJobCard({ appointment, emphasis = "neutral", nextActionLabe
         styles.card,
         surface === "dark" && {
           backgroundColor: "rgba(8, 43, 51, 0.9)",
-          borderColor: "rgba(255,255,255,0.08)",
+          borderColor: "rgba(255,255,255,0.14)",
         },
       ]}
     >
-      <ImageFrame source={imageUrl} categorySlug={appointment.category_slug} label={appointment.service_name ?? "Premium care"} />
-      <View style={styles.headerRow}>
-        <View style={{ flex: 1 }}>
-          <Text variant="h3" weight="bold" style={surface === "dark" ? { color: theme.colors.surfaceElevated } : undefined}>
+      <View style={styles.mainRow}>
+        <ImageFrame source={imageUrl} categorySlug={appointment.category_slug} label={appointment.service_name ?? "Premium care"} />
+        <View style={styles.jobCopy}>
+          <View style={styles.categoryLine}>
+            <Ionicons name={getCategoryIcon(appointment.category_slug)} size={24} color={surface === "dark" ? "rgba(255,255,255,0.78)" : theme.colors.primary} />
+            <View style={{ flex: 1 }}>
+              <Text variant="caption" weight="bold" color={surface === "dark" ? "rgba(255,255,255,0.76)" : theme.colors.textMuted}>
+                {(appointment.category_name ?? "Care").toUpperCase()}
+              </Text>
+              <Text variant="caption" color={surface === "dark" ? "rgba(255,255,255,0.64)" : theme.colors.textMuted} numberOfLines={1}>
+                {appointment.service_name ?? "Premium care"}
+              </Text>
+            </View>
+          </View>
+
+          <Text variant="h3" weight="bold" style={surface === "dark" ? styles.darkTitle : undefined} numberOfLines={2}>
             {appointment.service_name ?? "Appointment"}
           </Text>
-          <Text color={surface === "dark" ? "rgba(255,255,255,0.74)" : theme.colors.textSecondary} style={styles.subcopy}>
+          <Text color={surface === "dark" ? "rgba(255,255,255,0.82)" : theme.colors.textSecondary} style={styles.customerName} numberOfLines={1}>
             {appointment.customer_name ?? "Customer"}
           </Text>
-        </View>
-        <Ionicons name="chevron-forward" size={20} color={surface === "dark" ? "rgba(255,255,255,0.72)" : theme.colors.textMuted} />
-      </View>
 
-      <View style={styles.badges}>
-        <StatusBadge label={nextActionLabel} tone={tone} />
-        {appointment.category_name ? <StatusBadge label={appointment.category_name} tone="primary" /> : null}
-        <AppointmentStatusBadge status={appointment.status} />
-        <StatusBadge label={appointment.provider_name ? "Assigned" : "Unassigned"} tone={appointment.provider_name ? "success" : "warning"} />
+          <View style={styles.badges}>
+            <StatusBadge label={nextActionLabel} tone={tone} />
+            {appointment.category_name ? <StatusBadge label={appointment.category_name} tone="primary" /> : null}
+            <AppointmentStatusBadge status={appointment.status} />
+            {!appointment.provider_name ? <StatusBadge label="Unassigned" tone="warning" /> : null}
+          </View>
+        </View>
+        <Ionicons name="chevron-forward" size={30} color={surface === "dark" ? "rgba(255,255,255,0.86)" : theme.colors.textMuted} />
       </View>
 
       <View style={[styles.infoGrid, { backgroundColor: surface === "dark" ? "rgba(255,255,255,0.06)" : theme.colors.surfaceMuted, borderColor: surface === "dark" ? "rgba(255,255,255,0.08)" : theme.colors.borderSoft }]}>
-        <InfoRow icon="calendar-outline" label="Scheduled" value={new Date(appointment.start_time).toLocaleString()} />
+        <InfoRow icon="calendar-outline" label="Scheduled" value={formatSchedule(appointment.start_time)} />
         <InfoRow icon="person-outline" label="Provider" value={appointment.provider_name ?? "Needs assignment"} />
         <InfoRow icon="location-outline" label="Area" value={location || "Address pending"} />
       </View>
-
-      <Text variant="caption" color={surface === "dark" ? "rgba(255,255,255,0.64)" : theme.colors.textMuted}>
-        {appointment.provider_name ? "Open to review assignment, progress, and next action." : "Open to assign this job and review customer details."}
-      </Text>
     </PressableCard>
   );
 }
@@ -85,6 +93,26 @@ const JOB_IMAGES: Record<string, string> = {
 
 function getJobImageUrl(categorySlug?: string | null) {
   return categorySlug ? JOB_IMAGES[categorySlug] ?? JOB_IMAGES.shoes : JOB_IMAGES.shoes;
+}
+
+function getCategoryIcon(categorySlug?: string | null): keyof typeof Ionicons.glyphMap {
+  const icons: Record<string, keyof typeof Ionicons.glyphMap> = {
+    shoes: "footsteps-outline",
+    laundry: "basket-outline",
+    "dry-cleaning": "shirt-outline",
+    "handbags-leather": "bag-handle-outline",
+    "rugs-textiles": "albums-outline",
+    alterations: "cut-outline",
+  };
+
+  return categorySlug ? icons[categorySlug] ?? "sparkles-outline" : "sparkles-outline";
+}
+
+function formatSchedule(value: string) {
+  const date = new Date(value);
+  const day = date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  const time = date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  return `${day}\n${time}`;
 }
 
 function ImageFrame({
@@ -138,19 +166,19 @@ function InfoRow({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMap;
 
 const styles = StyleSheet.create({
   card: {
-    gap: 12,
-    padding: 0,
-    overflow: "hidden",
+    gap: 14,
+    padding: 16,
+    borderRadius: 18,
   },
   media: {
-    minHeight: 138,
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
+    width: 142,
+    height: 142,
+    minHeight: 142,
+    borderRadius: 10,
     overflow: "hidden",
   },
   mediaImage: {
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
+    borderRadius: 10,
   },
   mediaOverlay: {
     flex: 1,
@@ -162,30 +190,44 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 999,
   },
-  headerRow: {
+  mainRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: 12,
-    paddingHorizontal: 16,
+    alignItems: "center",
+    gap: 18,
   },
-  subcopy: {
-    marginTop: 4,
+  jobCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 8,
+  },
+  categoryLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  darkTitle: {
+    color: "#FFFFFF",
+  },
+  customerName: {
+    fontSize: 16,
+    lineHeight: 21,
   },
   badges: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
-    paddingHorizontal: 16,
+    gap: 7,
   },
   infoGrid: {
     borderRadius: 18,
-    padding: 12,
-    gap: 10,
-    marginHorizontal: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
     borderWidth: 1,
+    flexDirection: "row",
+    gap: 12,
   },
   infoRow: {
+    flex: 1,
+    minWidth: 0,
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 10,

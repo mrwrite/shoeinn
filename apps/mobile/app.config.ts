@@ -33,6 +33,17 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       },
     },
   },
+  ios: {
+    ...config.ios,
+    bundleIdentifier: "com.mrwrite.shoeinn",
+    config: {
+      ...config.ios?.config,
+      googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
+    },
+    infoPlist: {
+      ITSAppUsesNonExemptEncryption: false,
+    },
+  },
   updates: {
     ...config.updates,
     checkAutomatically: "ON_ERROR_RECOVERY",

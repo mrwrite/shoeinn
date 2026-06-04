@@ -22,7 +22,8 @@
         "EXPO_PUBLIC_APP_ENV": "staging",
         "EXPO_PUBLIC_ENABLE_DEMO_LOGINS": "true",
         "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyBuGdJpuCV5rmcJQ_Hrg7Zkd0ajL6XUglw",
-        "EXPO_PUBLIC_MOBILE_REDIRECT_BASE": "shoeinn://payment-return"
+        "EXPO_PUBLIC_MOBILE_REDIRECT_BASE": "shoeinn://payment-return",
+        "EXPO_PUBLIC_DEMO_MARKET": "shelby"
       }
     },
     "production": {

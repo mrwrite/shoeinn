@@ -86,6 +86,13 @@ export default function OwnerDashboardScreen() {
   const refreshing = jobsQuery.isRefetching || teamQuery.isRefetching || companyQuery.isRefetching;
   const boardCue = unassigned.length > 0 ? `${unassigned.length} jobs need assignment.` : "The board is covered and the team can focus on progress and delivery.";
   const companyName = companyQuery.data?.name ?? "Your shop";
+  const todayLabel = new Date().toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const filterCounts: Record<FilterKey, number> = {
+    unassigned: unassigned.length,
+    in_progress: inProgress.length,
+    ready: jobs.filter((item) => item.status === "ready").length,
+    all: jobs.length,
+  };
 
   return (
     <AppScreen
@@ -128,31 +135,31 @@ export default function OwnerDashboardScreen() {
             </View>
           </View>
 
-          <View style={styles.headerBlock}>
-            <Text variant="overline" weight="bold" color={theme.colors.accent}>
-              OWNER COMMAND CENTER
-            </Text>
-            <View style={styles.titleRow}>
-              <Text variant="h1" weight="bold" style={styles.companyTitle}>
-                {companyName}
+          <View style={styles.heroRow}>
+            <View style={styles.headerBlock}>
+              <Text variant="overline" weight="bold" color={theme.colors.accent}>
+                OWNER COMMAND CENTER
               </Text>
-              <Ionicons name="shield-checkmark" size={22} color={theme.colors.accent} />
+              <View style={styles.titleRow}>
+                <Text variant="h1" weight="regular" style={styles.companyTitle}>
+                  {companyName}
+                </Text>
+                <Ionicons name="shield-checkmark" size={22} color={theme.colors.accent} />
+              </View>
+              <Text style={styles.greetingCopy}>Good morning, {greetingName}. Here's today's pickup-and-delivery picture.</Text>
             </View>
-            <Text style={styles.greetingCopy}>Good morning, {greetingName}. Here's today's pickup-and-delivery picture.</Text>
-          </View>
 
-          <View style={styles.datePillRow}>
             <View style={styles.datePill}>
-              <Ionicons name="calendar-outline" size={18} color={theme.colors.accent} />
+              <Ionicons name="calendar-outline" size={20} color={theme.colors.accent} />
               <Text weight="semibold" style={styles.datePillText}>
-                Today, Jun 4
+                Today, {todayLabel}
               </Text>
-              <Ionicons name="chevron-down" size={16} color={theme.colors.surfaceElevated} />
+              <Ionicons name="chevron-down" size={17} color={theme.colors.surfaceElevated} />
             </View>
           </View>
 
           <View style={styles.summaryGrid}>
-            <SummaryCard label="Today" value={`${todaysJobs.length}`} detail="Jobs on today's board" tone="neutral" />
+            <SummaryCard label="Today's jobs" value={`${todaysJobs.length}`} detail="Jobs on today's board" tone="today" />
             <SummaryCard label="Unassigned" value={`${unassigned.length}`} detail="Need attention" tone={unassigned.length > 0 ? "priority" : "neutral"} />
             <SummaryCard label="Active" value={`${inProgress.length}`} detail="Currently moving" tone="active" />
             <SummaryCard label="Complete" value={`${completed.length}`} detail="Delivered or done" tone="ready" />
@@ -173,7 +180,13 @@ export default function OwnerDashboardScreen() {
                 </Text>
                 <Text style={styles.attentionCopy}>{boardCue}</Text>
               </View>
-              <Button label={unassigned.length > 0 ? "Action needed" : "Covered"} variant="gold" size="compact" onPress={() => undefined} />
+              <Button
+                label={unassigned.length > 0 ? "Action needed" : "Covered"}
+                variant="gold"
+                size="compact"
+                rightIcon={<Ionicons name="chevron-forward" size={18} color={theme.colors.textPrimary} />}
+                onPress={() => setSelectedFilter(unassigned.length > 0 ? "unassigned" : "all")}
+              />
             </View>
             {topCategories.length > 0 ? (
               <View style={styles.categoryRow}>
@@ -183,19 +196,6 @@ export default function OwnerDashboardScreen() {
               </View>
             ) : null}
           </Card>
-
-          <View style={styles.sectionHeaderRow}>
-            <SectionHeader
-              tone="dark"
-              title="Jobs board"
-              subtitle="Filter the board the way a cleaner owner would think about the day."
-              style={{ flex: 1 }}
-            />
-            <View style={styles.iconCluster}>
-              <IconButton icon="search-outline" />
-              <IconButton icon="options-outline" />
-            </View>
-          </View>
 
           <View style={styles.filterRow}>
             {(
@@ -222,34 +222,60 @@ export default function OwnerDashboardScreen() {
                     },
                   ]}
                 >
-                  <Text variant="caption" weight="bold" color={active ? theme.colors.accent : "rgba(255,255,255,0.76)"}>
+                  <Text
+                    variant="meta"
+                    weight="bold"
+                    color={active ? theme.colors.accent : "rgba(255,255,255,0.76)"}
+                    numberOfLines={1}
+                    style={styles.filterLabel}
+                  >
                     {option.label}
                   </Text>
+                  <View style={[styles.filterCount, { backgroundColor: active ? theme.colors.accent : "rgba(255,255,255,0.10)" }]}>
+                    <Text variant="meta" weight="bold" color={active ? "#FFFFFF" : "rgba(255,255,255,0.78)"}>
+                      {filterCounts[option.key]}
+                    </Text>
+                  </View>
                 </Pressable>
               );
             })}
           </View>
 
-          <View style={styles.jobList}>
-            {filteredJobs.length === 0 ? (
-              <EmptyState
-                title="Nothing in this segment"
-                message="Switch filters or pull to refresh after reseeding the local demo data."
-                icon="briefcase-outline"
+          <Card variant="outline" style={styles.jobsBoardCard}>
+            <View style={styles.sectionHeaderRow}>
+              <SectionHeader
+                tone="dark"
+                title="Jobs Board"
+                subtitle="Filter the board the way a cleaner owner would think about the day."
+                style={{ flex: 1 }}
               />
-            ) : (
-              filteredJobs.map((appointment) => (
-                <OwnerJobCard
-                  key={appointment.id}
-                  appointment={appointment}
-                  emphasis={getEmphasis(appointment)}
-                  nextActionLabel={getNextActionLabel(appointment)}
-                  surface="dark"
-                  onPress={() => navigation.navigate("ProviderAppointmentDetail", { appointment })}
+              <View style={styles.iconCluster}>
+                <IconButton icon="search-outline" />
+                <IconButton icon="options-outline" />
+              </View>
+            </View>
+
+            <View style={styles.jobList}>
+              {filteredJobs.length === 0 ? (
+                <EmptyState
+                  title="Nothing in this segment"
+                  message="Switch filters or pull to refresh after reseeding the local demo data."
+                  icon="briefcase-outline"
                 />
-              ))
-            )}
-          </View>
+              ) : (
+                filteredJobs.map((appointment) => (
+                  <OwnerJobCard
+                    key={appointment.id}
+                    appointment={appointment}
+                    emphasis={getEmphasis(appointment)}
+                    nextActionLabel={getNextActionLabel(appointment)}
+                    surface="dark"
+                    onPress={() => navigation.navigate("ProviderAppointmentDetail", { appointment })}
+                  />
+                ))
+              )}
+            </View>
+          </Card>
 
           <Card variant="outline" style={styles.teamCard}>
             <SectionHeader
@@ -291,24 +317,39 @@ function SummaryCard({
   label: string;
   value: string;
   detail: string;
-  tone: "priority" | "ready" | "active" | "neutral";
+  tone: "priority" | "ready" | "active" | "neutral" | "today";
 }) {
   const theme = useTheme();
-  const color = tone === "priority" ? "#F66464" : tone === "ready" ? "#56C271" : tone === "active" ? theme.colors.accent : "rgba(255,255,255,0.76)";
+  const color =
+    tone === "priority"
+      ? "#FF6868"
+      : tone === "ready"
+        ? "#56C271"
+        : tone === "active"
+          ? "#49BEB7"
+          : tone === "today"
+            ? theme.colors.accent
+            : "rgba(255,255,255,0.76)";
+  const icon =
+    tone === "priority"
+      ? "people-outline"
+      : tone === "ready"
+        ? "checkmark-circle-outline"
+        : tone === "active"
+          ? "car-outline"
+          : "calendar-outline";
   return (
     <Card variant="outline" style={[styles.summaryCard, { backgroundColor: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.12)" }]}>
-      <Ionicons
-        name={tone === "priority" ? "alert-circle-outline" : tone === "ready" ? "checkmark-circle-outline" : tone === "active" ? "trail-sign-outline" : "calendar-outline"}
-        size={22}
-        color={color}
-      />
+      <View style={[styles.summaryIcon, { borderColor: `${color}70`, backgroundColor: `${color}14` }]}>
+        <Ionicons name={icon} size={24} color={color} />
+      </View>
       <Text variant="caption" weight="bold" color={color}>
         {label.toUpperCase()}
       </Text>
-      <Text variant="h1" weight="bold" style={{ color, marginTop: 2 }}>
+      <Text variant="h1" weight="bold" style={{ color, marginTop: 2, fontSize: 30, lineHeight: 34 }}>
         {value}
       </Text>
-      <Text style={{ color: "rgba(255,255,255,0.68)" }}>{detail}</Text>
+      <Text variant="caption" style={{ color: "rgba(255,255,255,0.68)" }}>{detail}</Text>
     </Card>
   );
 }
@@ -334,9 +375,9 @@ function TeamRow({ provider, activeCount, readyCount }: { provider: CompanyUser;
 
 const styles = StyleSheet.create({
   content: {
-    padding: 16,
-    gap: 14,
-    paddingBottom: 24,
+    padding: 18,
+    gap: 18,
+    paddingBottom: 112,
     backgroundColor: "#062E37",
   },
   topBar: {
@@ -350,9 +391,9 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   iconButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
+    width: 52,
+    height: 52,
+    borderRadius: 16,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
@@ -367,7 +408,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "rgba(255,255,255,0.02)",
   },
+  heroRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    gap: 16,
+  },
   headerBlock: {
+    flex: 1,
     gap: 8,
   },
   titleRow: {
@@ -378,8 +426,8 @@ const styles = StyleSheet.create({
   },
   companyTitle: {
     color: "#F8F5EF",
-    fontSize: 32,
-    lineHeight: 36,
+    fontSize: 34,
+    lineHeight: 39,
   },
   greetingCopy: {
     color: "rgba(255,255,255,0.82)",
@@ -387,39 +435,45 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     maxWidth: 330,
   },
-  datePillRow: {
-    alignItems: "flex-end",
-  },
   datePill: {
-    minHeight: 48,
-    borderRadius: 18,
-    paddingHorizontal: 16,
+    minHeight: 56,
+    borderRadius: 16,
+    paddingHorizontal: 18,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
+    borderColor: "rgba(255,255,255,0.18)",
     backgroundColor: "rgba(255,255,255,0.04)",
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
+    minWidth: 178,
   },
   datePillText: {
     color: "#F8F5EF",
   },
   summaryGrid: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
+    gap: 8,
   },
   summaryCard: {
-    width: "47%",
+    flex: 1,
     minHeight: 150,
     gap: 8,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.12)",
     backgroundColor: "rgba(255,255,255,0.03)",
+    padding: 12,
+  },
+  summaryIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
   attentionCard: {
     gap: 14,
-    padding: 18,
+    padding: 22,
     borderWidth: 1,
     borderRadius: 22,
     backgroundColor: "rgba(255,255,255,0.03)",
@@ -427,16 +481,16 @@ const styles = StyleSheet.create({
   },
   attentionTop: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
+    alignItems: "center",
+    gap: 18,
   },
   alertIcon: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    borderWidth: 1,
-    borderColor: "rgba(214, 166, 61, 0.35)",
-    backgroundColor: "rgba(214, 166, 61, 0.08)",
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    borderWidth: 3,
+    borderColor: "rgba(214, 166, 61, 0.9)",
+    backgroundColor: "rgba(214, 166, 61, 0.10)",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -462,16 +516,38 @@ const styles = StyleSheet.create({
   },
   filterRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
+    gap: 10,
   },
   filterPill: {
-    minHeight: 40,
+    flex: 1,
+    minWidth: 0,
+    minHeight: 54,
     borderRadius: 999,
-    paddingHorizontal: 14,
+    paddingHorizontal: 8,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
+    flexDirection: "row",
+    gap: 6,
+  },
+  filterLabel: {
+    flexShrink: 1,
+  },
+  filterCount: {
+    minWidth: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 7,
+  },
+  jobsBoardCard: {
+    gap: 16,
+    padding: 18,
+    borderWidth: 1,
+    borderRadius: 22,
+    backgroundColor: "rgba(255,255,255,0.03)",
+    borderColor: "rgba(255,255,255,0.12)",
   },
   jobList: {
     gap: 12,
