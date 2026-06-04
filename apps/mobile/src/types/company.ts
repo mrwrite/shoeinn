@@ -1,4 +1,5 @@
 import type { AppointmentStatus } from "./booking";
+import type { CareCategorySummary } from "./care";
 
 export interface ProviderAppointment {
   id: string;
@@ -11,7 +12,12 @@ export interface ProviderAppointment {
   city?: string | null;
   state?: string | null;
   postal_code?: string | null;
+  service_id?: string | null;
   service_name?: string | null;
+  category_id?: string | null;
+  category_slug?: string | null;
+  category_name?: string | null;
+  category_icon_key?: string | null;
   start_time: string;
   status: AppointmentStatus;
   is_assigned?: boolean;
@@ -31,6 +37,7 @@ export interface Company {
   name: string;
   city?: string | null;
   state?: string | null;
+  offered_categories?: CareCategorySummary[];
 }
 
 export interface CompanyUser {

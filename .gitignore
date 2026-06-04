@@ -37,3 +37,5 @@ __pycache__/
 apps/api/app/static/
 apps/api/app/static/uploads/
 dev.db
+.local-logs/
+.worktrees/

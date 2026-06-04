@@ -26,7 +26,6 @@ from app.models import (
     AppointmentEvent,
     AppointmentLocationUpdate,
     Notification,
-    Service,
 )
 from app.models.company_user import CompanyUser
 from app.models.user import User
@@ -115,12 +114,29 @@ def _provider_display_name(user: User | None) -> str | None:
     return display_name or None
 
 
-def _serialize_assignment(assignment: AppointmentAssignment, provider: User | None) -> AppointmentAssignmentRead:
+def _appointment_service_context(appt: Appointment) -> dict[str, object | None]:
+    return {
+        "service_id": appt.service_id,
+        "service_name": appt.service_name,
+        "category_id": appt.category_id,
+        "category_slug": appt.category_slug,
+        "category_name": appt.category_name,
+        "category_icon_key": appt.category_icon_key,
+    }
+
+
+def _serialize_assignment(
+    assignment: AppointmentAssignment,
+    provider: User | None,
+    appointment: Appointment | None = None,
+) -> AppointmentAssignmentRead:
+    service_context = _appointment_service_context(appointment) if appointment else {}
     return AppointmentAssignmentRead.model_validate(
         {
             "id": assignment.id,
             "appointment_id": assignment.appointment_id,
             "user_id": assignment.user_id,
+            **service_context,
             "assigned_at": assignment.assigned_at,
             "unassigned_at": assignment.unassigned_at,
             "is_active": assignment.is_active,
@@ -287,7 +303,6 @@ def open_appointments(current=Depends(get_current_company_user), db: Session = D
 
         items = []
         for appt, assignment, assigned_user in rows:
-            svc = db.get(Service, appt.service_id) if appt.service_id else None
             items.append(
                 {
                     "id": appt.id,
@@ -299,7 +314,7 @@ def open_appointments(current=Depends(get_current_company_user), db: Session = D
                     "city": appt.city,
                     "state": appt.state,
                     "postal_code": appt.postal_code,
-                    "service_name": svc.name if svc else None,
+                    **_appointment_service_context(appt),
                     "start_time": appt.start_time,
                     "status": appt.status.value,
                     # assignment info
@@ -338,7 +353,6 @@ def open_appointments(current=Depends(get_current_company_user), db: Session = D
 
     items = []
     for appt in q.all():
-        svc = db.get(Service, appt.service_id) if appt.service_id else None
         items.append(
             {
                 "id": appt.id,
@@ -350,7 +364,7 @@ def open_appointments(current=Depends(get_current_company_user), db: Session = D
                 "city": appt.city,
                 "state": appt.state,
                 "postal_code": appt.postal_code,
-                "service_name": svc.name if svc else None,
+                **_appointment_service_context(appt),
                 "start_time": appt.start_time,
                 "status": appt.status.value,
                 "is_assigned": False,
@@ -386,7 +400,6 @@ def my_appointments(current=Depends(get_current_company_user), db: Session = Dep
 
     items = []
     for appt, assignment in rows:
-        svc = db.get(Service, appt.service_id) if appt.service_id else None
         items.append(
             {
                 "id": appt.id,
@@ -398,7 +411,7 @@ def my_appointments(current=Depends(get_current_company_user), db: Session = Dep
                 "city": appt.city,
                 "state": appt.state,
                 "postal_code": appt.postal_code,
-                "service_name": svc.name if svc else None,
+                **_appointment_service_context(appt),
                 "start_time": appt.start_time,
                 "status": appt.status.value,
                 # assignment info
@@ -426,10 +439,6 @@ def claimed_appointments(current=Depends(get_current_company_user), db: Session 
     )
     items = []
     for appt, assignment in q.all():
-        service_name = None
-        if appt.service_id:
-            svc = db.get(Service, appt.service_id)
-            service_name = svc.name if svc else None
         items.append(
             {
                 "id": appt.id,
@@ -441,7 +450,7 @@ def claimed_appointments(current=Depends(get_current_company_user), db: Session 
                 "city": appt.city,
                 "state": appt.state,
                 "postal_code": appt.postal_code,
-                "service_name": service_name,
+                **_appointment_service_context(appt),
                 "start_time": appt.start_time,
                 "status": appt.status.value,
                 "is_assigned": True,
@@ -506,7 +515,7 @@ def claim_appointment(
         old_provider=None,
         new_provider=current_user,
     )
-    return _serialize_assignment(assignment, current_user)
+    return _serialize_assignment(assignment, current_user, appt)
 
 
 @router.post(
@@ -575,7 +584,7 @@ def assign_appointment(
         old_provider=None,
         new_provider=provider,
     )
-    return _serialize_assignment(assignment, provider)
+    return _serialize_assignment(assignment, provider, appt)
 
 
 @router.post(
@@ -669,7 +678,7 @@ def reassign_appointment(
         old_provider=old_provider,
         new_provider=new_provider,
     )
-    return _serialize_assignment(assignment, new_provider)
+    return _serialize_assignment(assignment, new_provider, appt)
 
 
 @router.get("/appointments")
@@ -678,14 +687,10 @@ def company_appointments(current=Depends(get_current_company_user), db: Session 
     q = db.query(Appointment).filter_by(company_id=company_id).order_by(Appointment.start_time.desc())
     items = []
     for appt in q.all():
-        service_name = None
-        if appt.service_id:
-            svc = db.get(Service, appt.service_id)
-            service_name = svc.name if svc else None
         items.append(
             {
                 "id": appt.id,
-                "service_name": service_name,
+                **_appointment_service_context(appt),
                 "type": appt.type,
                 "start_time": appt.start_time,
                 "status": appt.status.value,
@@ -810,14 +815,10 @@ def all_appointments(current=Depends(get_current_company_admin), db: Session = D
 
     results = []
     for appt, assignment, user in q.all():
-        service_name = None
-        if appt.service_id:
-            svc = db.get(Service, appt.service_id)
-            service_name = svc.name if svc else None
         results.append(
             {
                 "id": appt.id,
-                "service_name": service_name,
+                **_appointment_service_context(appt),
                 "type": appt.type,
                 "start_time": appt.start_time,
                 "status": appt.status.value,

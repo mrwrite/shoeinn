@@ -11,18 +11,27 @@ const showDemoLogins =
   process.env.EXPO_PUBLIC_ENABLE_DEMO_LOGINS === "true" ||
   process.env.SHOW_DEMO_LOGINS === "true";
 
+const demoMarket = process.env.EXPO_PUBLIC_DEMO_MARKET ?? "shelby";
+
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: "Shoeinn",
   slug: "shoeinn",
   scheme: "shoeinn",
-  version: "1.0.0",
+  version: "1.0.1",
   userInterfaceStyle: "light",
   orientation: "portrait",
   platforms: ["ios", "android", "web"],
   android: {
     ...config.android,
     package: "com.mrwrite.shoeinn",
+    versionCode: 2,
+    config: {
+      ...config.android?.config,
+      googleMaps: {
+        apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
+      },
+    },
   },
   updates: {
     ...config.updates,
@@ -38,6 +47,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       ? { MOBILE_REDIRECT_BASE: configuredMobileRedirectBase }
       : {}),
     SHOW_DEMO_LOGINS: showDemoLogins,
+    DEMO_MARKET: demoMarket,
     eas: {
       ...config.extra?.eas,
       projectId: "1a753a1a-ae23-47e9-ba06-cc6148fb36ee",

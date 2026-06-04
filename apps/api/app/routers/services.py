@@ -6,10 +6,10 @@ from datetime import date, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.core.db import get_db
-from app.models import Service
+from app.models import CareCategory, Service
 from app.schemas.service import ServiceRead
 from app.services.availability import get_daily_availability
 
@@ -17,12 +17,24 @@ router = APIRouter(tags=["services"])
 
 
 @router.get("/services", response_model=list[ServiceRead])
-def list_services(company_id: UUID | None = None, db: Session = Depends(get_db)) -> list[ServiceRead]:
+def list_services(
+    company_id: UUID | None = None,
+    category_slug: str | None = None,
+    category_id: UUID | None = None,
+    db: Session = Depends(get_db),
+) -> list[ServiceRead]:
     """Return all active services ordered by name."""
 
-    q = db.query(Service).filter(Service.is_active.is_(True))
+    q = db.query(Service).options(joinedload(Service.category)).filter(Service.is_active.is_(True))
     if company_id:
         q = q.filter(Service.company_id == company_id)
+    if category_id:
+        q = q.filter(Service.category_id == category_id)
+    if category_slug:
+        q = q.join(Service.category).filter(
+            CareCategory.slug == category_slug,
+            CareCategory.is_active.is_(True),
+        )
     services = q.order_by(Service.name.asc()).all()
     return services
 

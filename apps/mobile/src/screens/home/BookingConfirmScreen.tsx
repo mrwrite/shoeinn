@@ -4,10 +4,15 @@ import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import { getMe } from "../../api/http";
-import { ScreenContainer } from "../../components/ScreenContainer";
+import { AppScreen } from "../../components/ui/AppScreen";
+import { BookingStepper } from "../../components/ui/BookingStepper";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
+import { MediaPlaceholder } from "../../components/ui/MediaPlaceholder";
+import { SectionHeader } from "../../components/ui/SectionHeader";
+import { StatusBadge } from "../../components/ui/StatusBadge";
 import { Text } from "../../components/ui/Text";
+import { getServiceCategoryLabel } from "../../discovery/categoryMetadata";
 import { useCityState } from "../../hooks/useCityState";
 import type { HomeStackParamList } from "../../navigation/types";
 import { useAuthStore } from "../../state/authStore";
@@ -18,6 +23,7 @@ export default function BookingConfirmScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<HomeStackParamList>>();
   const route = useRoute<RouteProp<HomeStackParamList, "BookingConfirm">>();
   const { service, date, time } = route.params;
+  const categoryLabel = getServiceCategoryLabel(service);
   const { fullName, email } = useAuthStore();
   const [name, setName] = useState(fullName ?? "");
   const [phone, setPhone] = useState("");
@@ -84,13 +90,30 @@ export default function BookingConfirmScreen() {
     !state.trim() ||
     !postalCode.trim();
 
+  const inputStyle = [
+    styles.input,
+    {
+      backgroundColor: theme.colors.surface,
+      borderColor: theme.colors.borderSoft,
+      color: theme.colors.textPrimary,
+    },
+  ];
+
+  const bookingSteps = [
+    { key: "date", label: "Date" },
+    { key: "time", label: "Time" },
+    { key: "details", label: "Details" },
+    { key: "pay", label: "Pay" },
+  ];
+
   return (
-    <ScreenContainer
+    <AppScreen
       scrollable
       stickyFooter={
         <View style={styles.footerContent}>
           <Button
             label="Continue to Review & Pay"
+            variant="gold"
             disabled={disabled}
             onPress={() =>
               navigation.navigate("BookingReviewPay", {
@@ -116,88 +139,82 @@ export default function BookingConfirmScreen() {
       }
     >
       <View style={styles.content}>
-        <Text variant="title" weight="bold">
-          Booking details
-        </Text>
+        <BookingStepper steps={bookingSteps} currentIndex={2} />
 
-        <Card>
-          <Text variant="subtitle" weight="semibold">
-            Selected service
-          </Text>
-          <View style={{ marginTop: 10, gap: 8 }}>
+        <Card variant="marketplace" style={styles.heroCard}>
+          <MediaPlaceholder
+            compact
+            categorySlug={service.category_slug}
+            label="Confirm details"
+            caption={service.name}
+            style={styles.heroMedia}
+          />
+          <View style={styles.heroCopy}>
+            <SectionHeader
+              eyebrow="Pickup details"
+              title="Confirm your care appointment"
+              subtitle="Add the contact and address details your provider needs for pickup."
+            />
+            <View style={styles.badgeRow}>
+              {categoryLabel ? <StatusBadge label={categoryLabel} tone="primary" /> : null}
+              <StatusBadge label="Pickup" tone="warning" />
+            </View>
+          </View>
+        </Card>
+
+        <Card variant="marketplace">
+          <View style={styles.cardHeader}>
+            <SectionHeader title="Selected service" />
+            <StatusBadge label="Pickup" tone="primary" />
+          </View>
+          <View style={styles.summaryRows}>
             {summary.map((row) => (
               <View key={row.label} style={styles.row}>
-                <Text color={theme.colors.mutedText}>{row.label}</Text>
-                <Text weight="semibold">{row.value}</Text>
+                <Text color={theme.colors.textMuted}>{row.label}</Text>
+                <Text weight="bold" style={styles.rowValue}>
+                  {row.value}
+                </Text>
               </View>
             ))}
           </View>
         </Card>
 
-        <Card>
-          <Text variant="subtitle" weight="semibold">
-            Your details
-          </Text>
-          <View style={{ marginTop: 12, gap: 12 }}>
-            <TextInput
-              placeholder="Full name"
-              value={name}
-              onChangeText={setName}
-              style={[styles.input, { borderColor: theme.colors.border }]}
-              placeholderTextColor={theme.colors.mutedText}
-            />
+        <Card variant="marketplace">
+          <SectionHeader title="Your details" subtitle="Used for pickup updates and appointment communication." />
+          <View style={styles.formFields}>
+            <TextInput placeholder="Full name" value={name} onChangeText={setName} style={inputStyle} placeholderTextColor={theme.colors.textSubtle} />
             <TextInput
               placeholder="Phone"
               value={phone}
               onChangeText={setPhone}
-              style={[styles.input, { borderColor: theme.colors.border }]}
-              placeholderTextColor={theme.colors.mutedText}
+              style={inputStyle}
+              placeholderTextColor={theme.colors.textSubtle}
               keyboardType="phone-pad"
             />
             <TextInput
               placeholder="Email (optional)"
               value={customerEmail}
               onChangeText={setCustomerEmail}
-              style={[styles.input, { borderColor: theme.colors.border }]}
-              placeholderTextColor={theme.colors.mutedText}
+              style={inputStyle}
+              placeholderTextColor={theme.colors.textSubtle}
               keyboardType="email-address"
               autoCapitalize="none"
             />
           </View>
         </Card>
 
-        <Card>
-          <Text variant="subtitle" weight="semibold">
-            Service address
-          </Text>
-          <View style={{ marginTop: 12, gap: 12 }}>
-            <TextInput
-              placeholder="Address line 1"
-              value={addressLine1}
-              onChangeText={setAddressLine1}
-              style={[styles.input, { borderColor: theme.colors.border }]}
-              placeholderTextColor={theme.colors.mutedText}
-            />
-            <TextInput
-              placeholder="Address line 2 (optional)"
-              value={addressLine2}
-              onChangeText={setAddressLine2}
-              style={[styles.input, { borderColor: theme.colors.border }]}
-              placeholderTextColor={theme.colors.mutedText}
-            />
-            <TextInput
-              placeholder="City"
-              value={city}
-              onChangeText={setCity}
-              style={[styles.input, { borderColor: theme.colors.border }]}
-              placeholderTextColor={theme.colors.mutedText}
-            />
+        <Card variant="marketplace">
+          <SectionHeader title="Service address" subtitle="Where the provider should meet you." />
+          <View style={styles.formFields}>
+            <TextInput placeholder="Address line 1" value={addressLine1} onChangeText={setAddressLine1} style={inputStyle} placeholderTextColor={theme.colors.textSubtle} />
+            <TextInput placeholder="Address line 2 (optional)" value={addressLine2} onChangeText={setAddressLine2} style={inputStyle} placeholderTextColor={theme.colors.textSubtle} />
+            <TextInput placeholder="City" value={city} onChangeText={setCity} style={inputStyle} placeholderTextColor={theme.colors.textSubtle} />
             <TextInput
               placeholder="State"
               value={state}
               onChangeText={setState}
-              style={[styles.input, { borderColor: theme.colors.border }]}
-              placeholderTextColor={theme.colors.mutedText}
+              style={inputStyle}
+              placeholderTextColor={theme.colors.textSubtle}
               autoCapitalize="characters"
               maxLength={2}
             />
@@ -205,14 +222,14 @@ export default function BookingConfirmScreen() {
               placeholder="Postal code"
               value={postalCode}
               onChangeText={setPostalCode}
-              style={[styles.input, { borderColor: theme.colors.border }]}
-              placeholderTextColor={theme.colors.mutedText}
+              style={inputStyle}
+              placeholderTextColor={theme.colors.textSubtle}
               keyboardType="numbers-and-punctuation"
             />
           </View>
         </Card>
       </View>
-    </ScreenContainer>
+    </AppScreen>
   );
 }
 
@@ -220,23 +237,54 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
     paddingBottom: 140,
-    gap: 12,
+    gap: 14,
   },
   footerContent: {
-    backgroundColor: "#F8F9FA",
-    padding: 8,
-    borderRadius: 16,
+    flexDirection: "row",
+  },
+  heroCard: {
+    padding: 0,
+    overflow: "hidden",
+  },
+  heroMedia: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+  },
+  heroCopy: {
+    padding: 16,
+    gap: 12,
+  },
+  badgeRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  cardHeader: {
+    gap: 12,
+  },
+  summaryRows: {
+    marginTop: 12,
+    gap: 10,
   },
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  rowValue: {
+    flex: 1,
+    textAlign: "right",
+  },
+  formFields: {
+    marginTop: 14,
+    gap: 12,
   },
   input: {
-    height: 48,
-    borderRadius: 14,
+    minHeight: 52,
+    borderRadius: 20,
     borderWidth: 1,
-    paddingHorizontal: 14,
-    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 16,
+    fontSize: 16,
   },
 });

@@ -12,22 +12,10 @@ import {
 import type { Notification } from "../types/notification";
 import type { NotificationPreferences } from "../types/user";
 import { customerNotificationsQueryKey } from "../query/keys";
+import { getReadableAppointmentStatus } from "../features/appointmentCopy";
 
 export { customerNotificationsQueryKey };
 export const customerNotificationPreferencesQueryKey = ["me", "notification-preferences"] as const;
-
-const statusLabels: Record<string, string> = {
-  requested: "Requested",
-  confirmed: "Confirmed",
-  en_route_pickup: "En route to pickup",
-  picked_up: "Picked up",
-  cleaning: "Cleaning",
-  ready: "Ready",
-  out_for_delivery: "Out for delivery",
-  delivered: "Delivered",
-  completed: "Completed",
-  cancelled: "Cancelled",
-};
 
 export type CustomerNotificationViewModel = {
   title: string;
@@ -74,7 +62,7 @@ function formatStatusLabel(status?: string | null): string | null {
   if (!status) {
     return null;
   }
-  return statusLabels[status] ?? status.replace(/_/g, " ");
+  return getReadableAppointmentStatus(status);
 }
 
 function formatRelativeTime(value: string): string {

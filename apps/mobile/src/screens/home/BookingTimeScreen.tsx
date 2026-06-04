@@ -1,13 +1,20 @@
 import React, { useMemo, useState } from "react";
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from "react-native";
+import { FlatList, StyleSheet, View } from "react-native";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useQuery } from "@tanstack/react-query";
 
 import { getAvailability } from "../../api/http";
-import { ScreenContainer } from "../../components/ScreenContainer";
+import { AppScreen } from "../../components/ui/AppScreen";
+import { BookingStepper } from "../../components/ui/BookingStepper";
 import { Button } from "../../components/ui/Button";
+import { Card, PressableCard } from "../../components/ui/Card";
+import { LoadingState } from "../../components/ui/LoadingState";
+import { MediaPlaceholder } from "../../components/ui/MediaPlaceholder";
+import { SectionHeader } from "../../components/ui/SectionHeader";
+import { StatusBadge } from "../../components/ui/StatusBadge";
 import { Text } from "../../components/ui/Text";
+import { getServiceCategoryLabel } from "../../discovery/categoryMetadata";
 import type { HomeStackParamList } from "../../navigation/types";
 import { useTheme } from "../../theme/theme";
 
@@ -17,6 +24,7 @@ export default function BookingTimeScreen() {
   const route = useRoute<RouteProp<HomeStackParamList, "BookingTime">>();
   const { service, date } = route.params;
   const [selected, setSelected] = useState<string | null>(null);
+  const categoryLabel = getServiceCategoryLabel(service);
 
   const availabilityQuery = useQuery({
     queryKey: ["availability", service.id, date],
@@ -35,13 +43,20 @@ export default function BookingTimeScreen() {
   }, [date]);
 
   const displaySlots = slots.length > 0 ? slots : fallbackSlots;
+  const bookingSteps = [
+    { key: "date", label: "Date" },
+    { key: "time", label: "Time" },
+    { key: "details", label: "Details" },
+    { key: "pay", label: "Pay" },
+  ];
 
   return (
-    <ScreenContainer
+    <AppScreen
       stickyFooter={
         <View style={styles.footerContent}>
           <Button
-            label="Review"
+            label="Review details"
+            variant="gold"
             disabled={!selected}
             onPress={() => selected && navigation.navigate("BookingConfirm", { service, date, time: selected })}
             style={{ flex: 1 }}
@@ -53,61 +68,112 @@ export default function BookingTimeScreen() {
         data={displaySlots}
         keyExtractor={(item) => item}
         numColumns={2}
-        columnWrapperStyle={{ paddingHorizontal: 16, justifyContent: "space-between" }}
-        contentContainerStyle={{ paddingVertical: 20, paddingBottom: 140, gap: 12 }}
+        columnWrapperStyle={styles.column}
+        contentContainerStyle={styles.listContent}
         ListHeaderComponent={
-          <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
-            <Text variant="title" weight="bold">
-              Pick a time
-            </Text>
-            <Text color={theme.colors.mutedText} style={{ marginTop: 6 }}>
-              {new Date(date).toDateString()}
-            </Text>
-            {slots.length === 0 ? (
-              <Text variant="caption" color={theme.colors.mutedText} style={{ marginTop: 6 }}>
-                Using generated slots. TODO: backend availability endpoint needed for richer times.
-              </Text>
-            ) : null}
+          <View style={styles.header}>
+            <BookingStepper steps={bookingSteps} currentIndex={1} />
+            <Card variant="marketplace" style={styles.summaryCard}>
+              <MediaPlaceholder
+                compact
+                categorySlug={service.category_slug}
+                label="Pickup window"
+                caption={service.name}
+                style={styles.summaryMedia}
+              />
+              <View style={styles.summaryCopy}>
+                <SectionHeader
+                  eyebrow="Pickup window"
+                  title="Pick a time"
+                  subtitle={new Date(date).toLocaleDateString(undefined, {
+                    weekday: "long",
+                    month: "long",
+                    day: "numeric",
+                  })}
+                />
+                <View style={styles.badgeRow}>
+                  {categoryLabel ? <StatusBadge label={categoryLabel} tone="primary" /> : null}
+                  {slots.length === 0 ? <StatusBadge label="Demo time slots" tone="warning" /> : <StatusBadge label="Live availability" tone="success" />}
+                </View>
+              </View>
+            </Card>
           </View>
         }
         renderItem={({ item }) => {
           const isSelected = selected === item;
           return (
-            <Pressable
+            <PressableCard
               onPress={() => setSelected(item)}
+              variant={isSelected ? "elevated" : "outline"}
               style={[
-                styles.card,
-                { borderColor: isSelected ? theme.colors.tealSecondary : theme.colors.border },
-                isSelected && { backgroundColor: `${theme.colors.tealSecondary}11` },
+                styles.timeCard,
+                {
+                  backgroundColor: isSelected ? `${theme.colors.secondary}12` : theme.colors.card,
+                  borderColor: isSelected ? theme.colors.primary : theme.colors.borderSoft,
+                },
               ]}
             >
-              <Text weight="semibold">{new Date(item).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</Text>
-            </Pressable>
+              <Text variant="h3" weight="bold">
+                {new Date(item).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              </Text>
+              <Text variant="caption" color={theme.colors.textSecondary} style={styles.slotLabel}>
+                {isSelected ? "Selected" : "Available pickup"}
+              </Text>
+            </PressableCard>
           );
         }}
-        ListFooterComponent={availabilityQuery.isLoading ? (
-          <View style={{ paddingVertical: 10 }}>
-            <ActivityIndicator color={theme.colors.peacockPrimary} />
-          </View>
-        ) : null}
+        ListFooterComponent={availabilityQuery.isLoading ? <LoadingState label="Checking availability" /> : null}
       />
-    </ScreenContainer>
+    </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
+  listContent: {
+    paddingVertical: 16,
+    paddingBottom: 140,
+    gap: 12,
+  },
+  column: {
+    paddingHorizontal: 16,
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  header: {
+    paddingHorizontal: 16,
+    marginBottom: 14,
+    gap: 14,
+  },
+  summaryCard: {
+    padding: 0,
+    overflow: "hidden",
+  },
+  summaryMedia: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+  },
+  summaryCopy: {
     padding: 16,
-    borderWidth: 1,
+    gap: 12,
+  },
+  badgeRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  timeCard: {
+    flex: 1,
+    minHeight: 104,
     marginBottom: 12,
     alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 24,
+  },
+  slotLabel: {
+    marginTop: 6,
+    textAlign: "center",
   },
   footerContent: {
-    backgroundColor: "#F8F9FA",
-    padding: 8,
-    borderRadius: 16,
+    flexDirection: "row",
   },
 });

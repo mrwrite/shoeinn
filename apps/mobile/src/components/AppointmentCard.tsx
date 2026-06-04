@@ -1,11 +1,13 @@
 import React from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import { useTheme } from "../theme/theme";
 import type { AppointmentSummary } from "../types/booking";
 import { Button } from "./ui/Button";
-import { Card } from "./ui/Card";
+import { MediaPlaceholder } from "./ui/MediaPlaceholder";
+import { PressableCard } from "./ui/Card";
+import { AppointmentStatusBadge, StatusBadge } from "./ui/StatusBadge";
 import { Text } from "./ui/Text";
 
 type Props = {
@@ -13,237 +15,190 @@ type Props = {
   onPress?: (appointment: AppointmentSummary) => void;
   onClaim?: (appointment: AppointmentSummary) => void;
   claimable?: boolean;
+  claimDisabled?: boolean;
+  claimLoading?: boolean;
   helperText?: string;
   actionLabel?: string;
   emphasis?: "actionable" | "owned" | "neutral";
 };
 
-const statusColors: Record<string, string> = {
-  confirmed: "#1B998B",
-  requested: "#0F4C5C",
-  pending_payment: "#b45309",
-  payment_failed: "#dc2626",
-  cleaning: "#E6AF2E",
-  ready: "#2EC4B6",
-  out_for_delivery: "#2EC4B6",
-  delivered: "#1B998B",
-  completed: "#059669",
-  cancelled: "#9CA3AF",
-};
+function getPaymentLabel(appointment: AppointmentSummary): { label: string; tone: "success" | "warning" | "danger" } | null {
+  if (appointment.payment_mode !== "service") {
+    return null;
+  }
+  if (appointment.payment_status === "succeeded") {
+    return { label: "Paid", tone: "success" };
+  }
+  if (appointment.payment_status === "failed" || appointment.status === "payment_failed") {
+    return { label: "Payment failed", tone: "danger" };
+  }
+  if (appointment.payment_status === "requires_action" || appointment.status === "pending_payment") {
+    return { label: appointment.payment_checkout_url ? "Complete payment" : "Payment pending", tone: "warning" };
+  }
+  if (appointment.payment_status === "pending") {
+    return { label: "Payment pending", tone: "warning" };
+  }
+  return null;
+}
 
 export function AppointmentCard({
   appointment,
   onPress,
   onClaim,
   claimable,
+  claimDisabled,
+  claimLoading,
   helperText,
   actionLabel,
   emphasis = "neutral",
 }: Props) {
   const theme = useTheme();
-  const statusColor = statusColors[appointment.status] ?? theme.colors.mutedText;
-  const paymentStatus = appointment.payment_status ?? null;
-  const paymentLabel = (() => {
-    if (appointment.payment_mode !== "service") {
-      return null;
-    }
-    if (paymentStatus === "succeeded") {
-      return "Paid";
-    }
-    if (paymentStatus === "failed" || appointment.status === "payment_failed") {
-      return "Payment failed";
-    }
-    if (paymentStatus === "requires_action" || appointment.status === "pending_payment") {
-      return appointment.payment_checkout_url ? "Complete payment" : "Payment pending";
-    }
-    if (paymentStatus === "pending") {
-      return "Payment pending";
-    }
-    return null;
-  })();
-  const paymentTone = (() => {
-    if (paymentLabel === "Paid") {
-      return { backgroundColor: "#ecfdf5", borderColor: "#86efac", color: "#166534" };
-    }
-    if (paymentLabel === "Payment failed") {
-      return { backgroundColor: "#fef2f2", borderColor: "#fecaca", color: "#b91c1c" };
-    }
-    return { backgroundColor: "#fffbeb", borderColor: "#fde68a", color: "#92400e" };
-  })();
-  const actionTone = {
-    actionable: { background: "#ecfdf5", border: "#86efac", text: "#166534", accent: "#0f766e" },
-    owned: { background: "#eff6ff", border: "#93c5fd", text: "#1d4ed8", accent: "#1d4ed8" },
-    neutral: {
-      background: "#f8fafc",
-      border: theme.colors.border,
-      text: theme.colors.mutedText,
-      accent: theme.colors.mutedText,
-    },
-  }[emphasis];
+  const payment = getPaymentLabel(appointment);
+  const area = [appointment.city, appointment.state].filter(Boolean).join(", ") || "Location pending";
+  const appointmentDate = new Date(appointment.start_time);
+  const actionTone = emphasis === "actionable" ? "success" : emphasis === "owned" ? "primary" : "neutral";
+  const accessibilityLabel = `Open appointment ${appointment.service_name ?? "appointment"} for ${
+    appointment.customer_name ?? "customer"
+  }, status ${appointment.status.replace(/_/g, " ")}`;
 
   return (
-    <Pressable onPress={() => onPress?.(appointment)} style={({ pressed }) => [{ marginBottom: 14 }, pressed && { opacity: 0.96 }]}>
-      <Card style={[styles.card, emphasis === "actionable" && styles.cardActionable]}>
-        <View style={styles.header}>
-          <View style={styles.headerContent}>
-            <View style={styles.labelRow}>
-              {actionLabel ? (
-                <View
-                  style={[
-                    styles.actionPill,
-                    {
-                      backgroundColor: actionTone.background,
-                      borderColor: actionTone.border,
-                    },
-                  ]}
-                >
-                  <Text weight="semibold" style={{ color: actionTone.text }}>
-                    {actionLabel}
-                  </Text>
-                </View>
-              ) : null}
-              <View style={[styles.statusPill, { backgroundColor: `${statusColor}18`, borderColor: `${statusColor}55` }]}>
-                <Text weight="semibold" style={{ color: statusColor }}>
-                  {appointment.status.replace(/_/g, " ")}
-                </Text>
-              </View>
-              {paymentLabel ? (
-                <View style={[styles.statusPill, paymentTone]}>
-                  <Text weight="semibold" style={{ color: paymentTone.color }}>
-                    {paymentLabel}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
-            <Text variant="subtitle" weight="semibold" style={{ marginTop: 12 }}>
-              {appointment.service_name ?? "Appointment"}
-            </Text>
-            <Text color={theme.colors.mutedText} style={{ marginTop: 4 }}>
-              {claimable ? "Review the job details, then claim when you are ready." : "Open the job for current progress, route details, and updates."}
-            </Text>
-          </View>
+    <PressableCard
+      onPress={() => onPress?.(appointment)}
+      variant={emphasis === "actionable" ? "elevated" : "marketplace"}
+      accessibilityLabel={accessibilityLabel}
+      style={[
+        styles.card,
+        emphasis === "actionable" && { borderColor: `${theme.colors.success}44` },
+      ]}
+    >
+      <MediaPlaceholder
+        compact
+        categorySlug={appointment.category_slug}
+        label={appointment.category_name ?? "Care appointment"}
+        caption={appointment.service_name ?? "Premium care"}
+        style={styles.media}
+      />
+      <View style={styles.header}>
+        <View style={{ flex: 1 }}>
+          <Text variant="h3" weight="bold">
+            {appointment.service_name ?? "Appointment"}
+          </Text>
+          <Text color={theme.colors.textSecondary} style={styles.subcopy}>
+            {claimable ? "Review the job details, then claim when ready." : "Track pickup, care progress, payment, and delivery."}
+          </Text>
         </View>
+        <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
+      </View>
 
-        <View style={styles.infoPanel}>
-          <View style={styles.metaItem}>
-            <Ionicons name="calendar-outline" size={16} color={actionTone.accent} />
-            <View style={styles.metaCopy}>
-              <Text weight="semibold">When</Text>
-              <Text color={theme.colors.mutedText}>
-                {new Date(appointment.start_time).toLocaleString()}
-              </Text>
-            </View>
-          </View>
-          <View style={styles.metaItem}>
-            <Ionicons name="location-outline" size={16} color={actionTone.accent} />
-            <View style={styles.metaCopy}>
-              <Text weight="semibold">Where</Text>
-              <Text color={theme.colors.mutedText}>
-                {[appointment.city, appointment.state].filter(Boolean).join(", ") || "Location pending"}
-              </Text>
-            </View>
-          </View>
-          <View style={styles.metaItem}>
-            <Ionicons name="person-outline" size={16} color={actionTone.accent} />
-            <View style={styles.metaCopy}>
-              <Text weight="semibold">Customer</Text>
-              <Text color={theme.colors.mutedText}>
-                {appointment.customer_name}
-              </Text>
-            </View>
-          </View>
+      <View style={styles.badges}>
+        {actionLabel ? <StatusBadge label={actionLabel} tone={actionTone} /> : null}
+        {appointment.category_name ? <StatusBadge label={appointment.category_name} tone="primary" /> : null}
+        <AppointmentStatusBadge status={appointment.status} />
+        {payment ? <StatusBadge label={payment.label} tone={payment.tone} /> : null}
+      </View>
+
+      <View style={[styles.infoPanel, { backgroundColor: theme.colors.surfaceMuted }]}>
+        <InfoRow icon="calendar-outline" label="When" value={appointmentDate.toLocaleString()} />
+        <InfoRow icon="storefront-outline" label="Provider" value={appointment.company_id ? "Selected company" : "Matching provider"} />
+        <InfoRow icon="location-outline" label="Area" value={area} />
+      </View>
+
+      {helperText ? (
+        <View style={[styles.helperCard, { backgroundColor: theme.colors.warningSoft, borderColor: `${theme.colors.warning}33` }]}>
+          <Text variant="caption" color={theme.colors.textSecondary}>
+            {helperText}
+          </Text>
         </View>
+      ) : null}
 
-        {helperText ? (
-          <View style={styles.helperCard}>
-            <Text variant="caption" color={theme.colors.mutedText}>
-              {helperText}
-            </Text>
-          </View>
-        ) : null}
+      {claimable ? (
+        <Button
+          label={claimLoading ? "Claiming..." : "Claim appointment"}
+          onPress={() => onClaim?.(appointment)}
+          disabled={claimDisabled || claimLoading}
+          loading={claimLoading}
+          style={styles.claimButton}
+        />
+      ) : null}
+    </PressableCard>
+  );
+}
 
-        {claimable ? (
-          <Button
-            label="Claim appointment"
-            onPress={() => onClaim?.(appointment)}
-            style={styles.claimButton}
-          />
-        ) : (
-          <View style={styles.footerHint}>
-            <Ionicons name="arrow-forward-circle-outline" size={16} color={theme.colors.mutedText} />
-            <Text variant="caption" color={theme.colors.mutedText}>
-              Tap anywhere on the card to open job details.
-            </Text>
-          </View>
-        )}
-      </Card>
-    </Pressable>
+function InfoRow({
+  icon,
+  label,
+  value,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: string;
+}) {
+  const theme = useTheme();
+  return (
+    <View style={styles.infoRow}>
+      <Ionicons name={icon} size={16} color={theme.colors.primary} />
+      <View style={styles.infoCopy}>
+        <Text variant="caption" color={theme.colors.textMuted}>
+          {label}
+        </Text>
+        <Text weight="bold">{value}</Text>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    gap: 12,
-    borderWidth: 1,
-    borderColor: "#eef2f7",
+    marginBottom: 16,
+    gap: 14,
+    padding: 0,
+    overflow: "hidden",
   },
-  cardActionable: {
-    borderColor: "#b7f3d0",
+  media: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
   },
   header: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "flex-start",
+    gap: 12,
+    paddingHorizontal: 16,
   },
-  headerContent: {
-    flex: 1,
-  },
-  labelRow: {
+  badges: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
-  },
-  statusPill: {
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderWidth: 1,
-  },
-  actionPill: {
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderWidth: 1,
+    paddingHorizontal: 16,
   },
   infoPanel: {
-    gap: 10,
-    borderRadius: 14,
+    borderRadius: 20,
     padding: 12,
-    backgroundColor: "#f8fafc",
+    gap: 10,
+    marginHorizontal: 16,
   },
-  metaItem: {
+  helperCard: {
+    borderRadius: 16,
+    padding: 10,
+    borderWidth: 1,
+    marginHorizontal: 16,
+    marginBottom: 16,
+  },
+  subcopy: {
+    marginTop: 4,
+  },
+  infoRow: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 10,
   },
-  metaCopy: {
+  infoCopy: {
     flex: 1,
     gap: 2,
   },
-  helperCard: {
-    borderRadius: 12,
-    padding: 10,
-    backgroundColor: "#fffbea",
-    borderWidth: 1,
-    borderColor: "#fde68a",
-  },
   claimButton: {
     marginTop: 2,
-  },
-  footerHint: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
+    marginHorizontal: 16,
+    marginBottom: 16,
   },
 });
 

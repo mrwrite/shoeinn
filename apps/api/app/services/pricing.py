@@ -23,6 +23,10 @@ class PriceLineItem:
 class BookingQuote:
     service_id: str
     service_name: str
+    category_id: str | None
+    category_slug: str | None
+    category_name: str | None
+    category_icon_key: str | None
     currency: str
     line_items: list[PriceLineItem]
     subtotal: int
@@ -62,6 +66,10 @@ def calculate_booking_quote(*, service: Service, booking_type: str, currency: st
     return BookingQuote(
         service_id=str(service.id),
         service_name=service.name,
+        category_id=str(service.category_id) if service.category_id else None,
+        category_slug=service.category_slug,
+        category_name=service.category_name,
+        category_icon_key=service.category_icon_key,
         currency=currency.lower(),
         line_items=line_items,
         subtotal=subtotal,

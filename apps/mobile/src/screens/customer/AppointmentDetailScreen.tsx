@@ -1,21 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  Linking,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Alert, Image, Linking, Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   API_URL,
@@ -25,13 +14,27 @@ import {
   getAppointmentEvents,
   refreshAppointmentPayment,
 } from "../../api/http";
+import { AppointmentTimeline, type AppointmentTimelineItem } from "../../components/AppointmentTimeline";
 import { CustomerTravelMapCard } from "../../components/CustomerTravelMapCard";
+import { AppScreen } from "../../components/ui/AppScreen";
+import { Button } from "../../components/ui/Button";
+import { Card } from "../../components/ui/Card";
+import { EmptyState } from "../../components/ui/EmptyState";
+import { LoadingState } from "../../components/ui/LoadingState";
+import { MediaPlaceholder } from "../../components/ui/MediaPlaceholder";
+import { SectionHeader } from "../../components/ui/SectionHeader";
+import { AppointmentStatusBadge, StatusBadge } from "../../components/ui/StatusBadge";
+import { Text } from "../../components/ui/Text";
 import { useFocusedAutoRefresh } from "../../hooks/useFocusedAutoRefresh";
 import {
   getCustomerNotificationCopy,
   getLatestNotificationForAppointment,
   useCustomerNotifications,
 } from "../../hooks/useCustomerNotifications";
+import {
+  customerAppointmentNextStepCopy,
+  customerAppointmentStatusLabels,
+} from "../../features/appointmentCopy";
 import type { AppointmentStackParamList } from "../../navigation/types";
 import {
   appointmentAssignmentQueryKey,
@@ -39,28 +42,11 @@ import {
   appointmentQueryKey,
   customerAppointmentsQueryKey,
 } from "../../query/keys";
-import type {
-  AppointmentEvent,
-  AppointmentSummary,
-} from "../../types/booking";
+import { useTheme } from "../../theme/theme";
+import type { AppointmentEvent, AppointmentSummary } from "../../types/booking";
 
 const travelStatuses = new Set(["en_route_pickup", "out_for_delivery"]);
 const photoVisibleStatuses = new Set(["ready", "out_for_delivery", "delivered", "completed"]);
-
-const statusLabels: Record<string, string> = {
-  requested: "Requested",
-  pending_payment: "Pending payment",
-  payment_failed: "Payment failed",
-  confirmed: "Confirmed",
-  en_route_pickup: "En route to pickup",
-  picked_up: "Picked up",
-  cleaning: "Cleaning",
-  ready: "Ready",
-  out_for_delivery: "Out for delivery",
-  delivered: "Delivered",
-  completed: "Completed",
-  cancelled: "Cancelled",
-};
 
 const statusOrder = [
   "requested",
@@ -77,32 +63,26 @@ const statusOrder = [
   "cancelled",
 ];
 
-type Props = NativeStackScreenProps<
-  AppointmentStackParamList,
-  "AppointmentDetail"
->;
+type Props = NativeStackScreenProps<AppointmentStackParamList, "AppointmentDetail">;
 
 type CustomerAssignmentState =
   | { kind: "assigned"; title: string; detail?: string }
   | { kind: "unassigned"; title: string; detail?: string }
   | { kind: "assignment_unavailable"; title: string; detail?: string };
 
-type TimelineState = "current" | "completed" | "upcoming" | "terminal";
+const formatDateTime = (value?: string | null) => (value ? new Date(value).toLocaleString() : "-");
 
-const timelineDescriptions: Record<TimelineState, string> = {
-  current: "This is what is happening right now.",
-  completed: "Finished",
-  upcoming: "Coming up next",
-  terminal: "Final outcome",
-};
+function formatMoney(amount: number | null | undefined, currency: string | null | undefined): string {
+  if (amount == null || !currency) {
+    return "--";
+  }
+  return new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency: currency.toUpperCase(),
+  }).format(amount / 100);
+}
 
-const formatDateTime = (value?: string | null) =>
-  value ? new Date(value).toLocaleString() : "-";
-
-const buildStatusHistory = (
-  events: AppointmentEvent[],
-  currentStatus?: string
-) => {
+const buildTimelineItems = (events: AppointmentEvent[], currentStatus?: string): AppointmentTimelineItem[] => {
   const reached = new Set<string>();
   events.forEach((event) => {
     if (event.kind === "status_change" && event.payload?.status) {
@@ -124,8 +104,7 @@ const buildStatusHistory = (
       return status !== "cancelled";
     })
     .map((status, index) => {
-      let state: TimelineState = "upcoming";
-
+      let state: AppointmentTimelineItem["state"] = "upcoming";
       if (status === currentStatus && (status === "completed" || status === "cancelled")) {
         state = "terminal";
       } else if (status === currentStatus) {
@@ -136,7 +115,19 @@ const buildStatusHistory = (
         state = "completed";
       }
 
-      return { status, state };
+      return {
+        key: status,
+        title: customerAppointmentStatusLabels[status] ?? status,
+        detail:
+          state === "current"
+            ? "Happening now"
+            : state === "completed"
+              ? "Finished"
+              : state === "terminal"
+                ? "Final outcome"
+                : "Coming up next",
+        state,
+      };
     });
 };
 
@@ -149,6 +140,7 @@ const resolvePhotoUrl = (url?: string | null) => {
 };
 
 export default function AppointmentDetailScreen({ route }: Props) {
+  const theme = useTheme();
   const { appointmentId, summary, refreshPaymentOnOpen, paymentReturnStatus } = route.params;
   const navigation = useNavigation<NativeStackNavigationProp<AppointmentStackParamList>>();
   const queryClient = useQueryClient();
@@ -173,15 +165,13 @@ export default function AppointmentDetailScreen({ route }: Props) {
   });
   const notificationsQuery = useCustomerNotifications(true);
 
-  const status = appointmentQuery.data?.status ?? summary?.status;
-  const shouldShowTravelMap = status ? travelStatuses.has(status) : false;
-
-  const appointment =
-    appointmentQuery.data ?? (summary as AppointmentSummary | undefined);
+  const appointment = appointmentQuery.data ?? (summary as AppointmentSummary | undefined);
   const paymentAwareAppointment = appointmentQuery.data;
-  const statusHistory = useMemo(
-    () => buildStatusHistory(eventsQuery.data ?? [], appointment?.status),
-    [eventsQuery.data, appointment?.status]
+  const status = appointment?.status;
+  const shouldShowTravelMap = status ? travelStatuses.has(status) : false;
+  const timelineItems = useMemo(
+    () => buildTimelineItems(eventsQuery.data ?? [], appointment?.status),
+    [eventsQuery.data, appointment?.status],
   );
 
   const finishedPhotoUrl = resolvePhotoUrl(appointmentQuery.data?.ready_photo_url);
@@ -198,7 +188,7 @@ export default function AppointmentDetailScreen({ route }: Props) {
         ? {
             kind: "unassigned",
             title: "No provider assigned yet",
-            detail: "We’re still matching your appointment with a provider.",
+            detail: "We're still matching your appointment with a provider.",
           }
         : {
             kind: "assignment_unavailable",
@@ -208,30 +198,12 @@ export default function AppointmentDetailScreen({ route }: Props) {
       : {
           kind: "unassigned",
           title: "Checking provider assignment",
-          detail: "We’re loading the latest assignment details.",
+          detail: "We're loading the latest assignment details.",
         };
-  const currentStatusLabel = appointment
-    ? statusLabels[appointment.status] ?? appointment.status
-    : "Appointment";
   const recentNotification = getLatestNotificationForAppointment(notificationsQuery.data, appointmentId);
   const recentNotificationCopy = recentNotification ? getCustomerNotificationCopy(recentNotification) : null;
-  const nextStepCopy: Record<string, string> = {
-    requested: "Your appointment request has been received.",
-    pending_payment: "Payment is required before the booking can be confirmed.",
-    payment_failed: "Payment did not complete. You can retry checkout or place a new booking.",
-    confirmed: "A provider can now prepare for pickup.",
-    en_route_pickup: "Your provider is on the way to pick up your order.",
-    picked_up: "Your items are with the provider.",
-    cleaning: "Your items are currently being cleaned.",
-    ready: "Your order is ready for delivery.",
-    out_for_delivery: "Your provider is bringing your order back to you.",
-    delivered: "Your order has been delivered.",
-    completed: "Everything for this appointment is complete.",
-    cancelled: "This appointment was cancelled.",
-  };
   const isAppointmentLoading = appointmentQuery.isLoading && !appointment;
-  const isLiveAppointment =
-    !!appointment && !["completed", "cancelled", "payment_failed"].includes(appointment.status);
+  const isLiveAppointment = !!appointment && !["completed", "cancelled", "payment_failed"].includes(appointment.status);
 
   const handleOpenCheckout = async () => {
     const checkoutUrl = appointmentQuery.data?.payment_checkout_url;
@@ -312,90 +284,116 @@ export default function AppointmentDetailScreen({ route }: Props) {
   }, [refreshPaymentOnOpen]);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <AppScreen>
       <ScrollView contentContainerStyle={styles.container}>
         {!appointment ? (
-          <View style={styles.stateCard}>
-            {isAppointmentLoading ? <ActivityIndicator /> : null}
-            <Text style={styles.sectionTitle}>
-              {isAppointmentLoading ? "Loading your appointment" : "Appointment not found"}
-            </Text>
-            <Text style={styles.meta}>
-              {isAppointmentLoading
-                ? "We’re pulling together the latest appointment details for you."
-                : "We couldn’t find this appointment in the active customer flow."}
-            </Text>
-          </View>
+          isAppointmentLoading ? (
+            <LoadingState label="Loading your appointment" />
+          ) : (
+            <EmptyState
+              title="Appointment not found"
+              message="We couldn't find this appointment in the active customer flow."
+              icon="calendar-clear-outline"
+            />
+          )
         ) : (
           <>
-            <View style={styles.heroCard}>
-              <Text style={styles.title}>
-                {appointment.service_name ?? "Appointment"}
-              </Text>
-              <Text style={styles.meta}>
-                {formatDateTime(appointment.start_time)}
-              </Text>
-              <View style={styles.chip}>
-                <Text style={styles.chipText}>
-                  {statusLabels[appointment.status] ?? appointment.status}
-                </Text>
-              </View>
-              <View style={styles.summaryBlock}>
-                <Text style={styles.sectionTitle}>Current status</Text>
-                <Text style={styles.value}>{currentStatusLabel}</Text>
-                <Text style={styles.meta}>
-                  {nextStepCopy[appointment.status] ?? "We’ll keep this status updated as your appointment moves forward."}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.card}>
-              <Text style={styles.sectionTitle}>Provider</Text>
-              <Text style={styles.value}>{assignmentState.title}</Text>
-              {assignmentState.detail ? (
-                <Text style={styles.meta}>{assignmentState.detail}</Text>
-              ) : null}
-            </View>
-
-            {paymentAwareAppointment?.payment_mode === "service" &&
-            (appointment.status === "pending_payment" || appointment.status === "payment_failed") ? (
-              <View style={styles.card}>
-                <Text style={styles.sectionTitle}>Payment</Text>
-                <Text style={styles.value}>
-                  {appointment.status === "pending_payment" ? "Finish checkout to confirm" : "Payment needs attention"}
-                </Text>
-                <Text style={styles.meta}>
-                  {paymentAwareAppointment.payment_message ?? "Complete payment before this booking can move forward."}
-                </Text>
-                <View style={styles.paymentActions}>
-                  {paymentAwareAppointment.payment_checkout_url ? (
-                    <Pressable style={styles.paymentPrimaryButton} onPress={() => void handleOpenCheckout()}>
-                      <Text style={styles.paymentPrimaryText}>Open secure checkout</Text>
-                    </Pressable>
-                  ) : null}
-                  <Pressable style={styles.paymentSecondaryButton} onPress={() => void handleRefreshPayment("manual")}>
-                    <Text style={styles.paymentSecondaryText}>Check payment status</Text>
-                  </Pressable>
-                  {appointment.status === "pending_payment" ? (
-                    <Pressable onPress={() => void handleCancelPendingPayment()}>
-                      <Text style={styles.paymentCancelText}>Cancel unpaid booking</Text>
-                    </Pressable>
-                  ) : null}
+            <Card variant="marketplace" style={styles.heroCard}>
+              <MediaPlaceholder
+                compact
+                categorySlug={appointment.category_slug}
+                label={appointment.service_name ?? "Care appointment"}
+                caption={appointment.category_name ?? "Premium care"}
+                style={styles.heroMedia}
+              />
+              <View style={styles.heroBody}>
+                <View style={styles.heroTop}>
+                  <View style={{ flex: 1 }}>
+                    <Text variant="caption" weight="bold" color={theme.colors.textMuted}>
+                      Care appointment
+                    </Text>
+                    <Text variant="h1" weight="bold" style={styles.heroTitle}>
+                      {appointment.service_name ?? "Appointment"}
+                    </Text>
+                  </View>
+                  <AppointmentStatusBadge status={appointment.status} />
+                </View>
+                <View style={styles.badgeRow}>
+                  {appointment.category_name ? <StatusBadge label={appointment.category_name} tone="primary" /> : null}
+                  {paymentAwareAppointment?.payment_status ? <StatusBadge label={`Payment ${paymentAwareAppointment.payment_status}`} tone={paymentAwareAppointment.payment_status === "succeeded" ? "success" : "warning"} /> : null}
+                </View>
+                <Text color={theme.colors.textSecondary}>{formatDateTime(appointment.start_time)}</Text>
+                <View style={[styles.nextStep, { backgroundColor: theme.colors.surfaceMuted }]}>
+                  <Text weight="bold">Current step</Text>
+                  <Text color={theme.colors.textSecondary} style={styles.nextStepCopy}>
+                    {customerAppointmentNextStepCopy[appointment.status] ?? "We'll keep this status updated as your appointment moves forward."}
+                  </Text>
                 </View>
               </View>
+            </Card>
+
+            <Card variant="marketplace">
+              <SectionHeader title="Provider" subtitle={assignmentState.detail} />
+              <View style={styles.providerRow}>
+                <View style={[styles.providerIcon, { backgroundColor: theme.colors.accentSoft }]}>
+                  <Ionicons name="person-circle-outline" size={24} color={theme.colors.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text weight="bold">{assignmentState.title}</Text>
+                  <Text variant="caption" color={theme.colors.textMuted} style={styles.nextStepCopy}>
+                    {assignmentState.kind === "assigned" ? "Your provider will continue updating this appointment." : "Assignment updates will appear here."}
+                  </Text>
+                </View>
+              </View>
+            </Card>
+
+            {paymentAwareAppointment?.payment_mode === "service" ? (
+              <Card variant="marketplace">
+                <SectionHeader title="Payment" />
+                <View style={styles.paymentSummary}>
+                  <SummaryRow label="Status" value={paymentAwareAppointment.payment_status ?? "pending"} />
+                  <SummaryRow
+                    label="Amount"
+                    value={formatMoney(
+                      paymentAwareAppointment.payment_amount_received ?? paymentAwareAppointment.payment_amount_expected,
+                      paymentAwareAppointment.payment_currency,
+                    )}
+                  />
+                </View>
+                {appointment.status === "pending_payment" || appointment.status === "payment_failed" ? (
+                  <View style={styles.paymentActions}>
+                    <Text color={theme.colors.textSecondary}>
+                      {paymentAwareAppointment.payment_message ?? "Complete payment before this booking can move forward."}
+                    </Text>
+                    {paymentAwareAppointment.payment_checkout_url ? (
+                      <Button label="Open secure checkout" variant="gold" onPress={() => void handleOpenCheckout()} />
+                    ) : null}
+                    <Button label="Check payment status" variant="secondary" onPress={() => void handleRefreshPayment("manual")} />
+                    {appointment.status === "pending_payment" ? (
+                      <Button label="Cancel unpaid booking" variant="ghost" onPress={() => void handleCancelPendingPayment()} />
+                    ) : null}
+                  </View>
+                ) : null}
+              </Card>
             ) : null}
 
             {recentNotificationCopy ? (
               <Pressable
-                style={[styles.card, recentNotificationCopy.unread && styles.recentUpdateCard]}
                 onPress={() => navigation.navigate("CustomerNotifications")}
+                accessibilityRole="button"
+                accessibilityLabel="Open recent appointment update in notifications"
               >
-                <View style={styles.recentUpdateHeader}>
-                  <Text style={styles.sectionTitle}>Recent update</Text>
-                  <Text style={styles.meta}>{recentNotificationCopy.timestampLabel}</Text>
-                </View>
-                <Text style={styles.value}>{recentNotificationCopy.title}</Text>
-                <Text style={styles.meta}>{recentNotificationCopy.detail}</Text>
+                <Card
+                  variant="marketplace"
+                  style={recentNotificationCopy.unread ? [styles.unreadUpdateCard, { borderColor: `${theme.colors.primary}33` }] : undefined}
+                >
+                  <View style={styles.updateHeader}>
+                    <SectionHeader title="Recent update" subtitle={recentNotificationCopy.timestampLabel} />
+                    {recentNotificationCopy.unread ? <StatusBadge label="New" tone="primary" /> : null}
+                  </View>
+                  <Text weight="bold">{recentNotificationCopy.title}</Text>
+                  <Text color={theme.colors.textSecondary}>{recentNotificationCopy.detail}</Text>
+                </Card>
               </Pressable>
             ) : null}
 
@@ -413,116 +411,60 @@ export default function AppointmentDetailScreen({ route }: Props) {
               />
             ) : null}
 
-            <View style={styles.card}>
-              <Text style={styles.sectionTitle}>Progress</Text>
-              <Text style={styles.meta}>Follow what has already happened, what is active now, and what comes next.</Text>
+            <Card variant="marketplace">
+              <SectionHeader title="Progress timeline" subtitle="Follow what has happened, what is active now, and what comes next." />
               {eventsQuery.isLoading ? (
-                <View style={styles.timelineState}>
-                  <ActivityIndicator />
-                  <Text style={styles.meta}>We’re loading the latest progress history.</Text>
-                </View>
+                <LoadingState label="Loading progress history" />
               ) : eventsQuery.isError ? (
-                <View style={styles.timelineState}>
-                  <Text style={styles.meta}>
-                    Progress history is temporarily unavailable. Your current status summary above is still up to date.
-                  </Text>
-                </View>
+                <EmptyState
+                  title="Progress history unavailable"
+                  message="Your current status summary above is still up to date."
+                  icon="time-outline"
+                />
               ) : (
-                <View style={styles.timelineList}>
-                  {statusHistory.map((item, index) => (
-                    <View key={item.status} style={styles.timelineEntry}>
-                      <View style={styles.timelineRail}>
-                        <View
-                          style={[
-                            styles.statusDot,
-                            item.state === "current" && styles.statusDotCurrent,
-                            item.state === "completed" && styles.statusDotCompleted,
-                            item.state === "upcoming" && styles.statusDotUpcoming,
-                            item.state === "terminal" && styles.statusDotTerminal,
-                          ]}
-                        />
-                        {index < statusHistory.length - 1 ? (
-                          <View
-                            style={[
-                              styles.timelineLine,
-                              item.state === "completed" && styles.timelineLineCompleted,
-                              item.state === "current" && styles.timelineLineCurrent,
-                            ]}
-                          />
-                        ) : null}
-                      </View>
-                      <View
-                        style={[
-                          styles.statusRow,
-                          item.state === "current" && styles.statusRowCurrent,
-                          item.state === "completed" && styles.statusRowCompleted,
-                          item.state === "upcoming" && styles.statusRowUpcoming,
-                          item.state === "terminal" && styles.statusRowTerminal,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.statusLabel,
-                            item.state === "current" && styles.statusLabelCurrent,
-                            item.state === "completed" && styles.statusLabelCompleted,
-                            item.state === "terminal" && styles.statusLabelTerminal,
-                          ]}
-                        >
-                          {statusLabels[item.status] ?? item.status}
-                        </Text>
-                        <Text style={styles.statusMeta}>
-                          {timelineDescriptions[item.state]}
-                        </Text>
-                      </View>
-                    </View>
-                  ))}
-                </View>
+                <AppointmentTimeline items={timelineItems} style={styles.timeline} />
               )}
-            </View>
+            </Card>
 
             {shouldShowFinishedPhotoSection ? (
-              <View style={styles.card}>
-                <Text style={styles.sectionTitle}>Finished photo</Text>
+              <Card variant="marketplace">
+                <SectionHeader title="Completion photo" />
                 {finishedPhotoUrl ? (
-                  <Pressable onPress={() => setExpandedPhotoUrl(finishedPhotoUrl)}>
-                    <Image
-                      source={{ uri: finishedPhotoUrl }}
-                      style={styles.finishedPhoto}
-                    />
-                    <Text style={styles.meta}>Tap to expand</Text>
+                  <Pressable
+                    onPress={() => setExpandedPhotoUrl(finishedPhotoUrl)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Expand completion appointment photo"
+                  >
+                    <Image source={{ uri: finishedPhotoUrl }} style={styles.finishedPhoto} />
+                    <Text variant="caption" color={theme.colors.textMuted}>
+                      Tap to expand
+                    </Text>
                   </Pressable>
                 ) : (
-                  <Text style={styles.meta}>A completion photo is expected here once it is available.</Text>
+                  <Text color={theme.colors.textSecondary}>A completion photo is expected here once it is available.</Text>
                 )}
-              </View>
+              </Card>
             ) : null}
 
-            <View style={styles.card}>
-              <Text style={styles.sectionTitle}>Details</Text>
-              <Text style={styles.label}>Customer</Text>
-              <Text style={styles.value}>{appointment.customer_name}</Text>
-              <Text style={styles.label}>Contact</Text>
-              <Text style={styles.value}>{appointment.customer_phone}</Text>
-              {appointment.address_line1 ? (
-                <>
-                  <Text style={styles.label}>Address</Text>
-                  <Text style={styles.value}>
-                    {[appointment.address_line1, appointment.address_line2]
-                      .filter(Boolean)
-                      .join(", ")}
-                  </Text>
-                  <Text style={styles.meta}>
-                    {[
-                      appointment.city,
-                      appointment.state,
-                      appointment.postal_code,
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                  </Text>
-                </>
-              ) : null}
-            </View>
+            <Card variant="marketplace">
+              <SectionHeader title="Pickup and drop-off" subtitle="The address and contact details attached to this appointment." />
+              <View style={styles.detailRows}>
+                <SummaryRow label="Customer" value={appointment.customer_name} />
+                <SummaryRow label="Contact" value={appointment.customer_phone} />
+                {appointment.address_line1 ? (
+                  <>
+                    <SummaryRow
+                      label="Address"
+                      value={[appointment.address_line1, appointment.address_line2].filter(Boolean).join(", ")}
+                    />
+                    <SummaryRow
+                      label="Area"
+                      value={[appointment.city, appointment.state, appointment.postal_code].filter(Boolean).join(" ")}
+                    />
+                  </>
+                ) : null}
+              </View>
+            </Card>
           </>
         )}
       </ScrollView>
@@ -531,183 +473,118 @@ export default function AppointmentDetailScreen({ route }: Props) {
         <Pressable
           style={styles.photoModalBackdrop}
           onPress={() => setExpandedPhotoUrl(null)}
+          accessibilityRole="button"
+          accessibilityLabel="Close expanded photo"
         >
-          {expandedPhotoUrl ? (
-            <Image
-              source={{ uri: expandedPhotoUrl }}
-              style={styles.photoModalImage}
-            />
-          ) : null}
+          {expandedPhotoUrl ? <Image source={{ uri: expandedPhotoUrl }} style={styles.photoModalImage} /> : null}
         </Pressable>
       </Modal>
-    </SafeAreaView>
+    </AppScreen>
+  );
+}
+
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  const theme = useTheme();
+  return (
+    <View style={styles.summaryRow}>
+      <Text color={theme.colors.textMuted}>{label}</Text>
+      <Text weight="bold" style={styles.summaryValue}>
+        {value || "-"}
+      </Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#f3f4f6" },
-  container: { padding: 16, paddingBottom: 40, gap: 12 },
-  stateCard: {
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24,
-    borderRadius: 16,
-    backgroundColor: "#ffffff",
-    gap: 8,
+  container: {
+    padding: 16,
+    paddingBottom: 40,
+    gap: 14,
   },
   heroCard: {
-    backgroundColor: "#eff6ff",
-    padding: 18,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "#bfdbfe",
-    gap: 8,
+    padding: 0,
+    overflow: "hidden",
   },
-  card: {
-    backgroundColor: "#fff",
+  heroMedia: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+  },
+  heroBody: {
     padding: 16,
-    borderRadius: 16,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
+    gap: 12,
+  },
+  heroTop: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  heroTitle: {
+    marginTop: 4,
+  },
+  badgeRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
   },
-  paymentActions: {
-    marginTop: 8,
+  nextStep: {
+    borderRadius: 20,
+    padding: 12,
+  },
+  nextStepCopy: {
+    marginTop: 4,
+  },
+  providerRow: {
+    marginTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  providerIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  paymentSummary: {
+    marginTop: 12,
     gap: 10,
   },
-  paymentPrimaryButton: {
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: "center",
-    backgroundColor: "#0F4C5C",
-  },
-  paymentPrimaryText: {
-    color: "#ffffff",
-    fontWeight: "700",
-  },
-  paymentSecondaryButton: {
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: "center",
-    backgroundColor: "#eff6ff",
-  },
-  paymentSecondaryText: {
-    color: "#1d4ed8",
-    fontWeight: "700",
-  },
-  paymentCancelText: {
-    color: "#b91c1c",
-    fontWeight: "600",
-  },
-  recentUpdateCard: {
-    borderWidth: 1,
-    borderColor: "#bfdbfe",
-    backgroundColor: "#eff6ff",
-  },
-  recentUpdateHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 12,
-  },
-  title: { fontSize: 20, fontWeight: "800" },
-  meta: { color: "#6b7280" },
-  chip: {
-    alignSelf: "flex-start",
-    backgroundColor: "#dbeafe",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-  },
-  chipText: { fontWeight: "700", textTransform: "capitalize", color: "#1d4ed8" },
-  summaryBlock: {
-    marginTop: 4,
-    gap: 4,
-  },
-  sectionTitle: { fontSize: 16, fontWeight: "700" },
-  label: { color: "#6b7280", marginTop: 4 },
-  value: { fontSize: 16, fontWeight: "600" },
-  timelineList: {
-    marginTop: 6,
-    gap: 0,
-  },
-  timelineEntry: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  timelineRail: {
-    width: 16,
-    alignItems: "center",
-  },
-  timelineLine: {
-    flex: 1,
-    width: 2,
-    backgroundColor: "#e5e7eb",
-    marginTop: 4,
-  },
-  timelineLineCompleted: {
-    backgroundColor: "#86efac",
-  },
-  timelineLineCurrent: {
-    backgroundColor: "#93c5fd",
-  },
-  statusRow: {
-    flex: 1,
-    marginBottom: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    backgroundColor: "#ffffff",
-  },
-  statusDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+  paymentActions: {
     marginTop: 14,
-    backgroundColor: "#e5e7eb",
+    gap: 10,
   },
-  statusDotCurrent: { backgroundColor: "#0F4C5C" },
-  statusDotCompleted: { backgroundColor: "#22c55e" },
-  statusDotUpcoming: { backgroundColor: "#d1d5db" },
-  statusDotTerminal: { backgroundColor: "#7c3aed" },
-  statusRowCurrent: {
-    backgroundColor: "#eff6ff",
-    borderColor: "#93c5fd",
+  updateHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
   },
-  statusRowCompleted: {
-    backgroundColor: "#f0fdf4",
-    borderColor: "#86efac",
+  unreadUpdateCard: {
   },
-  statusRowUpcoming: {
-    backgroundColor: "#f8fafc",
-    borderStyle: "dashed",
-  },
-  statusRowTerminal: {
-    backgroundColor: "#faf5ff",
-    borderColor: "#d8b4fe",
-  },
-  statusLabel: { color: "#6b7280", fontWeight: "600" },
-  statusLabelCurrent: { color: "#111827", fontWeight: "700" },
-  statusLabelCompleted: { color: "#166534", fontWeight: "700" },
-  statusLabelTerminal: { color: "#5b21b6", fontWeight: "700" },
-  statusMeta: {
-    color: "#6b7280",
-    marginTop: 4,
-    fontSize: 12,
-  },
-  timelineState: {
-    paddingVertical: 12,
-    gap: 8,
+  timeline: {
+    marginTop: 12,
   },
   finishedPhoto: {
     width: "100%",
     height: 220,
-    borderRadius: 12,
+    borderRadius: 18,
+    marginTop: 12,
     marginBottom: 8,
+  },
+  detailRows: {
+    marginTop: 12,
+    gap: 10,
+  },
+  summaryRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  summaryValue: {
+    flex: 1,
+    textAlign: "right",
   },
   photoModalBackdrop: {
     flex: 1,

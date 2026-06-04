@@ -11,6 +11,8 @@ import type { ProviderAppointment } from "../types/company";
 import { decodePolyline } from "../utils/decodePolyline";
 import { Button } from "./ui/Button";
 import { Card } from "./ui/Card";
+import { SectionHeader } from "./SectionHeader";
+import { StatusBadge } from "./StatusBadge";
 import { Text } from "./ui/Text";
 
 type TravelMapAppointment = Pick<
@@ -320,14 +322,10 @@ export function TravelMapCard({ appointment, onOpenFullScreenMap }: Props) {
   const showMap = permissionStatus === "granted" && destination && hasDestinationAddress;
 
   return (
-    <Card style={styles.card}>
+    <Card variant="marketplace" style={styles.card}>
       <View style={styles.header}>
-        <View>
-          <Text weight="semibold">{statusLabel}</Text>
-          <Text color={theme.colors.mutedText} style={{ marginTop: 4 }}>
-            {address || "Destination pending"}
-          </Text>
-        </View>
+        <SectionHeader title="Route and location" subtitle={address || "Destination pending"} style={styles.headerCopy} />
+        <StatusBadge label={statusLabel} tone="primary" />
         {onOpenFullScreenMap ? (
           <Button label="Appointment details" variant="ghost" onPress={onOpenFullScreenMap} />
         ) : null}
@@ -335,36 +333,36 @@ export function TravelMapCard({ appointment, onOpenFullScreenMap }: Props) {
 
       <View style={styles.pills}>
         {eta ? (
-          <View style={[styles.pill, { backgroundColor: theme.colors.border }]}>
+          <View style={[styles.pill, { backgroundColor: theme.colors.surface }]}>
             <Text weight="semibold">{eta}</Text>
           </View>
         ) : null}
         {distance ? (
-          <View style={[styles.pill, { backgroundColor: theme.colors.border }]}>
+          <View style={[styles.pill, { backgroundColor: theme.colors.surface }]}>
             <Text weight="semibold">{distance}</Text>
           </View>
         ) : null}
       </View>
 
       {!hasDestinationAddress ? (
-        <View style={styles.messageBox}>
-          <Text color={theme.colors.mutedText}>Customer address missing. Ask customer to update address.</Text>
+        <View style={[styles.messageBox, { backgroundColor: theme.colors.surface }]}>
+          <Text color={theme.colors.textSecondary}>Customer address missing. Ask customer to update address.</Text>
           {onOpenFullScreenMap ? (
             <Button label="Open appointment details" variant="secondary" onPress={onOpenFullScreenMap} style={{ marginTop: 12 }} />
           ) : null}
         </View>
       ) : locationError ? (
-        <View style={styles.messageBox}>
-          <Text color={theme.colors.mutedText}>{locationError}</Text>
+        <View style={[styles.messageBox, { backgroundColor: theme.colors.surface }]}>
+          <Text color={theme.colors.textSecondary}>{locationError}</Text>
           <Button label="Open in Maps" variant="secondary" onPress={openInMaps} style={{ marginTop: 12 }} />
         </View>
       ) : geocodeError ? (
-        <View style={styles.messageBox}>
-          <Text color={theme.colors.mutedText}>{geocodeError}</Text>
+        <View style={[styles.messageBox, { backgroundColor: theme.colors.surface }]}>
+          <Text color={theme.colors.textSecondary}>{geocodeError}</Text>
           <Button label="Open in Maps" variant="secondary" onPress={openInMaps} style={{ marginTop: 12 }} />
         </View>
       ) : showMap ? (
-        <View style={styles.mapWrapper}>
+        <View style={[styles.mapWrapper, { borderColor: theme.colors.border }]}>
           <MapView
             ref={mapRef}
             style={StyleSheet.absoluteFill}
@@ -379,29 +377,29 @@ export function TravelMapCard({ appointment, onOpenFullScreenMap }: Props) {
               <Marker
                 coordinate={providerLocation}
                 title="You"
-                pinColor={theme.colors.peacockPrimary}
+                pinColor={theme.colors.primary}
               />
             ) : null}
             <Marker coordinate={destination} title="Destination" />
             {routeCoords.length ? (
-              <Polyline coordinates={routeCoords} strokeColor={theme.colors.peacockPrimary} strokeWidth={4} />
+              <Polyline coordinates={routeCoords} strokeColor={theme.colors.primary} strokeWidth={4} />
             ) : null}
           </MapView>
           {loadingDirections ? (
-            <View style={styles.loadingOverlay}>
-              <ActivityIndicator color={theme.colors.peacockPrimary} />
+            <View style={[styles.loadingOverlay, { backgroundColor: theme.colors.surfaceElevated }]}>
+              <ActivityIndicator color={theme.colors.primary} />
             </View>
           ) : null}
           {directionsError ? (
             <View style={styles.mapFooter}>
-              <Text color={theme.colors.mutedText}>{directionsError}</Text>
+              <Text color={theme.colors.textSecondary}>{directionsError}</Text>
               <Button label="Open in Maps" variant="ghost" onPress={openInMaps} style={{ marginTop: 6 }} />
             </View>
           ) : null}
         </View>
       ) : (
-        <View style={styles.messageBox}>
-          <Text color={theme.colors.mutedText}>Waiting for location permission…</Text>
+        <View style={[styles.messageBox, { backgroundColor: theme.colors.surface }]}>
+          <Text color={theme.colors.textSecondary}>Waiting for location permission...</Text>
         </View>
       )}
     </Card>
@@ -410,13 +408,16 @@ export function TravelMapCard({ appointment, onOpenFullScreenMap }: Props) {
 
 const styles = StyleSheet.create({
   card: {
-    padding: 16,
+    gap: 12,
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
     gap: 12,
+  },
+  headerCopy: {
+    flex: 1,
   },
   pills: {
     flexDirection: "row",
@@ -429,23 +430,22 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   mapWrapper: {
-    marginTop: 16,
+    marginTop: 4,
     height: 220,
-    borderRadius: 16,
+    borderRadius: 22,
     overflow: "hidden",
+    borderWidth: 1,
   },
   loadingOverlay: {
     position: "absolute",
     top: 12,
     right: 12,
-    backgroundColor: "rgba(255,255,255,0.9)",
     borderRadius: 16,
     padding: 6,
   },
   messageBox: {
-    marginTop: 16,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 18,
   },
   mapFooter: {
     position: "absolute",

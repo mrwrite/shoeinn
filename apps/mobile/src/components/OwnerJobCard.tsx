@@ -1,10 +1,12 @@
 import React from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { ImageBackground, StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import type { ProviderAppointment } from "../types/company";
 import { useTheme } from "../theme/theme";
-import { Card } from "./ui/Card";
+import { PressableCard } from "./ui/Card";
+import { MediaPlaceholder } from "./ui/MediaPlaceholder";
+import { AppointmentStatusBadge, StatusBadge } from "./ui/StatusBadge";
 import { Text } from "./ui/Text";
 
 type Props = {
@@ -12,95 +14,123 @@ type Props = {
   emphasis?: "priority" | "ready" | "active" | "neutral";
   nextActionLabel: string;
   onPress: () => void;
+  surface?: "light" | "dark";
 };
 
-const statusColors: Record<string, string> = {
-  confirmed: "#0F4C5C",
-  en_route_pickup: "#0F766E",
-  picked_up: "#0F766E",
-  cleaning: "#B45309",
-  ready: "#166534",
-  out_for_delivery: "#0E7490",
-  delivered: "#0F766E",
-  completed: "#4B5563",
-  cancelled: "#9CA3AF",
-  requested: "#1D4ED8",
-};
-
-export function OwnerJobCard({ appointment, emphasis = "neutral", nextActionLabel, onPress }: Props) {
+export function OwnerJobCard({ appointment, emphasis = "neutral", nextActionLabel, onPress, surface = "light" }: Props) {
   const theme = useTheme();
-  const statusColor = statusColors[appointment.status] ?? theme.colors.peacockPrimary;
-  const emphasisPalette = {
-    priority: { bg: "#FEF2F2", border: "#FECACA", label: "#B91C1C" },
-    ready: { bg: "#ECFDF5", border: "#86EFAC", label: "#166534" },
-    active: { bg: "#EFF6FF", border: "#BFDBFE", label: "#1D4ED8" },
-    neutral: { bg: "#F8FAFC", border: "#E2E8F0", label: theme.colors.mutedText },
-  }[emphasis];
-
   const location = [appointment.city ?? appointment.customer_city, appointment.state ?? appointment.customer_state]
     .filter(Boolean)
     .join(", ");
+  const tone = emphasis === "priority" ? "danger" : emphasis === "ready" ? "success" : emphasis === "active" ? "primary" : "neutral";
+  const accessibilityLabel = `Open owner job ${appointment.service_name ?? "appointment"} for ${
+    appointment.customer_name ?? "customer"
+  }, status ${appointment.status.replace(/_/g, " ")}`;
+  const imageUrl = getJobImageUrl(appointment.category_slug);
 
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [pressed && { opacity: 0.96 }]}>
-      <Card style={styles.card}>
-        <View style={styles.headerRow}>
-          <View style={[styles.emphasisPill, { backgroundColor: emphasisPalette.bg, borderColor: emphasisPalette.border }]}>
-            <Text variant="caption" weight="semibold" style={{ color: emphasisPalette.label }}>
-              {nextActionLabel}
-            </Text>
-          </View>
-          <View style={[styles.statusPill, { backgroundColor: `${statusColor}14`, borderColor: `${statusColor}44` }]}>
-            <Text variant="caption" weight="semibold" style={{ color: statusColor }}>
-              {appointment.status.replace(/_/g, " ")}
-            </Text>
-          </View>
-        </View>
-
-        <Text variant="subtitle" weight="bold" style={{ marginTop: 12 }}>
-          {appointment.service_name ?? "Appointment"}
-        </Text>
-        <Text color={theme.colors.mutedText} style={{ marginTop: 4 }}>
-          {appointment.customer_name ?? "Customer"}
-        </Text>
-
-        <View style={styles.infoGrid}>
-          <InfoRow icon="calendar-outline" label="Scheduled" value={new Date(appointment.start_time).toLocaleString()} />
-          <InfoRow icon="person-outline" label="Assigned" value={appointment.provider_name ?? "Unassigned"} />
-          <InfoRow icon="location-outline" label="Area" value={location || "Address pending"} />
-        </View>
-
-        <View style={styles.footer}>
-          <Text variant="caption" color={theme.colors.mutedText}>
-            {appointment.provider_name
-              ? "Open to review assignment, progress, and next action."
-              : "Open to review details and assign this pickup."}
+    <PressableCard
+      onPress={onPress}
+      variant={emphasis === "priority" ? "elevated" : "marketplace"}
+      accessibilityLabel={accessibilityLabel}
+      style={[
+        styles.card,
+        surface === "dark" && {
+          backgroundColor: "rgba(8, 43, 51, 0.9)",
+          borderColor: "rgba(255,255,255,0.08)",
+        },
+      ]}
+    >
+      <ImageFrame source={imageUrl} categorySlug={appointment.category_slug} label={appointment.service_name ?? "Premium care"} />
+      <View style={styles.headerRow}>
+        <View style={{ flex: 1 }}>
+          <Text variant="h3" weight="bold" style={surface === "dark" ? { color: theme.colors.surfaceElevated } : undefined}>
+            {appointment.service_name ?? "Appointment"}
           </Text>
-          <Ionicons name="arrow-forward-circle-outline" size={18} color={theme.colors.peacockPrimary} />
+          <Text color={surface === "dark" ? "rgba(255,255,255,0.74)" : theme.colors.textSecondary} style={styles.subcopy}>
+            {appointment.customer_name ?? "Customer"}
+          </Text>
         </View>
-      </Card>
-    </Pressable>
+        <Ionicons name="chevron-forward" size={20} color={surface === "dark" ? "rgba(255,255,255,0.72)" : theme.colors.textMuted} />
+      </View>
+
+      <View style={styles.badges}>
+        <StatusBadge label={nextActionLabel} tone={tone} />
+        {appointment.category_name ? <StatusBadge label={appointment.category_name} tone="primary" /> : null}
+        <AppointmentStatusBadge status={appointment.status} />
+        <StatusBadge label={appointment.provider_name ? "Assigned" : "Unassigned"} tone={appointment.provider_name ? "success" : "warning"} />
+      </View>
+
+      <View style={[styles.infoGrid, { backgroundColor: surface === "dark" ? "rgba(255,255,255,0.06)" : theme.colors.surfaceMuted, borderColor: surface === "dark" ? "rgba(255,255,255,0.08)" : theme.colors.borderSoft }]}>
+        <InfoRow icon="calendar-outline" label="Scheduled" value={new Date(appointment.start_time).toLocaleString()} />
+        <InfoRow icon="person-outline" label="Provider" value={appointment.provider_name ?? "Needs assignment"} />
+        <InfoRow icon="location-outline" label="Area" value={location || "Address pending"} />
+      </View>
+
+      <Text variant="caption" color={surface === "dark" ? "rgba(255,255,255,0.64)" : theme.colors.textMuted}>
+        {appointment.provider_name ? "Open to review assignment, progress, and next action." : "Open to assign this job and review customer details."}
+      </Text>
+    </PressableCard>
   );
 }
 
-function InfoRow({
-  icon,
+const JOB_IMAGES: Record<string, string> = {
+  shoes: "https://images.unsplash.com/photo-1525966222134-fcfa99b8ae77?auto=format&fit=crop&w=1200&q=80",
+  laundry: "https://images.unsplash.com/photo-1542089363-7a1e6c5c1b1d?auto=format&fit=crop&w=1200&q=80",
+  "dry-cleaning": "https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=1200&q=80",
+  "handbags-leather": "https://images.unsplash.com/photo-1523170335258-f5ed11844a49?auto=format&fit=crop&w=1200&q=80",
+  "rugs-textiles": "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80",
+  alterations: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1200&q=80",
+};
+
+function getJobImageUrl(categorySlug?: string | null) {
+  return categorySlug ? JOB_IMAGES[categorySlug] ?? JOB_IMAGES.shoes : JOB_IMAGES.shoes;
+}
+
+function ImageFrame({
+  source,
+  categorySlug,
   label,
-  value,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
+  source: string;
+  categorySlug?: string | null;
   label: string;
-  value: string;
 }) {
+  const [error, setError] = React.useState(false);
+  const theme = useTheme();
+  if (error) {
+    return (
+      <MediaPlaceholder
+        compact
+        categorySlug={categorySlug}
+        label={label}
+        caption="Premium care"
+        style={styles.media}
+      />
+    );
+  }
+
+  return (
+    <ImageBackground source={{ uri: source }} resizeMode="cover" style={styles.media} imageStyle={styles.mediaImage} onError={() => setError(true)}>
+      <View style={[styles.mediaOverlay, { backgroundColor: "rgba(14, 18, 20, 0.18)" }]}>
+        <View style={[styles.mediaAccent, { backgroundColor: theme.colors.accent }]} />
+      </View>
+    </ImageBackground>
+  );
+}
+
+function InfoRow({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMap; label: string; value: string }) {
   const theme = useTheme();
   return (
     <View style={styles.infoRow}>
-      <Ionicons name={icon} size={16} color={theme.colors.peacockPrimary} />
+      <Ionicons name={icon} size={16} color={theme.colors.accent} />
       <View style={{ flex: 1 }}>
-        <Text variant="caption" color={theme.colors.mutedText}>
+        <Text variant="caption" color="rgba(255,255,255,0.64)">
           {label}
         </Text>
-        <Text weight="semibold">{value}</Text>
+        <Text weight="bold" style={{ color: theme.colors.surfaceElevated }}>
+          {value}
+        </Text>
       </View>
     </View>
   );
@@ -108,44 +138,57 @@ function InfoRow({
 
 const styles = StyleSheet.create({
   card: {
-    gap: 10,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
+    gap: 12,
+    padding: 0,
+    overflow: "hidden",
+  },
+  media: {
+    minHeight: 138,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    overflow: "hidden",
+  },
+  mediaImage: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+  },
+  mediaOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    padding: 12,
+  },
+  mediaAccent: {
+    width: 44,
+    height: 6,
+    borderRadius: 999,
   },
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    gap: 10,
+    alignItems: "flex-start",
+    gap: 12,
+    paddingHorizontal: 16,
   },
-  emphasisPill: {
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+  subcopy: {
+    marginTop: 4,
   },
-  statusPill: {
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+  badges: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    paddingHorizontal: 16,
   },
   infoGrid: {
-    borderRadius: 14,
-    backgroundColor: "#F8FAFC",
+    borderRadius: 18,
     padding: 12,
     gap: 10,
+    marginHorizontal: 16,
+    borderWidth: 1,
   },
   infoRow: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 10,
-  },
-  footer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 12,
   },
 });
 

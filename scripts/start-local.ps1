@@ -142,7 +142,8 @@ if (-not (Test-SameApiUrl -Left $ApiBaseUrl -Right $localApiBaseUrl)) {
 $mobileArgs = @(
     "-ExecutionPolicy", "Bypass",
     "-File", "`"$MobileScript`"",
-    "-ApiBaseUrl", $ApiBaseUrl
+    "-ApiBaseUrl", $ApiBaseUrl,
+    "-DemoMarket", $DemoMarket
 )
 
 if ($MobileRedirectBase) {

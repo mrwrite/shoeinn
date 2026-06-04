@@ -1,7 +1,26 @@
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.models import Appointment, AppointmentAssignment, Company, User
+from app.models import (
+    Appointment,
+    AppointmentAssignment,
+    CareCategory,
+    Company,
+    CompanyCareCategory,
+    ProviderCareCategory,
+    Service,
+    User,
+)
+
+
+REQUIRED_CATEGORY_SLUGS = {
+    "shoes",
+    "laundry",
+    "dry-cleaning",
+    "handbags-leather",
+    "rugs-textiles",
+    "alterations",
+}
 
 
 EXPECTED_COMPANY_ADDRESSES = {
@@ -33,6 +52,50 @@ EXPECTED_MT_JULIET_CUSTOMER_JOB_ADDRESSES = {
     ("500 Golden Bear Gateway", "Mt. Juliet", "TN", "37122"),
     ("1450 Central Pike", "Mt. Juliet", "TN", "37122"),
 }
+
+
+def _market_companies(db_session: Session, company_names: set[str]) -> list[Company]:
+    return db_session.query(Company).filter(Company.name.in_(company_names)).all()
+
+
+def _market_service_category_slugs(db_session: Session, company_names: set[str]) -> set[str]:
+    companies = _market_companies(db_session, company_names)
+    company_ids = [company.id for company in companies]
+    rows = (
+        db_session.query(CareCategory.slug)
+        .join(Service, Service.category_id == CareCategory.id)
+        .filter(Service.company_id.in_(company_ids))
+        .distinct()
+        .all()
+    )
+    return {row[0] for row in rows}
+
+
+def _assert_market_has_required_categories(db_session: Session, company_names: set[str]) -> None:
+    companies = _market_companies(db_session, company_names)
+    company_ids = [company.id for company in companies]
+    assert len(companies) == 3
+
+    services = db_session.query(Service).filter(Service.company_id.in_(company_ids)).all()
+    assert services
+    assert all(service.category_id is not None for service in services)
+    assert _market_service_category_slugs(db_session, company_names) == REQUIRED_CATEGORY_SLUGS
+
+    company_category_count = (
+        db_session.query(CompanyCareCategory)
+        .filter(CompanyCareCategory.company_id.in_(company_ids), CompanyCareCategory.is_active.is_(True))
+        .count()
+    )
+    assert company_category_count >= len(REQUIRED_CATEGORY_SLUGS)
+
+    provider_ids = [
+        user.id
+        for user in db_session.query(User)
+        .join(AppointmentAssignment, AppointmentAssignment.user_id == User.id, isouter=True)
+        .filter(User.role.in_(["provider", "company_admin"]))
+        .all()
+    ]
+    assert db_session.query(ProviderCareCategory).filter(ProviderCareCategory.provider_id.in_(provider_ids)).count() > 0
 
 
 def test_dev_seed_creates_assignments_without_company_id_and_reset_reseeds(
@@ -105,7 +168,7 @@ def test_dev_seed_populates_realistic_city_aligned_addresses(
         .filter(Appointment.company_id.in_(company_by_id))
         .all()
     )
-    assert len(appointments) == 8
+    assert len(appointments) == 9
     assert all(appointment.address_line1 for appointment in appointments)
     assert all(appointment.city and appointment.state and appointment.postal_code for appointment in appointments)
     cluster_cities = {"Pelham", "Helena", "Alabaster"}
@@ -129,6 +192,44 @@ def test_dev_seed_populates_realistic_city_aligned_addresses(
     assert len(distinct_company_addresses) == 3
     assert len(distinct_appointment_addresses) == len(EXPECTED_CUSTOMER_JOB_ADDRESSES)
     assert customer.address_line1 in distinct_appointment_addresses
+
+
+def test_dev_seed_shelby_market_has_multi_category_services_and_filters(
+    db_session: Session,
+    client: TestClient,
+) -> None:
+    response = client.post("/dev/seed?reset=true")
+    assert response.status_code == 200, response.text
+
+    company_names = set(EXPECTED_COMPANY_ADDRESSES.keys())
+    _assert_market_has_required_categories(db_session, company_names)
+
+    for category_slug in REQUIRED_CATEGORY_SLUGS:
+        services_response = client.get("/services", params={"category_slug": category_slug})
+        assert services_response.status_code == 200, services_response.text
+        services = services_response.json()
+        assert services
+        assert {service["category_slug"] for service in services} == {category_slug}
+
+        companies_response = client.get("/companies", params={"category_slug": category_slug, "state": "AL"})
+        assert companies_response.status_code == 200, companies_response.text
+        companies = companies_response.json()
+        assert companies
+        assert all(
+            category_slug in {category["slug"] for category in company["offered_categories"]}
+            for company in companies
+        )
+
+    shoe_services = client.get("/services", params={"category_slug": "shoes"}).json()
+    assert any("Sneaker" in service["name"] or "White Pair" in service["name"] for service in shoe_services)
+
+    first_company = _market_companies(db_session, company_names)[0]
+    company_service_response = client.get(
+        f"/companies/{first_company.id}/services",
+        params={"category_slug": "shoes"},
+    )
+    assert company_service_response.status_code == 200, company_service_response.text
+    assert all(service["category_slug"] == "shoes" for service in company_service_response.json())
 
 
 def test_dev_seed_mt_juliet_selector_resets_other_demo_markets_and_rotates_selected_pool(
@@ -173,7 +274,7 @@ def test_dev_seed_mt_juliet_selector_resets_other_demo_markets_and_rotates_selec
         .filter(Appointment.company_id.in_(company_by_id))
         .all()
     )
-    assert len(appointments) == 8
+    assert len(appointments) == 9
     assert all(appointment.address_line1 for appointment in appointments)
     assert all(appointment.city == "Mt. Juliet" for appointment in appointments)
     assert all(appointment.state == "TN" for appointment in appointments)
@@ -182,6 +283,34 @@ def test_dev_seed_mt_juliet_selector_resets_other_demo_markets_and_rotates_selec
         (appointment.address_line1, appointment.city, appointment.state, appointment.postal_code)
         for appointment in appointments
     } == EXPECTED_MT_JULIET_CUSTOMER_JOB_ADDRESSES
+
+    _assert_market_has_required_categories(db_session, set(EXPECTED_MT_JULIET_COMPANY_ADDRESSES.keys()))
+
+
+def test_dev_seed_mt_juliet_market_has_multi_category_services_and_reset_is_stable(
+    db_session: Session,
+    client: TestClient,
+) -> None:
+    first = client.post("/dev/seed?reset=true&demo_market=mt_juliet")
+    assert first.status_code == 200, first.text
+
+    second = client.post("/dev/seed?reset=true&demo_market=mt_juliet")
+    assert second.status_code == 200, second.text
+    assert second.json()["created"]["company_categories"] > 0
+    assert second.json()["created"]["provider_categories"] > 0
+
+    company_names = set(EXPECTED_MT_JULIET_COMPANY_ADDRESSES.keys())
+    _assert_market_has_required_categories(db_session, company_names)
+
+    for category_slug in REQUIRED_CATEGORY_SLUGS:
+        companies_response = client.get("/companies", params={"category_slug": category_slug, "state": "TN"})
+        assert companies_response.status_code == 200, companies_response.text
+        companies = companies_response.json()
+        assert companies
+        assert all(
+            category_slug in {category["slug"] for category in company["offered_categories"]}
+            for company in companies
+        )
 
 
 def test_dev_seed_mt_juliet_quick_demo_users_have_expected_roles(

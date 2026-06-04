@@ -8,6 +8,10 @@ export type ServiceStatus = 'active' | 'inactive';
 
 export interface Service {
   id: string;
+  category_id?: string | null;
+  category_slug?: string | null;
+  category_name?: string | null;
+  category_icon_key?: string | null;
   name: string;
   description?: string | null;
   price: number;

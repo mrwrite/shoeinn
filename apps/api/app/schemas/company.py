@@ -1,6 +1,8 @@
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+from app.schemas.care_category import CareCategorySummary
 
 
 class CompanyOut(BaseModel):
@@ -14,6 +16,7 @@ class CompanyOut(BaseModel):
     city: str | None = None
     state: str | None = None
     postal_code: str | None = None
+    offered_categories: list[CareCategorySummary] = Field(default_factory=list)
 
     class Config:
         from_attributes = True

@@ -11,7 +11,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Header, HTTPException, Request, UploadFile, status
 from sqlalchemy import func, or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.core.config import settings
 from app.core.db import get_db
@@ -126,6 +126,11 @@ def _serialize_appointment(appointment: Appointment) -> AppointmentRead:
             "id": appointment.id,
             "company_id": appointment.company_id,
             "service_id": appointment.service_id,
+            "service_name": appointment.service_name,
+            "category_id": appointment.category_id,
+            "category_slug": appointment.category_slug,
+            "category_name": appointment.category_name,
+            "category_icon_key": appointment.category_icon_key,
             "hold_id": appointment.hold_id,
             "type": appointment.type,
             "customer_name": appointment.customer_name,
@@ -188,6 +193,10 @@ def _serialize_quote(quote: BookingQuote) -> AppointmentQuoteRead:
     return AppointmentQuoteRead(
         service_id=UUID(quote.service_id),
         service_name=quote.service_name,
+        category_id=UUID(quote.category_id) if quote.category_id else None,
+        category_slug=quote.category_slug,
+        category_name=quote.category_name,
+        category_icon_key=quote.category_icon_key,
         currency=quote.currency,
         line_items=[
             {
@@ -267,21 +276,23 @@ def list_my_appointments(
 
     q = (
         db.query(Appointment)
+        .options(joinedload(Appointment.service).joinedload(Service.category))
         .filter(or_(*owner_filters))
         .filter(Appointment.status != AppointmentStatus.cancelled)
         .order_by(Appointment.start_time.desc())
     )
     for appt in q.all():
-        service_name = None
-        if appt.service_id:
-            svc = db.get(Service, appt.service_id)
-            service_name = svc.name if svc else None
         items.append(
             AppointmentListItem.model_validate(
                 {
                     "id": appt.id,
                     "company_id": appt.company_id,
-                    "service_name": service_name,
+                    "service_id": appt.service_id,
+                    "service_name": appt.service_name,
+                    "category_id": appt.category_id,
+                    "category_slug": appt.category_slug,
+                    "category_name": appt.category_name,
+                    "category_icon_key": appt.category_icon_key,
                     "customer_name": appt.customer_name,
                     "customer_phone": appt.customer_phone,
                     "address_line1": appt.address_line1,
@@ -459,7 +470,12 @@ def read_appointment(
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> AppointmentRead:
-    appointment = db.get(Appointment, appointment_id)
+    appointment = (
+        db.query(Appointment)
+        .options(joinedload(Appointment.service).joinedload(Service.category))
+        .filter(Appointment.id == appointment_id)
+        .one_or_none()
+    )
     if appointment is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
 
@@ -489,7 +505,12 @@ def read_provider_location(
     current_customer=Depends(get_current_customer),
     db: Session = Depends(get_db),
 ) -> AppointmentProviderLocationResponse:
-    appointment = db.get(Appointment, appointment_id)
+    appointment = (
+        db.query(Appointment)
+        .options(joinedload(Appointment.service).joinedload(Service.category))
+        .filter(Appointment.id == appointment_id)
+        .one_or_none()
+    )
     if appointment is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
 
@@ -520,7 +541,12 @@ def read_assignment_company(
 ) -> AppointmentAssignmentRead:
     current_user, company_id = current
 
-    appointment = db.get(Appointment, appointment_id)
+    appointment = (
+        db.query(Appointment)
+        .options(joinedload(Appointment.service).joinedload(Service.category))
+        .filter(Appointment.id == appointment_id)
+        .one_or_none()
+    )
     if appointment is None:
         raise HTTPException(status_code=404, detail="Appointment not found")
 
@@ -546,6 +572,12 @@ def read_assignment_company(
             "appointment_id": assignment.appointment_id,
             "company_id": company_id,
             "user_id": assignment.user_id,
+            "service_id": appointment.service_id,
+            "service_name": appointment.service_name,
+            "category_id": appointment.category_id,
+            "category_slug": appointment.category_slug,
+            "category_name": appointment.category_name,
+            "category_icon_key": appointment.category_icon_key,
             "assigned_at": assignment.assigned_at,
             "unassigned_at": assignment.unassigned_at,
             "is_active": assignment.is_active,
@@ -564,7 +596,12 @@ def read_assignment(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ) -> AppointmentAssignmentRead:    
-    appointment = db.get(Appointment, appointment_id)
+    appointment = (
+        db.query(Appointment)
+        .options(joinedload(Appointment.service).joinedload(Service.category))
+        .filter(Appointment.id == appointment_id)
+        .one_or_none()
+    )
     if appointment is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")       
 
@@ -591,6 +628,12 @@ def read_assignment(
             "id": assignment.id,
             "appointment_id": assignment.appointment_id,
             "user_id": assignment.user_id,
+            "service_id": appointment.service_id,
+            "service_name": appointment.service_name,
+            "category_id": appointment.category_id,
+            "category_slug": appointment.category_slug,
+            "category_name": appointment.category_name,
+            "category_icon_key": appointment.category_icon_key,
             "assigned_at": assignment.assigned_at,
             "unassigned_at": assignment.unassigned_at,
             "is_active": assignment.is_active,
@@ -823,7 +866,12 @@ def refresh_appointment_payment(
     db: Session = Depends(get_db),
     gateway: PaymentGateway = Depends(get_payment_gateway),
 ) -> AppointmentRead:
-    appointment = db.get(Appointment, appointment_id)
+    appointment = (
+        db.query(Appointment)
+        .options(joinedload(Appointment.service).joinedload(Service.category))
+        .filter(Appointment.id == appointment_id)
+        .one_or_none()
+    )
     if appointment is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
 
@@ -849,7 +897,12 @@ def cancel_appointment_payment(
     current_customer=Depends(get_current_customer),
     db: Session = Depends(get_db),
 ) -> AppointmentRead:
-    appointment = db.get(Appointment, appointment_id)
+    appointment = (
+        db.query(Appointment)
+        .options(joinedload(Appointment.service).joinedload(Service.category))
+        .filter(Appointment.id == appointment_id)
+        .one_or_none()
+    )
     if appointment is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
 

@@ -9,6 +9,7 @@ import uuid
 from app.enums import AppointmentStatus
 from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, String
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
 
 from app.core.db import Base
 
@@ -67,3 +68,25 @@ class Appointment(Base):
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
     )
+
+    service = relationship("Service")
+
+    @property
+    def service_name(self) -> str | None:
+        return self.service.name if self.service is not None else None
+
+    @property
+    def category_id(self):
+        return self.service.category_id if self.service is not None else None
+
+    @property
+    def category_slug(self) -> str | None:
+        return self.service.category_slug if self.service is not None else None
+
+    @property
+    def category_name(self) -> str | None:
+        return self.service.category_name if self.service is not None else None
+
+    @property
+    def category_icon_key(self) -> str | None:
+        return self.service.category_icon_key if self.service is not None else None

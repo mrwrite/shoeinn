@@ -1,16 +1,15 @@
 import React, { useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  View,
-} from "react-native";
+import { FlatList, Pressable, RefreshControl, StyleSheet, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { ScreenContainer } from "../../components/ScreenContainer";
-import { Card } from "../../components/ui/Card";
+import { AppScreen } from "../../components/ui/AppScreen";
+import { EmptyState } from "../../components/ui/EmptyState";
+import { LoadingState } from "../../components/ui/LoadingState";
+import { SectionHeader } from "../../components/ui/SectionHeader";
+import { StatusBadge } from "../../components/ui/StatusBadge";
+import { Button } from "../../components/ui/Button";
+import { PressableCard } from "../../components/ui/Card";
 import { Text } from "../../components/ui/Text";
 import { useFocusedAutoRefresh } from "../../hooks/useFocusedAutoRefresh";
 import {
@@ -25,6 +24,7 @@ import {
   shouldHideNotificationGroup,
   useArchivedCustomerNotificationGroups,
   useCustomerNotifications,
+  type GroupedCustomerNotification,
 } from "../../hooks/useCustomerNotifications";
 import { openCustomerAppointmentFromNotification } from "../../navigation/customerNotificationNavigation";
 import { useTheme } from "../../theme/theme";
@@ -76,13 +76,11 @@ export default function CustomerNotificationsScreen() {
     },
   });
 
-  const handlePress = async (item: ReturnType<typeof groupCustomerNotifications>[number]) => {
+  const handlePress = async (item: GroupedCustomerNotification) => {
     const unreadIds = getUnreadNotificationIdsForGroup(item);
     if (unreadIds.length > 0) {
       try {
-        await ackGroupMutation.mutateAsync({
-          notificationIds: unreadIds,
-        });
+        await ackGroupMutation.mutateAsync({ notificationIds: unreadIds });
       } catch (error) {
         // Keep navigation behavior even if ack fails; next refresh will retry state.
       }
@@ -91,210 +89,200 @@ export default function CustomerNotificationsScreen() {
     openCustomerAppointmentFromNotification(item.latest);
   };
 
-  const handleMarkGroupRead = async (item: ReturnType<typeof groupCustomerNotifications>[number]) => {
+  const handleMarkGroupRead = async (item: GroupedCustomerNotification) => {
     const unreadIds = getUnreadNotificationIdsForGroup(item);
     if (unreadIds.length === 0) {
       return;
     }
 
     try {
-      await ackGroupMutation.mutateAsync({
-        notificationIds: unreadIds,
-      });
+      await ackGroupMutation.mutateAsync({ notificationIds: unreadIds });
     } catch (error) {
       // Keep the inbox stable; refetch paths will recover state on next refresh.
     }
   };
 
-  const handleArchiveGroup = async (item: ReturnType<typeof groupCustomerNotifications>[number]) => {
+  const handleArchiveGroup = async (item: GroupedCustomerNotification) => {
     await archiveGroup(item);
   };
 
-  const renderItem = ({
-    item,
-  }: {
-    item: ReturnType<typeof groupCustomerNotifications>[number];
-  }) => {
+  const renderItem = ({ item }: { item: GroupedCustomerNotification }) => {
     const copy = getCustomerNotificationCopy(item.latest);
     const priority = getNotificationPriorityPresentation(item.latest);
     const olderVisible = item.older.slice(0, 2);
     const remainingOlderCount = Math.max(0, item.older.length - olderVisible.length);
     const unreadIds = getUnreadNotificationIdsForGroup(item);
     const isHighPriority = priority.tone === "high";
+
     return (
-      <Pressable onPress={() => void handlePress(item)}>
-        <Card
-          style={[
-            styles.notificationCard,
-            isHighPriority && styles.notificationCardPriority,
-            item.unread && { borderColor: "#bfdbfe", backgroundColor: "#eff6ff" },
-            item.unread && isHighPriority && styles.notificationCardPriorityUnread,
-          ]}
-        >
-          <View style={styles.groupHeader}>
-            <Text
-              variant="overline"
-              weight="semibold"
-              color={isHighPriority ? theme.colors.textCharcoal : theme.colors.peacockPrimary}
-            >
-              {priority.label}
-            </Text>
-            {!item.isStandalone ? (
-              <Text variant="caption" color={theme.colors.mutedText}>
-                {item.older.length > 0 ? `${item.older.length + 1} updates` : "1 update"}
-              </Text>
-            ) : null}
+      <PressableCard
+        onPress={() => void handlePress(item)}
+        accessibilityLabel={`Open notification: ${copy.title}`}
+        variant={item.unread ? "elevated" : "marketplace"}
+        style={[
+          styles.notificationCard,
+          {
+            backgroundColor: item.unread ? theme.colors.surfaceTint : theme.colors.card,
+            borderColor: item.unread ? `${theme.colors.primary}33` : theme.colors.borderSoft,
+          },
+        ]}
+      >
+        <View style={styles.cardTop}>
+          <View style={[styles.notificationIcon, { backgroundColor: isHighPriority ? theme.colors.warningSoft : theme.colors.accentSoft }]}>
+            <Ionicons
+              name={isHighPriority ? "flash-outline" : "notifications-outline"}
+              size={18}
+              color={isHighPriority ? theme.colors.warning : theme.colors.primary}
+            />
           </View>
-          <View style={styles.notificationHeader}>
-            <Text
-              variant="subtitle"
-              weight="semibold"
-              style={[styles.notificationTitle, isHighPriority && styles.notificationTitlePriority]}
-            >
-              {copy.title}
-            </Text>
-            <Text variant="caption" color={theme.colors.mutedText}>
-              {copy.timestampLabel}
-            </Text>
-          </View>
-          <Text color={theme.colors.mutedText} style={{ marginTop: 8 }}>
-            {copy.detail}
-          </Text>
-          {olderVisible.length > 0 ? (
-            <View style={styles.olderUpdates}>
-              {olderVisible.map((notification) => {
-                const olderCopy = getCustomerNotificationCopy(notification);
-                return (
-                  <View key={notification.id} style={styles.olderUpdateRow}>
-                    <Text variant="caption" weight="semibold" color={theme.colors.textCharcoal}>
-                      {olderCopy.title}
-                    </Text>
-                    <Text variant="caption" color={theme.colors.mutedText}>
-                      {olderCopy.timestampLabel}
-                    </Text>
-                  </View>
-                );
-              })}
-              {remainingOlderCount > 0 ? (
-                <Text variant="caption" color={theme.colors.mutedText}>
-                  +{remainingOlderCount} older update{remainingOlderCount === 1 ? "" : "s"}
+          <View style={{ flex: 1 }}>
+            <View style={styles.cardTitleRow}>
+              <StatusBadge label={priority.label} tone={isHighPriority ? "warning" : "primary"} />
+              {!item.isStandalone ? (
+                <Text variant="caption" color={theme.colors.textMuted}>
+                  {item.older.length > 0 ? `${item.older.length + 1} updates` : "1 update"}
                 </Text>
               ) : null}
             </View>
-          ) : null}
-          <View style={styles.notificationFooter}>
-            {item.unread ? (
-              <View style={styles.footerLeft}>
-                <View style={[styles.unreadPill, isHighPriority && styles.unreadPillPriority]}>
-                  <Text variant="overline" weight="semibold" color={theme.colors.peacockPrimary}>
-                    {unreadIds.length > 1 ? `${unreadIds.length} new` : "New"}
+            <Text variant="h3" weight="bold" style={styles.notificationTitle}>
+              {copy.title}
+            </Text>
+            <Text color={theme.colors.textSecondary} style={styles.notificationDetail}>
+              {copy.detail}
+            </Text>
+          </View>
+        </View>
+
+        {olderVisible.length > 0 ? (
+          <View style={[styles.olderUpdates, { borderTopColor: theme.colors.divider }]}>
+            {olderVisible.map((notification) => {
+              const olderCopy = getCustomerNotificationCopy(notification);
+              return (
+                <View key={notification.id} style={styles.olderUpdateRow}>
+                  <Text variant="caption" weight="bold" color={theme.colors.textPrimary}>
+                    {olderCopy.title}
+                  </Text>
+                  <Text variant="caption" color={theme.colors.textMuted}>
+                    {olderCopy.timestampLabel}
                   </Text>
                 </View>
-                <Pressable
-                  hitSlop={8}
-                  onPress={(event) => {
-                    event.stopPropagation();
-                    void handleMarkGroupRead(item);
-                  }}
-                >
-                  <Text variant="caption" weight="semibold" color={theme.colors.peacockPrimary}>
-                    Mark read
-                  </Text>
-                </Pressable>
-              </View>
-            ) : (
-              <Text variant="caption" color={theme.colors.mutedText}>
-                Read
+              );
+            })}
+            {remainingOlderCount > 0 ? (
+              <Text variant="caption" color={theme.colors.textMuted}>
+                +{remainingOlderCount} older update{remainingOlderCount === 1 ? "" : "s"}
               </Text>
-            )}
-            <View style={styles.footerRight}>
+            ) : null}
+          </View>
+        ) : null}
+
+        <View style={styles.notificationFooter}>
+          <View style={styles.footerLeft}>
+            {item.unread ? <StatusBadge label={unreadIds.length > 1 ? `${unreadIds.length} new` : "New"} tone="primary" /> : <StatusBadge label="Read" tone="neutral" />}
+            <Text variant="caption" color={theme.colors.textMuted}>
+              {copy.timestampLabel}
+            </Text>
+          </View>
+          <View style={styles.footerRight}>
+            {item.unread ? (
               <Pressable
                 hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Mark notification group read"
                 onPress={(event) => {
                   event.stopPropagation();
-                  void handleArchiveGroup(item);
+                  void handleMarkGroupRead(item);
                 }}
               >
-                <Text variant="caption" weight="semibold" color={theme.colors.mutedText}>
-                  Archive
+                <Text variant="caption" weight="bold" color={theme.colors.primary}>
+                  Mark read
                 </Text>
               </Pressable>
-              <Text variant="caption" color={theme.colors.peacockPrimary}>
-                Open update
+            ) : null}
+            <Pressable
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Archive notification group"
+              onPress={(event) => {
+                event.stopPropagation();
+                void handleArchiveGroup(item);
+              }}
+            >
+              <Text variant="caption" weight="bold" color={theme.colors.textMuted}>
+                Archive
               </Text>
-            </View>
+            </Pressable>
           </View>
-        </Card>
-      </Pressable>
+        </View>
+      </PressableCard>
     );
   };
 
   return (
-    <ScreenContainer>
+    <AppScreen>
       <View style={styles.header}>
         <View style={styles.headerRow}>
-          <View style={{ flex: 1 }}>
-            <Text variant="title" weight="bold">
-              Notifications
-            </Text>
-            <Text color={theme.colors.mutedText} style={{ marginTop: 4 }}>
-              Recent provider and appointment updates.
-            </Text>
+          <SectionHeader
+            eyebrow="Customer updates"
+            title="Notifications"
+            subtitle="Provider assignments, payment updates, and appointment progress."
+            style={styles.headerCopy}
+          />
+          {unreadCount > 0 ? <StatusBadge label={`${unreadCount} unread`} tone="primary" /> : null}
+        </View>
+        <View style={styles.actionsRow}>
+          <View style={styles.filterRow}>
+            {([
+              { key: "all", label: "All" },
+              { key: "unread", label: "Unread" },
+            ] as const).map((option) => {
+              const active = selectedFilter === option.key;
+              return (
+                <Pressable
+                  key={option.key}
+                  onPress={() => setSelectedFilter(option.key)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Show ${option.label.toLowerCase()} notifications`}
+                  accessibilityState={{ selected: active }}
+                  style={[
+                    styles.filterPill,
+                    {
+                      backgroundColor: active ? theme.colors.surfaceTint : theme.colors.surfaceElevated,
+                      borderColor: active ? `${theme.colors.primary}33` : theme.colors.borderSoft,
+                    },
+                  ]}
+                >
+                  <Text variant="caption" weight="bold" color={active ? theme.colors.primary : theme.colors.textMuted}>
+                    {option.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
           {unreadCount > 0 ? (
-            <Pressable
-              hitSlop={8}
+            <Button
+              label={ackAllMutation.isPending ? "Marking..." : "Mark all read"}
+              variant="ghost"
+              size="compact"
               disabled={ackAllMutation.isPending}
               onPress={() => {
                 void ackAllMutation.mutateAsync();
               }}
-            >
-              <Text variant="caption" weight="semibold" color={theme.colors.peacockPrimary}>
-                {ackAllMutation.isPending ? "Marking..." : "Mark all read"}
-              </Text>
-            </Pressable>
+            />
           ) : null}
-        </View>
-        <View style={styles.filterRow}>
-          {([
-            { key: "all", label: "All" },
-            { key: "unread", label: "Unread" },
-          ] as const).map((option) => {
-            const active = selectedFilter === option.key;
-            return (
-              <Pressable
-                key={option.key}
-                onPress={() => setSelectedFilter(option.key)}
-                style={[styles.filterPill, active && styles.filterPillActive]}
-              >
-                <Text
-                  variant="caption"
-                  weight="semibold"
-                  color={active ? theme.colors.peacockPrimary : theme.colors.mutedText}
-                >
-                  {option.label}
-                </Text>
-              </Pressable>
-            );
-          })}
         </View>
       </View>
 
       {notificationsQuery.isLoading || !isArchiveStateLoaded ? (
-        <View style={styles.state}>
-          <ActivityIndicator color={theme.colors.peacockPrimary} />
-          <Text color={theme.colors.mutedText}>Loading your latest updates.</Text>
-        </View>
+        <LoadingState label="Loading your latest updates" />
       ) : notificationsQuery.isError ? (
         <View style={styles.state}>
-          <Text weight="semibold" color={theme.colors.danger}>
-            Notifications are unavailable right now.
-          </Text>
-          <Pressable style={styles.retryButton} onPress={() => notificationsQuery.refetch()}>
-            <Text weight="semibold" color="#fff">
-              Retry
-            </Text>
-          </Pressable>
+          <EmptyState
+            title="Notifications are unavailable"
+            message="Refresh to get the latest appointment updates."
+            icon="cloud-offline-outline"
+          />
+          <Button label="Retry" onPress={() => notificationsQuery.refetch()} variant="secondary" style={styles.retryButton} />
         </View>
       ) : (
         <FlatList
@@ -306,36 +294,38 @@ export default function CustomerNotificationsScreen() {
             <RefreshControl
               refreshing={notificationsQuery.isRefetching}
               onRefresh={() => notificationsQuery.refetch()}
+              tintColor={theme.colors.primary}
             />
           }
           ListEmptyComponent={
-            <View style={styles.state}>
-              <Text weight="semibold">
-                {selectedFilter === "unread"
+            <EmptyState
+              title={
+                selectedFilter === "unread"
                   ? "You're all caught up"
                   : groupedNotifications.length > 0
                     ? "Inbox cleared"
-                    : "No updates yet"}
-              </Text>
-              <Text color={theme.colors.mutedText} style={{ textAlign: "center" }}>
-                {selectedFilter === "unread"
+                    : "No updates yet"
+              }
+              message={
+                selectedFilter === "unread"
                   ? "Unread provider and appointment updates will appear here when something new comes in."
                   : groupedNotifications.length > 0
                     ? "Archived groups and older read updates are tucked out of the default inbox."
-                    : "Assignment and delivery progress updates will appear here as your appointments move."}
-              </Text>
-            </View>
+                    : "Assignment and delivery progress updates will appear here as your appointments move."
+              }
+              icon="notifications-outline"
+            />
           }
         />
       )}
-    </ScreenContainer>
+    </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
   header: {
     padding: 16,
-    gap: 4,
+    gap: 14,
   },
   headerRow: {
     flexDirection: "row",
@@ -343,72 +333,73 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 12,
   },
+  headerCopy: {
+    flex: 1,
+  },
+  actionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
   filterRow: {
-    marginTop: 12,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
   filterPill: {
+    minHeight: 36,
     borderRadius: 999,
     paddingHorizontal: 12,
-    paddingVertical: 7,
-    backgroundColor: "#f3f4f6",
     borderWidth: 1,
-    borderColor: "#e5e7eb",
-  },
-  filterPillActive: {
-    backgroundColor: "#eff6ff",
-    borderColor: "#bfdbfe",
+    alignItems: "center",
+    justifyContent: "center",
   },
   list: {
     padding: 16,
-    paddingTop: 4,
+    paddingTop: 0,
+    paddingBottom: 24,
     gap: 12,
   },
   state: {
     flex: 1,
-    alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 24,
-    gap: 10,
+    padding: 24,
+  },
+  retryButton: {
+    marginTop: 12,
+    alignSelf: "stretch",
   },
   notificationCard: {
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    gap: 4,
-  },
-  notificationCardPriority: {
-    borderColor: "#d1d5db",
-    backgroundColor: "#fcfcfd",
-  },
-  notificationCardPriorityUnread: {
-    borderColor: "#93c5fd",
-    backgroundColor: "#f8fbff",
-  },
-  groupHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
     gap: 12,
-    marginBottom: 2,
   },
-  notificationHeader: {
+  cardTop: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 12,
   },
-  notificationTitle: {
-    flex: 1,
+  notificationIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  notificationTitlePriority: {
-    color: "#111827",
+  cardTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  notificationTitle: {
+    marginTop: 10,
+  },
+  notificationDetail: {
+    marginTop: 6,
   },
   olderUpdates: {
-    marginTop: 10,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: "#e5e7eb",
     gap: 6,
   },
   olderUpdateRow: {
@@ -418,35 +409,19 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   notificationFooter: {
-    marginTop: 10,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-  },
-  footerRight: {
-    flexDirection: "row",
-    alignItems: "center",
     gap: 12,
   },
   footerLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 8,
   },
-  unreadPill: {
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    backgroundColor: "#dbeafe",
-  },
-  unreadPillPriority: {
-    backgroundColor: "#e0f2fe",
-  },
-  retryButton: {
-    marginTop: 6,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: "#0F4C5C",
+  footerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
   },
 });

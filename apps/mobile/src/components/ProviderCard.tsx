@@ -1,10 +1,14 @@
 import React from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import { useTheme } from "../theme/theme";
 import type { Company } from "../types/company";
-import { Card } from "./ui/Card";
+import { getProviderCategoryLabel } from "../discovery/categoryMetadata";
+import { getMarketplaceVisual, getPrimaryCategorySlug } from "../discovery/marketplaceVisuals";
+import { PressableCard } from "./ui/Card";
+import { MediaPlaceholder } from "./ui/MediaPlaceholder";
+import { StatusBadge } from "./ui/StatusBadge";
 import { Text } from "./ui/Text";
 
 interface Props {
@@ -15,50 +19,115 @@ interface Props {
 export function ProviderCard({ company, onPress }: Props) {
   const theme = useTheme();
   const location = [company.city, company.state].filter(Boolean).join(", ") || "Location unknown";
+  const categoryLabel = getProviderCategoryLabel(company);
+  const primaryCategorySlug = getPrimaryCategorySlug(company.offered_categories);
+  const categories = company.offered_categories?.slice(0, 3) ?? [];
 
   return (
-    <Pressable onPress={() => onPress?.(company)} style={{ marginBottom: 12 }}>
-      <Card>
+    <PressableCard
+      onPress={() => onPress?.(company)}
+      variant="marketplace"
+      accessibilityLabel={`Open provider ${company.name}, ${location}`}
+      style={styles.card}
+    >
+      <MediaPlaceholder
+        categorySlug={primaryCategorySlug}
+        label={company.city ?? "Nearby"}
+        caption="Vetted local care team"
+        style={styles.media}
+      />
+      <View style={styles.content}>
         <View style={styles.row}>
-          <View style={[styles.iconBubble, { backgroundColor: theme.colors.peacockPrimary }]}>
-            <Ionicons name="storefront" size={18} color={theme.colors.surfaceLight} />
-          </View>
           <View style={{ flex: 1 }}>
-            <Text variant="subtitle" weight="semibold">
+            <Text variant="h3" weight="bold">
               {company.name}
             </Text>
-            <Text color={theme.colors.mutedText} style={{ marginTop: 4 }}>
+            <Text color={theme.colors.textSecondary} style={{ marginTop: 4 }}>
               {location}
             </Text>
           </View>
-          <View style={[styles.pill, { backgroundColor: `${theme.colors.tealSecondary}22` }]}> 
-            <Text weight="semibold" color={theme.colors.tealSecondary}>
-              Open
+          <StatusBadge label="Open" tone="success" />
+        </View>
+        {categories.length > 0 ? (
+          <View style={styles.categoryRow}>
+            {categories.map((category) => (
+              <View key={category.slug} style={[styles.categoryPill, { backgroundColor: getMarketplaceVisual(category.slug).softColor }]}>
+                <Ionicons
+                  name={getMarketplaceVisual(category.slug).iconName as keyof typeof Ionicons.glyphMap}
+                  size={13}
+                  color={theme.colors.primary}
+                />
+                <Text variant="caption" weight="bold" color={theme.colors.textSecondary} numberOfLines={1}>
+                  {category.name}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+        <View style={styles.metaRow}>
+          <View style={[styles.metaPill, { backgroundColor: theme.colors.surfaceMuted }]}>
+            <Ionicons name="shield-checkmark-outline" size={15} color={theme.colors.secondary} />
+            <Text variant="caption" weight="bold" color={theme.colors.textSecondary}>
+              {categoryLabel}
+            </Text>
+          </View>
+          <View style={[styles.metaPill, { backgroundColor: theme.colors.surfaceMuted }]}>
+            <Ionicons name="time-outline" size={15} color={theme.colors.primary} />
+            <Text variant="caption" weight="bold" color={theme.colors.textSecondary}>
+              Pickup windows
             </Text>
           </View>
         </View>
-      </Card>
-    </Pressable>
+      </View>
+    </PressableCard>
   );
 }
 
 const styles = StyleSheet.create({
+  card: {
+    marginBottom: 16,
+    padding: 0,
+    overflow: "hidden",
+  },
+  media: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+  },
+  content: {
+    padding: 16,
+    gap: 14,
+  },
   row: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 12,
   },
-  iconBubble: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
+  metaRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
   },
-  pill: {
+  categoryRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  categoryPill: {
+    maxWidth: "100%",
+    minHeight: 30,
+    borderRadius: 999,
     paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  metaPill: {
+    minHeight: 34,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
 });
 

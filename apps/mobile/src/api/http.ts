@@ -21,6 +21,7 @@ import type {
 import type { LoginPayload, LoginResponse, RegisterPayload, RegisterResponse } from "../types/auth";
 import type { Company, CompanyUser, CompanyUserCreateResponse } from "../types/company";
 import type { ProviderAppointment, StatusUpdatePayload } from "../types/company";
+import type { CareCategory } from "../types/care";
 import { getAuthToken } from "../state/authStore";
 import type { Notification } from "../types/notification";
 import type { PushRegisterRequest, PushUnregisterRequest } from "../types/push";
@@ -141,28 +142,55 @@ export function register(payload: RegisterPayload): Promise<RegisterResponse> {
   return request<RegisterResponse>("POST", "/auth/register", payload);
 }
 
-export function listServices(companyId?: string): Promise<Service[]> {
-  const search = companyId ? `?company_id=${encodeURIComponent(companyId)}` : "";
-  return request<Service[]>("GET", `/services${search}`);
+interface ListServicesParams {
+  companyId?: string;
+  categorySlug?: string | null;
+  categoryId?: string | null;
+}
+
+export function buildServicesPath(paramsOrCompanyId?: string | ListServicesParams): string {
+  const search = new URLSearchParams();
+  const params = typeof paramsOrCompanyId === "string" ? { companyId: paramsOrCompanyId } : paramsOrCompanyId;
+
+  if (params?.companyId) search.set("company_id", params.companyId);
+  if (params?.categorySlug) search.set("category_slug", params.categorySlug);
+  if (params?.categoryId) search.set("category_id", params.categoryId);
+
+  const suffix = search.toString();
+  return suffix ? `/services?${suffix}` : "/services";
+}
+
+export function listCareCategories(): Promise<CareCategory[]> {
+  return request<CareCategory[]>("GET", "/care-categories");
+}
+
+export function listServices(paramsOrCompanyId?: string | ListServicesParams): Promise<Service[]> {
+  return request<Service[]>("GET", buildServicesPath(paramsOrCompanyId));
 }
 
 interface ListCompaniesParams {
   query?: string;
   city?: string | null;
   state?: string | null;
+  categorySlug?: string | null;
+  categoryId?: string | null;
 }
 
-export function listCompanies(params: ListCompaniesParams = {}): Promise<Company[]> {
+export function buildCompaniesPath(params: ListCompaniesParams = {}): string {
   const search = new URLSearchParams();
 
   if (params.query) search.set("query", params.query);
   if (params.city) search.set("city", params.city);
   if (params.state) search.set("state", params.state);
+  if (params.categorySlug) search.set("category_slug", params.categorySlug);
+  if (params.categoryId) search.set("category_id", params.categoryId);
 
   const suffix = search.toString();
-  const path = suffix ? `/companies?${suffix}` : "/companies";
+  return suffix ? `/companies?${suffix}` : "/companies";
+}
 
-  return request<Company[]>("GET", path);
+export function listCompanies(params: ListCompaniesParams = {}): Promise<Company[]> {
+  return request<Company[]>("GET", buildCompaniesPath(params));
 }
 
 export function getJson<T>(path: string): Promise<T> {

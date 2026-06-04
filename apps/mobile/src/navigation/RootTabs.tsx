@@ -111,15 +111,31 @@ export default function RootTabs() {
   const homeTabComponent = usesOperationalHome ? ProviderNavigator : HomeNavigator;
   const insets = useSafeAreaInsets();
   const bottomPadding = Math.max(insets.bottom, 8);
+  const operationalShell = role === "provider" || role === "company_admin";
 
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: theme.colors.peacockPrimary,
-        tabBarInactiveTintColor: theme.colors.mutedText,
-        tabBarStyle: { paddingBottom: bottomPadding, height: 60 + bottomPadding },
-        tabBarLabelStyle: { paddingBottom: 4 },
+        tabBarActiveTintColor: operationalShell ? theme.colors.accent : theme.colors.primary,
+        tabBarInactiveTintColor: operationalShell ? "rgba(255,255,255,0.68)" : theme.colors.textSubtle,
+        tabBarStyle: {
+          paddingBottom: bottomPadding,
+          paddingTop: 8,
+          height: 68 + bottomPadding,
+          backgroundColor: operationalShell ? "#062E37" : theme.colors.surfaceElevated,
+          borderTopColor: operationalShell ? "rgba(255,255,255,0.08)" : theme.colors.borderSoft,
+          borderTopWidth: 1,
+          shadowColor: operationalShell ? "#000000" : "#1B1E24",
+          shadowOffset: { width: 0, height: -8 },
+          shadowOpacity: operationalShell ? 0.2 : 0.08,
+          shadowRadius: 20,
+          elevation: 12,
+        },
+        tabBarItemStyle: {
+          minHeight: 52,
+        },
+        tabBarLabelStyle: { paddingBottom: 4, fontWeight: "700", fontSize: 12, color: operationalShell ? "#F8F5EF" : undefined },
         tabBarIcon: ({ color, size }) => {
           const iconMap: Record<string, keyof typeof Ionicons.glyphMap> = {
             HomeTab: "home",
@@ -128,7 +144,7 @@ export default function RootTabs() {
             ProfileTab: "person",
           };
           const key = iconMap[route.name] ?? "ellipse-outline";
-          return <Ionicons name={key} size={size} color={color} />;
+          return <Ionicons name={key} size={size + 1} color={color} />;
         },
       })}
     >

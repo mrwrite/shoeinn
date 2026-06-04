@@ -5,6 +5,10 @@ describe("buildQuoteDisplayRows", () => {
     const rows = buildQuoteDisplayRows({
       service_id: "svc_123",
       service_name: "Deluxe Clean",
+      category_id: "cat_laundry",
+      category_slug: "laundry",
+      category_name: "Laundry",
+      category_icon_key: "shirt",
       currency: "usd",
       subtotal: 6500,
       fees: 1098,
