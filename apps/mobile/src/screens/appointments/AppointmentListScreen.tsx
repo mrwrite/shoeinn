@@ -1,5 +1,5 @@
 import React from "react";
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View } from "react-native";
+import { FlatList, Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -7,8 +7,12 @@ import { useQuery } from "@tanstack/react-query";
 
 import { getMyAppointments } from "../../api/http";
 import { AppointmentCard } from "../../components/AppointmentCard";
-import { ScreenContainer } from "../../components/ScreenContainer";
+import { AppScreen } from "../../components/ui/AppScreen";
+import { EmptyState } from "../../components/ui/EmptyState";
+import { LoadingState } from "../../components/ui/LoadingState";
+import { SectionHeader } from "../../components/ui/SectionHeader";
 import { Button } from "../../components/ui/Button";
+import { Card } from "../../components/ui/Card";
 import { Text } from "../../components/ui/Text";
 import {
   getUnreadCustomerNotificationCount,
@@ -33,6 +37,13 @@ export default function AppointmentListScreen() {
     queryFn: getMyAppointments,
     enabled: isCustomer,
   });
+  const appointments = data ?? [];
+  const activeAppointments = appointments.filter((appointment) => !["completed", "cancelled"].includes(appointment.status));
+  const completedAppointments = appointments.filter((appointment) => ["completed", "cancelled"].includes(appointment.status));
+  const sectionedAppointments = [
+    ...activeAppointments.map((appointment) => ({ ...appointment, __section: "active" as const })),
+    ...completedAppointments.map((appointment) => ({ ...appointment, __section: "past" as const })),
+  ];
 
   useFocusedAutoRefresh({
     enabled: isCustomer,
@@ -50,90 +61,126 @@ export default function AppointmentListScreen() {
 
   if (!isCustomer) {
     return (
-      <ScreenContainer contentContainerStyle={styles.center}>
-        <Text variant="title" weight="bold">
-          Appointments unavailable
-        </Text>
-        <Text color={theme.colors.mutedText} style={{ marginTop: 6, textAlign: "center" }}>
-          Appointments are only available for customers.
-        </Text>
-        <Button label="Go home" onPress={() => navigation.getParent()?.navigate("HomeTab")} style={{ marginTop: 12 }} />
-      </ScreenContainer>
+      <AppScreen contentContainerStyle={styles.center}>
+        <EmptyState
+          title="Appointments unavailable"
+          message="Appointments are only available for customers."
+          icon="calendar-clear-outline"
+          actionLabel="Go home"
+          onAction={() => navigation.getParent()?.navigate("HomeTab")}
+        />
+      </AppScreen>
     );
   }
 
   return (
-    <ScreenContainer>
-      <View style={styles.header}>
-        <View>
-          <Text variant="title" weight="bold">
-            Appointments
-          </Text>
-          <Text color={theme.colors.mutedText} style={{ marginTop: 4 }}>
-            Track your bookings
-          </Text>
-        </View>
+    <AppScreen>
+      <Card variant="marketplace" style={styles.header}>
+        <SectionHeader
+          eyebrow="Customer orders"
+          title="Care appointments"
+          subtitle="Track pickup, care progress, delivery, payment, and provider updates."
+          style={styles.headerCopy}
+        />
         <Pressable
           onPress={() => navigation.navigate("CustomerNotifications")}
-          style={styles.notificationButton}
+          style={({ pressed }) => [
+            styles.notificationButton,
+            {
+              backgroundColor: theme.colors.surfaceElevated,
+              borderColor: theme.colors.borderSoft,
+              opacity: pressed ? 0.92 : 1,
+            },
+            theme.shadows.soft,
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel="Open notifications"
         >
-          <Ionicons name="notifications-outline" size={20} color={theme.colors.peacockPrimary} />
+          <Ionicons name="notifications-outline" size={20} color={theme.colors.primary} />
           {unreadCount > 0 ? (
-            <View style={styles.notificationBadge}>
-              <Text variant="caption" weight="bold" color="#fff">
+            <View style={[styles.notificationBadge, { backgroundColor: theme.colors.danger }]}>
+              <Text variant="caption" weight="bold" color={theme.colors.surfaceElevated}>
                 {unreadCount > 9 ? "9+" : unreadCount}
               </Text>
             </View>
           ) : null}
         </Pressable>
-      </View>
+      </Card>
+
       {isLoading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={theme.colors.peacockPrimary} />
-        </View>
+        <LoadingState label="Loading appointments" />
       ) : isError ? (
         <View style={styles.center}>
-          <Text color={theme.colors.danger} weight="semibold">
-            Failed to load appointments
-          </Text>
-          <Button label="Retry" onPress={() => refetch()} style={{ marginTop: 12 }} />
+          <EmptyState
+            title="Failed to load appointments"
+            message="Refresh to get the latest booking status."
+            icon="cloud-offline-outline"
+          />
+          <Button label="Retry" onPress={() => refetch()} variant="secondary" style={styles.retryButton} />
         </View>
       ) : (
         <FlatList
-          data={data ?? []}
+          data={sectionedAppointments}
           keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          contentContainerStyle={{ padding: 16, paddingBottom: 24 }}
-          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
+          renderItem={({ item, index }) => {
+            const isFirstPast = item.__section === "past" && (index === 0 || sectionedAppointments[index - 1]?.__section !== "past");
+            const isFirstActive = item.__section === "active" && index === 0;
+            return (
+              <>
+                {isFirstActive ? <SectionLabel title="Active care" count={activeAppointments.length} /> : null}
+                {isFirstPast ? <SectionLabel title="Past care" count={completedAppointments.length} /> : null}
+                {renderItem({ item })}
+              </>
+            );
+          }}
+          contentContainerStyle={styles.list}
+          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={theme.colors.primary} />}
           ListEmptyComponent={
-            <View style={styles.empty}>
-              <Text weight="semibold">No appointments yet</Text>
-              <Text color={theme.colors.mutedText} style={{ marginTop: 4 }}>
-                Book a service to get started.
-              </Text>
-            </View>
+            <EmptyState
+              title="No appointments yet"
+              message="Book a service to start tracking pickup, care progress, and delivery here."
+              icon="calendar-outline"
+            />
           }
         />
       )}
-    </ScreenContainer>
+    </AppScreen>
+  );
+}
+
+function SectionLabel({ title, count }: { title: string; count: number }) {
+  const theme = useTheme();
+  return (
+    <View style={styles.sectionLabel}>
+      <Text variant="overline" weight="bold" color={theme.colors.accentPressed}>
+        {title}
+      </Text>
+      <Text variant="caption" color={theme.colors.textMuted}>
+        {count} {count === 1 ? "appointment" : "appointments"}
+      </Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   header: {
-    padding: 16,
-    gap: 4,
+    margin: 16,
+    marginBottom: 12,
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
+    gap: 12,
+  },
+  headerCopy: {
+    flex: 1,
   },
   notificationButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 48,
+    height: 48,
+    borderRadius: 18,
+    borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#eff6ff",
     position: "relative",
   },
   notificationBadge: {
@@ -144,21 +191,26 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: -1,
     right: -1,
-    backgroundColor: "#dc2626",
     alignItems: "center",
     justifyContent: "center",
+  },
+  list: {
+    padding: 16,
+    paddingTop: 0,
+    paddingBottom: 24,
+  },
+  sectionLabel: {
+    marginBottom: 10,
+    gap: 2,
   },
   center: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 40,
-    gap: 8,
+    padding: 24,
   },
-  empty: {
-    alignItems: "center",
-    paddingVertical: 40,
-    gap: 8,
+  retryButton: {
+    marginTop: 12,
+    alignSelf: "stretch",
   },
 });
-

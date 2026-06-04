@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { ActivityIndicator, Alert, StyleSheet, View } from "react-native";
+import { Alert, Pressable, StyleSheet, View } from "react-native";
 import { RouteProp, useRoute } from "@react-navigation/native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -12,10 +12,17 @@ import {
   listCompanyUsers,
   reassignAppointment,
 } from "../../api/http";
-import { Button } from "../../components/ui/Button";
-import { Card } from "../../components/ui/Card";
+import { AppointmentTimeline } from "../../components/AppointmentTimeline";
+import { AppButton } from "../../components/AppButton";
+import { AppCard } from "../../components/AppCard";
+import { EmptyState } from "../../components/EmptyState";
+import { LoadingState } from "../../components/LoadingState";
+import { SectionHeader } from "../../components/SectionHeader";
+import { AppointmentStatusBadge, StatusBadge } from "../../components/StatusBadge";
+import { AppScreen } from "../../components/ui/AppScreen";
 import { Text } from "../../components/ui/Text";
-import { ScreenContainer } from "../../components/ScreenContainer";
+import { getReadableAppointmentStatus } from "../../features/appointmentCopy";
+import { buildProviderTimeline } from "../../features/providerAdminCopy";
 import type { ProviderStackParamList } from "../../navigation/types";
 import { useTheme } from "../../theme/theme";
 
@@ -75,12 +82,14 @@ export default function OwnerAppointmentDetailScreen() {
   });
 
   const appointmentData = appointmentQuery.data;
+  const status = appointmentData?.status ?? appointment.status;
   const assignment = assignmentQuery.data;
-  const providers = useMemo(
-    () => (teamQuery.data ?? []).filter((user) => user.role === "provider"),
-    [teamQuery.data],
-  );
-  const canAssign = appointment.status === "confirmed" && !assignment;
+  const providers = useMemo(() => (teamQuery.data ?? []).filter((user) => user.role === "provider"), [teamQuery.data]);
+  const canAssign = status === "confirmed" && !assignment;
+  const isUpdatingAssignment = assignMutation.isPending || reassignMutation.isPending;
+  const timelineItems = useMemo(() => buildProviderTimeline(status), [status]);
+  const paymentStatus = appointmentData?.payment_status ?? null;
+  const paymentMode = appointmentData?.payment_mode ?? null;
 
   const handleAssign = async () => {
     if (!selectedProviderId) {
@@ -95,60 +104,95 @@ export default function OwnerAppointmentDetailScreen() {
   };
 
   return (
-    <ScreenContainer scrollable contentContainerStyle={styles.container}>
-      <Text variant="title" weight="bold">
-        {appointment.service_name ?? "Owner job detail"}
-      </Text>
-      <Text color={theme.colors.mutedText} style={{ marginTop: 4 }}>
-        Review ownership, progress, and the next best move for this customer order.
-      </Text>
-
-      <Card>
-        <Text variant="subtitle" weight="bold">
-          Snapshot
+    <AppScreen scrollable contentContainerStyle={styles.container}>
+      <AppCard variant="marketplace" style={styles.heroCard}>
+        <View style={styles.heroTop}>
+          <View style={{ flex: 1 }}>
+            <Text variant="caption" weight="bold" color={theme.colors.textMuted}>
+              Owner job detail
+            </Text>
+            <Text variant="h1" weight="bold" style={styles.heroTitle}>
+              {appointment.service_name ?? "Appointment"}
+            </Text>
+          </View>
+          <View style={styles.heroBadges}>
+            {(appointmentData?.category_name ?? appointment.category_name) ? (
+              <StatusBadge label={appointmentData?.category_name ?? appointment.category_name ?? "Care"} tone="primary" />
+            ) : null}
+            {paymentStatus ? (
+              <StatusBadge
+                label={`Payment ${paymentStatus.replace("_", " ")}`}
+                tone={paymentStatus === "succeeded" ? "success" : paymentStatus === "failed" ? "danger" : "warning"}
+              />
+            ) : null}
+            <AppointmentStatusBadge status={status} />
+          </View>
+        </View>
+        <Text color={theme.colors.textSecondary}>
+          {appointmentData?.customer_name ?? appointment.customer_name ?? "Customer"} · {new Date(appointmentData?.start_time ?? appointment.start_time).toLocaleString()}
         </Text>
+      </AppCard>
+
+      <AppCard variant="marketplace">
+        <SectionHeader title="Snapshot" subtitle="Customer, status, appointment time, and address context." />
         {appointmentQuery.isLoading ? (
-          <ActivityIndicator color={theme.colors.peacockPrimary} style={{ marginTop: 12 }} />
+          <LoadingState label="Loading appointment snapshot" />
         ) : (
           <View style={styles.infoBlock}>
             <Row label="Customer" value={appointmentData?.customer_name ?? appointment.customer_name ?? "Customer"} />
-            <Row label="Status" value={(appointmentData?.status ?? appointment.status).replace(/_/g, " ")} />
+            <Row label="Status" value={getReadableAppointmentStatus(status)} />
+            <Row label="Category" value={appointmentData?.category_name ?? appointment.category_name ?? "Care service"} />
             <Row label="When" value={new Date(appointmentData?.start_time ?? appointment.start_time).toLocaleString()} />
             <Row label="Address" value={appointmentData?.address_line1 ?? appointment.address_line1 ?? "Address pending"} />
+            <Row label="Payment" value={paymentMode ? `${paymentMode} / ${paymentStatus ?? "pending"}` : paymentStatus ? paymentStatus : "Not available"} />
           </View>
         )}
-      </Card>
+      </AppCard>
 
-      <Card>
-        <Text variant="subtitle" weight="bold">
-          Assignment control
-        </Text>
-        {assignmentQuery.isLoading ? (
-          <ActivityIndicator color={theme.colors.peacockPrimary} style={{ marginTop: 12 }} />
+      <AppCard variant="marketplace">
+        <SectionHeader
+          title="Assignment control"
+          subtitle={assignment ? `${assignment.provider_name ?? "A provider"} currently owns this job.` : "This job is waiting for an available provider."}
+        />
+        {assignmentQuery.isLoading || teamQuery.isLoading ? (
+          <LoadingState label="Loading assignment options" />
+        ) : providers.length === 0 ? (
+          <EmptyState title="No providers available" message="Add providers before assigning this job." icon="people-outline" />
         ) : (
           <>
-            <Text color={theme.colors.mutedText} style={{ marginTop: 8 }}>
-              {assignment
-                ? `${assignment.provider_name ?? "A provider"} currently owns this job.`
-                : "This job is still waiting for an available provider."}
-            </Text>
             <View style={styles.providerSelector}>
               {providers.map((provider) => {
                 const selected = selectedProviderId === provider.id;
-                const disabled = assignment?.user_id === provider.id;
+                const disabled = assignment?.user_id === provider.id || isUpdatingAssignment;
                 return (
-                  <Button
+                  <Pressable
                     key={provider.id}
-                    label={provider.full_name}
-                    variant={selected ? "primary" : "secondary"}
                     onPress={() => setSelectedProviderId(provider.id)}
                     disabled={disabled}
-                    style={styles.providerButton}
-                  />
+                    accessibilityRole="button"
+                    accessibilityLabel={`Select provider ${provider.full_name}`}
+                    accessibilityState={{ selected, disabled }}
+                    style={[
+                      styles.providerOption,
+                      {
+                        backgroundColor: selected ? `${theme.colors.primary}12` : theme.colors.surfaceElevated,
+                        borderColor: selected ? `${theme.colors.primary}44` : theme.colors.border,
+                        opacity: disabled ? 0.55 : 1,
+                      },
+                    ]}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text weight="bold">{provider.full_name}</Text>
+                      <Text variant="caption" color={theme.colors.textMuted}>
+                        {provider.email}
+                      </Text>
+                    </View>
+                    {assignment?.user_id === provider.id ? <StatusBadge label="Current" tone="success" /> : selected ? <StatusBadge label="Selected" tone="primary" /> : null}
+                  </Pressable>
                 );
               })}
             </View>
-            <Button
+            <AppButton
               label={
                 canAssign
                   ? assignMutation.isPending
@@ -161,54 +205,37 @@ export default function OwnerAppointmentDetailScreen() {
               onPress={() => {
                 void handleAssign();
               }}
-              disabled={!selectedProviderId || assignMutation.isPending || reassignMutation.isPending}
-              loading={assignMutation.isPending || reassignMutation.isPending}
-              style={{ marginTop: 14 }}
+              disabled={!selectedProviderId || isUpdatingAssignment}
+              loading={isUpdatingAssignment}
+              style={styles.assignButton}
             />
-            <Text variant="caption" color={theme.colors.mutedText} style={{ marginTop: 8 }}>
-              Use this as the owner's intervention moment during the demo. Unassigned jobs can be assigned here. Assigned jobs can be rerouted if the day changes.
-            </Text>
           </>
         )}
-      </Card>
+      </AppCard>
 
       {trackingQuery.data?.latest_location ? (
-        <Card>
-          <Text variant="subtitle" weight="bold">
-            Live travel check
+        <AppCard variant="marketplace">
+          <SectionHeader title="Live travel check" subtitle="Latest provider location ping." />
+          <Text color={theme.colors.textSecondary} style={styles.copyTop}>
+            {trackingQuery.data.latest_location.lat.toFixed(4)}, {trackingQuery.data.latest_location.lng.toFixed(4)}
           </Text>
-          <Text color={theme.colors.mutedText} style={{ marginTop: 8 }}>
-            Latest provider ping: {trackingQuery.data.latest_location.lat.toFixed(4)}, {trackingQuery.data.latest_location.lng.toFixed(4)}
-          </Text>
-          <Text variant="caption" color={theme.colors.mutedText} style={{ marginTop: 4 }}>
+          <Text variant="caption" color={theme.colors.textMuted}>
             Recorded {new Date(trackingQuery.data.latest_location.recorded_at).toLocaleString()}
           </Text>
-        </Card>
+        </AppCard>
       ) : null}
 
-      <Card>
-        <Text variant="subtitle" weight="bold">
-          Recent activity
-        </Text>
+      <AppCard variant="marketplace">
+        <SectionHeader title="Progress timeline" subtitle="Owner view of the appointment lifecycle." />
         {eventsQuery.isLoading ? (
-          <ActivityIndicator color={theme.colors.peacockPrimary} style={{ marginTop: 12 }} />
+          <LoadingState label="Loading appointment activity" />
+        ) : eventsQuery.isError ? (
+          <EmptyState title="Activity unavailable" message="Refresh to pull the latest appointment events." icon="time-outline" />
         ) : (
-          <View style={styles.timeline}>
-            {(eventsQuery.data ?? []).slice(-6).reverse().map((event) => (
-              <View key={event.id} style={styles.timelineRow}>
-                <View style={styles.timelineDot} />
-                <View style={{ flex: 1 }}>
-                  <Text weight="semibold">{event.kind.replace(/_/g, " ")}</Text>
-                  <Text variant="caption" color={theme.colors.mutedText}>
-                    {new Date(event.created_at).toLocaleString()}
-                  </Text>
-                </View>
-              </View>
-            ))}
-          </View>
+          <AppointmentTimeline items={timelineItems} style={styles.timeline} />
         )}
-      </Card>
-    </ScreenContainer>
+      </AppCard>
+    </AppScreen>
   );
 }
 
@@ -216,9 +243,9 @@ function Row({ label, value }: { label: string; value: string }) {
   const theme = useTheme();
   return (
     <View style={styles.row}>
-      <Text color={theme.colors.mutedText}>{label}</Text>
-      <Text weight="semibold" style={styles.rowValue}>
-        {value}
+      <Text color={theme.colors.textMuted}>{label}</Text>
+      <Text weight="bold" style={styles.rowValue}>
+        {value || "-"}
       </Text>
     </View>
   );
@@ -227,7 +254,22 @@ function Row({ label, value }: { label: string; value: string }) {
 const styles = StyleSheet.create({
   container: {
     padding: 16,
+    gap: 14,
+  },
+  heroCard: {
     gap: 12,
+  },
+  heroTop: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  heroBadges: {
+    alignItems: "flex-end",
+    gap: 8,
+  },
+  heroTitle: {
+    marginTop: 4,
   },
   infoBlock: {
     marginTop: 12,
@@ -247,23 +289,22 @@ const styles = StyleSheet.create({
     marginTop: 12,
     gap: 10,
   },
-  providerButton: {
-    width: "100%",
+  providerOption: {
+    minHeight: 64,
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  assignButton: {
+    marginTop: 14,
+  },
+  copyTop: {
+    marginTop: 12,
   },
   timeline: {
     marginTop: 12,
-    gap: 10,
-  },
-  timelineRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-  },
-  timelineDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginTop: 5,
-    backgroundColor: "#0F4C5C",
   },
 });

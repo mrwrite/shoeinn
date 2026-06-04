@@ -1,13 +1,20 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from "react-native";
+import { Alert, StyleSheet, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { getAppointment, refreshAppointmentPayment } from "../../api/http";
-import { ScreenContainer } from "../../components/ScreenContainer";
+import { AppScreen } from "../../components/ui/AppScreen";
+import { Button } from "../../components/ui/Button";
+import { Card } from "../../components/ui/Card";
+import { LoadingState } from "../../components/ui/LoadingState";
+import { SectionHeader } from "../../components/ui/SectionHeader";
+import { StatusBadge } from "../../components/ui/StatusBadge";
 import { Text } from "../../components/ui/Text";
 import type { AppointmentStackParamList } from "../../navigation/types";
 import { appointmentQueryKey, customerAppointmentsQueryKey } from "../../query/keys";
+import { useTheme } from "../../theme/theme";
 
 type Props = NativeStackScreenProps<AppointmentStackParamList, "PaymentResult">;
 
@@ -27,6 +34,7 @@ function formatMoney(amount: number | null | undefined, currency: string | null 
 }
 
 export default function PaymentResultScreen({ navigation, route }: Props) {
+  const theme = useTheme();
   const { bookingId, sessionId, status } = route.params;
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const queryClient = useQueryClient();
@@ -80,9 +88,12 @@ export default function PaymentResultScreen({ navigation, route }: Props) {
     }
     return (
       appointment?.payment_message ??
-      "We’re checking Stripe for the latest payment result for this booking."
+      "We're checking Stripe for the latest payment result for this booking."
     );
   }, [appointment?.payment_message, status]);
+
+  const tone = status === "cancel" ? "warning" : appointment?.payment_status === "failed" ? "danger" : appointment?.payment_status === "succeeded" ? "success" : "primary";
+  const icon = tone === "success" ? "checkmark-circle" : tone === "danger" ? "alert-circle" : "time-outline";
 
   const openAppointment = () => {
     navigation.replace("AppointmentDetail", {
@@ -93,90 +104,99 @@ export default function PaymentResultScreen({ navigation, route }: Props) {
   };
 
   return (
-    <ScreenContainer contentContainerStyle={styles.container}>
-      <View style={styles.hero}>
-        <Text variant="title" weight="bold">
-          {statusTitle}
-        </Text>
-        <Text style={styles.subtitle}>{statusBody}</Text>
-      </View>
+    <AppScreen contentContainerStyle={styles.container}>
+      <Card variant="marketplace" style={styles.hero}>
+        <View style={[styles.iconBubble, { backgroundColor: tone === "success" ? theme.colors.successSoft : theme.colors.accentSoft }]}>
+          <Ionicons name={icon} size={34} color={tone === "success" ? theme.colors.success : theme.colors.primary} />
+        </View>
+        <SectionHeader title={statusTitle} subtitle={statusBody} style={styles.header} />
+        <StatusBadge label={status === "cancel" ? "Checkout canceled" : appointment?.payment_status ?? "Verifying"} tone={tone} />
+      </Card>
 
-      <View style={styles.card}>
-        <Text weight="semibold">Booking</Text>
-        <Text style={styles.mono}>{bookingId}</Text>
+      <Card variant="marketplace" style={styles.card}>
+        <Text variant="caption" weight="bold" color={theme.colors.textMuted}>
+          Booking
+        </Text>
+        <Text color={theme.colors.textSecondary} style={styles.mono}>
+          {bookingId}
+        </Text>
+
         {sessionId ? (
-          <>
-            <Text weight="semibold" style={styles.sectionLabel}>
+          <View style={styles.sessionBlock}>
+            <Text variant="caption" weight="bold" color={theme.colors.textMuted}>
               Stripe session
             </Text>
-            <Text style={styles.mono}>{sessionId}</Text>
-          </>
-        ) : null}
-
-        {state.kind === "loading" ? (
-          <View style={styles.loadingRow}>
-            <ActivityIndicator />
-            <Text>Verifying latest payment status…</Text>
+            <Text color={theme.colors.textSecondary} style={styles.mono}>
+              {sessionId}
+            </Text>
           </View>
         ) : null}
 
+        {state.kind === "loading" ? <LoadingState label="Verifying latest payment status" /> : null}
+
         {state.kind === "error" ? (
-          <Text style={styles.errorText}>{state.message}</Text>
+          <View style={[styles.errorBlock, { backgroundColor: theme.colors.dangerSoft, borderColor: `${theme.colors.danger}33` }]}>
+            <Text color={theme.colors.danger} weight="bold">
+              {state.message}
+            </Text>
+          </View>
         ) : null}
 
         {appointment ? (
           <View style={styles.summary}>
-            <View style={styles.summaryRow}>
-              <Text>Payment status</Text>
-              <Text weight="semibold">{appointment.payment_status ?? "pending"}</Text>
-            </View>
-            <View style={styles.summaryRow}>
-              <Text>Booking status</Text>
-              <Text weight="semibold">{appointment.status}</Text>
-            </View>
-            <View style={styles.summaryRow}>
-              <Text>Amount</Text>
-              <Text weight="semibold">
-                {formatMoney(
-                  appointment.payment_amount_received ?? appointment.payment_amount_expected,
-                  appointment.payment_currency,
-                )}
-              </Text>
-            </View>
+            <SummaryRow label="Payment status" value={appointment.payment_status ?? "pending"} />
+            <SummaryRow label="Booking status" value={appointment.status} />
+            <SummaryRow
+              label="Amount"
+              value={formatMoney(
+                appointment.payment_amount_received ?? appointment.payment_amount_expected,
+                appointment.payment_currency,
+              )}
+            />
           </View>
         ) : null}
+      </Card>
+
+      <View style={styles.actions}>
+        <Button
+          label={status === "cancel" ? "Back to booking payment" : "View booking status"}
+          variant="gold"
+          onPress={openAppointment}
+        />
+        <Button
+          label={status === "success" ? "Refresh payment status" : "Review appointment"}
+          variant="secondary"
+          onPress={() => {
+            if (status === "success") {
+              void (async () => {
+                try {
+                  const latest = await refreshAppointmentPayment(bookingId);
+                  queryClient.setQueryData(appointmentQueryKey(bookingId), latest);
+                  await queryClient.invalidateQueries({ queryKey: customerAppointmentsQueryKey });
+                  setState({ kind: "loaded", appointment: latest });
+                } catch (error: any) {
+                  Alert.alert("Unable to refresh", error?.message ?? "Please try again.");
+                }
+              })();
+              return;
+            }
+            openAppointment();
+          }}
+        />
       </View>
+    </AppScreen>
+  );
+}
 
-      <Pressable style={styles.primaryButton} onPress={openAppointment}>
-        <Text style={styles.primaryText}>
-          {status === "cancel" ? "Back to booking payment" : "View booking status"}
-        </Text>
-      </Pressable>
-
-      <Pressable
-        style={styles.secondaryButton}
-        onPress={() => {
-          if (status === "success") {
-            void (async () => {
-              try {
-                const latest = await refreshAppointmentPayment(bookingId);
-                queryClient.setQueryData(appointmentQueryKey(bookingId), latest);
-                await queryClient.invalidateQueries({ queryKey: customerAppointmentsQueryKey });
-                setState({ kind: "loaded", appointment: latest });
-              } catch (error: any) {
-                Alert.alert("Unable to refresh", error?.message ?? "Please try again.");
-              }
-            })();
-            return;
-          }
-          openAppointment();
-        }}
-      >
-        <Text style={styles.secondaryText}>
-          {status === "success" ? "Refresh payment status" : "Review appointment"}
-        </Text>
-      </Pressable>
-    </ScreenContainer>
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  const theme = useTheme();
+  return (
+    <View style={styles.summaryRow}>
+      <Text color={theme.colors.textMuted}>{label}</Text>
+      <Text weight="bold" style={styles.summaryValue}>
+        {value}
+      </Text>
+    </View>
   );
 }
 
@@ -188,65 +208,49 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   hero: {
-    gap: 8,
+    alignItems: "center",
+    gap: 12,
+    padding: 22,
   },
-  subtitle: {
-    color: "#4b5563",
-    lineHeight: 22,
+  iconBubble: {
+    width: 72,
+    height: 72,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  header: {
+    alignItems: "center",
   },
   card: {
-    backgroundColor: "#ffffff",
-    borderRadius: 20,
-    padding: 18,
     gap: 10,
-    shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 3,
-  },
-  sectionLabel: {
-    marginTop: 4,
   },
   mono: {
-    color: "#334155",
+    fontSize: 13,
   },
-  loadingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingTop: 6,
+  sessionBlock: {
+    marginTop: 4,
+    gap: 4,
+  },
+  errorBlock: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 12,
   },
   summary: {
     marginTop: 8,
-    gap: 8,
+    gap: 10,
   },
   summaryRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     gap: 12,
   },
-  errorText: {
-    color: "#b91c1c",
+  summaryValue: {
+    flex: 1,
+    textAlign: "right",
   },
-  primaryButton: {
-    backgroundColor: "#0f172a",
-    borderRadius: 16,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  primaryText: {
-    color: "#ffffff",
-    fontWeight: "700",
-  },
-  secondaryButton: {
-    borderWidth: 1,
-    borderColor: "#cbd5e1",
-    borderRadius: 16,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  secondaryText: {
-    color: "#0f172a",
-    fontWeight: "600",
+  actions: {
+    gap: 10,
   },
 });

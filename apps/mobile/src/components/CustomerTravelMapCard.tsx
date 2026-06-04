@@ -10,6 +10,8 @@ import type { AppointmentStatus } from "../types/booking";
 import { decodePolyline } from "../utils/decodePolyline";
 import { Button } from "./ui/Button";
 import { Card } from "./ui/Card";
+import { SectionHeader } from "./ui/SectionHeader";
+import { StatusBadge } from "./ui/StatusBadge";
 import { Text } from "./ui/Text";
 
 type Props = {
@@ -243,7 +245,7 @@ export function CustomerTravelMapCard({ appointment }: Props) {
         const raw = response.location;
         if (!raw) {
           setProviderLocation(null);
-          setProviderError("Waiting for provider location…");
+          setProviderError("Waiting for provider location...");
           setEta(null);
           setDistance(null);
           setRouteCoords([]);
@@ -259,7 +261,7 @@ export function CustomerTravelMapCard({ appointment }: Props) {
         }
       } catch (err) {
         if (mountedRef.current) {
-          setProviderError("Waiting for provider location…");
+          setProviderError("Waiting for provider location...");
         }
       }
     };
@@ -308,43 +310,37 @@ export function CustomerTravelMapCard({ appointment }: Props) {
   }
 
   return (
-    <Card style={styles.card}>
+    <Card variant="marketplace" style={styles.card}>
       <View style={styles.header}>
-        <View>
-          <Text weight="semibold">
-            {appointment.status === "en_route_pickup" ? "Provider en route to pickup" : "Provider out for delivery"}
-          </Text>
-          <Text color={theme.colors.mutedText} style={{ marginTop: 4 }}>
-            {destinationLabel}
-          </Text>
-        </View>
+        <SectionHeader title="Live tracking" subtitle={destinationLabel} style={styles.headerCopy} />
+        <StatusBadge label={appointment.status === "en_route_pickup" ? "En route pickup" : "Out for delivery"} tone="primary" />
       </View>
 
       <View style={styles.pills}>
         {eta ? (
-          <View style={[styles.pill, { backgroundColor: theme.colors.border }]}>
+          <View style={[styles.pill, { backgroundColor: theme.colors.surfaceMuted }]}>
             <Text weight="semibold">{eta}</Text>
           </View>
         ) : null}
         {distance ? (
-          <View style={[styles.pill, { backgroundColor: theme.colors.border }]}>
+          <View style={[styles.pill, { backgroundColor: theme.colors.surfaceMuted }]}>
             <Text weight="semibold">{distance}</Text>
           </View>
         ) : null}
       </View>
 
       {destinationError ? (
-        <View style={styles.messageBox}>
-          <Text color={theme.colors.mutedText}>{destinationError}</Text>
+        <View style={[styles.messageBox, { backgroundColor: theme.colors.surfaceMuted }]}>
+          <Text color={theme.colors.textSecondary}>{destinationError}</Text>
           <Button label="Open in Maps" variant="secondary" onPress={openInMaps} style={{ marginTop: 12 }} />
         </View>
       ) : providerError && !providerLocation ? (
-        <View style={styles.messageBox}>
-          <Text color={theme.colors.mutedText}>{providerError}</Text>
+        <View style={[styles.messageBox, { backgroundColor: theme.colors.surfaceMuted }]}>
+          <Text color={theme.colors.textSecondary}>{providerError}</Text>
           <Button label="Open in Maps" variant="secondary" onPress={openInMaps} style={{ marginTop: 12 }} />
         </View>
       ) : destination ? (
-        <View style={styles.mapWrapper}>
+        <View style={[styles.mapWrapper, { borderColor: theme.colors.borderSoft }]}>
           <MapView
             ref={mapRef}
             style={StyleSheet.absoluteFill}
@@ -355,42 +351,45 @@ export function CustomerTravelMapCard({ appointment }: Props) {
               longitudeDelta: 0.03,
             }}
           >
-            {providerLocation ? <Marker coordinate={providerLocation} title="Provider" pinColor={theme.colors.peacockPrimary} /> : null}
+            {providerLocation ? <Marker coordinate={providerLocation} title="Provider" pinColor={theme.colors.primary} /> : null}
             <Marker coordinate={destination} title={usingCustomerGps ? "You" : "Destination"} />
             {routeCoords.length ? (
-              <Polyline coordinates={routeCoords} strokeColor={theme.colors.peacockPrimary} strokeWidth={4} />
+              <Polyline coordinates={routeCoords} strokeColor={theme.colors.primary} strokeWidth={4} />
             ) : null}
           </MapView>
           {loadingDirections ? (
-            <View style={styles.loadingOverlay}>
-              <ActivityIndicator color={theme.colors.peacockPrimary} />
+            <View style={[styles.loadingOverlay, { backgroundColor: theme.colors.surfaceElevated }]}>
+              <ActivityIndicator color={theme.colors.primary} />
             </View>
           ) : null}
           {directionsError ? (
             <View style={styles.mapFooter}>
-              <Text color={theme.colors.mutedText}>{directionsError}</Text>
+              <Text color={theme.colors.textSecondary}>{directionsError}</Text>
             </View>
           ) : null}
         </View>
       ) : (
-        <View style={styles.messageBox}>
-          <Text color={theme.colors.mutedText}>Preparing destination…</Text>
+        <View style={[styles.messageBox, { backgroundColor: theme.colors.surfaceMuted }]}>
+          <Text color={theme.colors.textSecondary}>Preparing destination...</Text>
         </View>
       )}
-      <Button label="Open in Maps" variant="ghost" onPress={openInMaps} style={{ marginTop: 12 }} />
+      <Button label="Open in Maps" variant="ghost" onPress={openInMaps} accessibilityLabel="Open route in Maps" style={{ marginTop: 12 }} />
     </Card>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    padding: 16,
+    gap: 12,
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
     gap: 12,
+  },
+  headerCopy: {
+    flex: 1,
   },
   pills: {
     flexDirection: "row",
@@ -403,23 +402,22 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   mapWrapper: {
-    marginTop: 16,
+    marginTop: 4,
     height: 220,
-    borderRadius: 16,
+    borderRadius: 26,
     overflow: "hidden",
+    borderWidth: 1,
   },
   loadingOverlay: {
     position: "absolute",
     top: 12,
     right: 12,
-    backgroundColor: "rgba(255,255,255,0.9)",
     borderRadius: 16,
     padding: 6,
   },
   messageBox: {
-    marginTop: 16,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 22,
   },
   mapFooter: {
     position: "absolute",

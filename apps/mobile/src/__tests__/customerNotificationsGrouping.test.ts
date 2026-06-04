@@ -7,6 +7,7 @@ jest.mock("../api/http", () => ({
 }));
 
 import {
+  getCustomerNotificationCopy,
   getLatestNotificationForAppointment,
   groupCustomerNotifications,
 } from "../hooks/useCustomerNotifications";
@@ -80,5 +81,17 @@ describe("customer notification grouping", () => {
     ];
 
     expect(getLatestNotificationForAppointment(notifications, "appt-1")?.id).toBe("delivery");
+  });
+
+  it("uses category-neutral status copy for in-care updates", () => {
+    const copy = getCustomerNotificationCopy(
+      makeNotification({
+        kind: "APPOINTMENT_STATUS_CHANGED",
+        payload: { new_status: "cleaning", category_slug: "laundry", category_name: "Laundry" },
+      }),
+    );
+
+    expect(copy.title).toBe("In care update");
+    expect(copy.detail).toBe("Your order is now in care.");
   });
 });

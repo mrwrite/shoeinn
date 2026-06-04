@@ -95,6 +95,12 @@ def _base_event(
         "event_kind": event_kind,
         "appointment_id": str(appointment.id),
         "company_id": str(appointment.company_id) if appointment.company_id else None,
+        "service_id": str(appointment.service_id) if appointment.service_id else None,
+        "service_name": appointment.service_name,
+        "category_id": str(appointment.category_id) if appointment.category_id else None,
+        "category_slug": appointment.category_slug,
+        "category_name": appointment.category_name,
+        "category_icon_key": appointment.category_icon_key,
         "occurred_at": datetime.now(timezone.utc).isoformat(),
     }
 

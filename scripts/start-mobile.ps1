@@ -1,5 +1,7 @@
 param(
     [string]$ApiBaseUrl = "http://localhost:8000",
+    [ValidateSet("shelby", "mt_juliet")]
+    [string]$DemoMarket = "shelby",
     [string]$MobileRedirectBase = "",
     [ValidateSet("", "mock", "service")]
     [string]$ExpectedPaymentMode = "",
@@ -23,6 +25,7 @@ try {
 
     $env:EXPO_PUBLIC_API_BASE_URL = $ApiBaseUrl
     $env:EXPO_PUBLIC_API_URL = $ApiBaseUrl
+    $env:EXPO_PUBLIC_DEMO_MARKET = $DemoMarket
     if ($MobileRedirectBase) {
         $env:EXPO_PUBLIC_MOBILE_REDIRECT_BASE = $MobileRedirectBase
     }
@@ -30,6 +33,7 @@ try {
     Write-Host ""
     Write-Host "==> Starting Expo"
     Write-Host "API: $ApiBaseUrl"
+    Write-Host "Demo market: $DemoMarket"
 
     if (-not $SkipApiCheck) {
         $healthUrl = "$($ApiBaseUrl.TrimEnd('/'))/health"

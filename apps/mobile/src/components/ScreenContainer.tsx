@@ -15,7 +15,7 @@ export function ScreenContainer({ children, scrollable = false, contentContainer
   const theme = useTheme();
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.colors.surfaceLight }]}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.colors.background }]}>
       {scrollable ? (
         <ScrollView style={styles.flex} contentContainerStyle={[styles.contentContainer, contentContainerStyle]}>
           {children}

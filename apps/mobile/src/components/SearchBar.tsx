@@ -2,6 +2,7 @@ import React from "react";
 import { Pressable, StyleSheet, Text, TextInput, TextInputProps, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
+import { brandCopy } from "../content/brandCopy";
 import { useTheme } from "../theme/theme";
 
 interface SearchBarProps extends Pick<TextInputProps, "value" | "onChangeText" | "onSubmitEditing" | "editable"> {
@@ -12,12 +13,12 @@ interface SearchBarProps extends Pick<TextInputProps, "value" | "onChangeText" |
 export function SearchBar({ value, onChangeText, onSubmitEditing, editable = true, onPress, placeholder }: SearchBarProps) {
   const theme = useTheme();
   const content = (
-    <View style={[styles.container, { backgroundColor: theme.colors.border }]}>
-      <Ionicons name="search" size={18} color={theme.colors.mutedText} style={styles.icon} />
+    <View style={[styles.container, { backgroundColor: theme.colors.surfaceElevated, borderColor: theme.colors.borderSoft }, theme.shadows.soft]}>
+      <Ionicons name="search" size={18} color={theme.colors.primary} style={styles.icon} />
       <TextInput
         style={styles.input}
-        placeholder={placeholder ?? "Search sneaker care services"}
-        placeholderTextColor={theme.colors.mutedText}
+        placeholder={placeholder ?? brandCopy.serviceSearchPlaceholder}
+        placeholderTextColor={theme.colors.textSubtle}
         value={value}
         onChangeText={onChangeText}
         onSubmitEditing={onSubmitEditing}
@@ -44,14 +45,16 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 24,
-    paddingHorizontal: 12,
+    minHeight: 52,
+    borderRadius: 22,
+    borderWidth: 1,
+    paddingHorizontal: 16,
     paddingVertical: 10,
   },
   input: {
     flex: 1,
     fontSize: 16,
-    color: "#1F2933",
+    color: "#1B1E24",
   },
   icon: {
     marginRight: 8,

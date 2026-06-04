@@ -93,6 +93,10 @@ class QuoteLineItem(BaseModel):
 class AppointmentQuoteRead(BaseModel):
     service_id: UUID
     service_name: str
+    category_id: UUID | None = None
+    category_slug: str | None = None
+    category_name: str | None = None
+    category_icon_key: str | None = None
     currency: str
     line_items: list[QuoteLineItem]
     subtotal: int
@@ -107,6 +111,11 @@ class AppointmentRead(BaseModel):
     id: UUID
     company_id: UUID
     service_id: UUID
+    service_name: str | None = None
+    category_id: UUID | None = None
+    category_slug: str | None = None
+    category_name: str | None = None
+    category_icon_key: str | None = None
     hold_id: UUID | None = None
     type: str
     customer_name: str
@@ -141,7 +150,12 @@ class AppointmentRead(BaseModel):
 class AppointmentListItem(BaseModel):
     id: UUID
     company_id: UUID | None = None
+    service_id: UUID | None = None
     service_name: str | None = None
+    category_id: UUID | None = None
+    category_slug: str | None = None
+    category_name: str | None = None
+    category_icon_key: str | None = None
     customer_name: str | None = None
     customer_phone: str | None = None
     address_line1: str | None = None
@@ -173,6 +187,12 @@ class AppointmentAssignmentRead(BaseModel):
     id: UUID
     appointment_id: UUID
     user_id: UUID
+    service_id: UUID | None = None
+    service_name: str | None = None
+    category_id: UUID | None = None
+    category_slug: str | None = None
+    category_name: str | None = None
+    category_icon_key: str | None = None
     assigned_at: datetime
     unassigned_at: datetime | None = None
     is_active: bool

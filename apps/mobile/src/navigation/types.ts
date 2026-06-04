@@ -5,7 +5,7 @@ import type { Company, ProviderAppointment } from "../types/company";
 
 export type HomeStackParamList = {
   Home: undefined;
-  ProviderMenu: { company: Company };
+  ProviderMenu: { company: Company; categorySlug?: string | null; categoryName?: string | null };
   ServiceDetail: { service: Service };
   BookingDate: { service: Service };
   BookingTime: { service: Service; date: string };

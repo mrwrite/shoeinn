@@ -14,15 +14,19 @@ from app.models.appointment_event import AppointmentEvent
 from app.models.appointment_hold import AppointmentHold
 from app.models.appointment_location_update import AppointmentLocationUpdate
 from app.models.available_slot import AvailableSlot
+from app.models.care_category import CareCategory
 from app.models.company import Company
+from app.models.company_care_category import CompanyCareCategory
 from app.models.company_user import CompanyUser
 from app.models.notification import Notification
 from app.models.notification_event import NotificationEvent
 from app.models.notification_outbox import NotificationOutbox
+from app.models.provider_care_category import ProviderCareCategory
 from app.models.push_token import PushToken
 from app.models.refresh_token import RefreshToken
 from app.models.service import Service
 from app.models.user import User
+from scripts.seed_services import ensure_baseline_care_categories
 
 router = APIRouter(prefix="/dev", tags=["dev"])
 
@@ -44,6 +48,7 @@ class SeedUser(TypedDict):
 class SeedService(TypedDict):
     name: str
     slug: str
+    category_slug: str
     price_cents: int
     duration_minutes: int
 
@@ -163,16 +168,25 @@ DEMO_MARKETS: dict[str, SeedMarket] = {
                 ],
                 "services": [
                     {
-                        "name": "Pickup & Press Refresh",
+                        "name": "Signature Sneaker Deep Clean",
                         "slug": "pelham-pickup-refresh",
-                        "price_cents": 2200,
-                        "duration_minutes": 45,
+                        "category_slug": "shoes",
+                        "price_cents": 3600,
+                        "duration_minutes": 60,
                     },
                     {
-                        "name": "Delivery Ready Deep Clean",
+                        "name": "Wash & Fold Essentials",
                         "slug": "pelham-deep-clean",
-                        "price_cents": 3600,
+                        "category_slug": "laundry",
+                        "price_cents": 2800,
                         "duration_minutes": 75,
+                    },
+                    {
+                        "name": "Executive Dry Cleaning",
+                        "slug": "pelham-executive-dry-cleaning",
+                        "category_slug": "dry-cleaning",
+                        "price_cents": 4200,
+                        "duration_minutes": 90,
                     },
                 ],
             },
@@ -192,16 +206,25 @@ DEMO_MARKETS: dict[str, SeedMarket] = {
                 ],
                 "services": [
                     {
-                        "name": "Helena Everyday Clean",
+                        "name": "Helena Everyday Sneaker Care",
                         "slug": "helena-everyday-clean",
+                        "category_slug": "shoes",
                         "price_cents": 2400,
                         "duration_minutes": 45,
                     },
                     {
-                        "name": "Helena Premium Restore",
+                        "name": "Designer Handbag Refresh",
                         "slug": "helena-premium-restore",
-                        "price_cents": 4200,
+                        "category_slug": "handbags-leather",
+                        "price_cents": 5200,
                         "duration_minutes": 90,
+                    },
+                    {
+                        "name": "Hemming & Minor Alterations",
+                        "slug": "helena-hemming-minor-alterations",
+                        "category_slug": "alterations",
+                        "price_cents": 3000,
+                        "duration_minutes": 60,
                     },
                 ],
             },
@@ -221,16 +244,25 @@ DEMO_MARKETS: dict[str, SeedMarket] = {
                 ],
                 "services": [
                     {
-                        "name": "Fast Turnaround Refresh",
+                        "name": "Area Rug Refresh",
                         "slug": "alabaster-fast-refresh",
-                        "price_cents": 2100,
-                        "duration_minutes": 40,
+                        "category_slug": "rugs-textiles",
+                        "price_cents": 6800,
+                        "duration_minutes": 120,
                     },
                     {
                         "name": "White Pair Recovery",
                         "slug": "alabaster-white-recovery",
+                        "category_slug": "shoes",
                         "price_cents": 3800,
                         "duration_minutes": 70,
+                    },
+                    {
+                        "name": "Leather Conditioning & Care",
+                        "slug": "alabaster-leather-conditioning-care",
+                        "category_slug": "handbags-leather",
+                        "price_cents": 5600,
+                        "duration_minutes": 95,
                     },
                 ],
             },
@@ -354,16 +386,25 @@ DEMO_MARKETS: dict[str, SeedMarket] = {
                 ],
                 "services": [
                     {
-                        "name": "Pickup & Press Refresh",
+                        "name": "Signature Sneaker Deep Clean",
                         "slug": "mtjuliet-pickup-refresh",
-                        "price_cents": 2200,
-                        "duration_minutes": 45,
+                        "category_slug": "shoes",
+                        "price_cents": 3600,
+                        "duration_minutes": 60,
                     },
                     {
-                        "name": "Delivery Ready Deep Clean",
+                        "name": "Wash & Fold Essentials",
                         "slug": "mtjuliet-deep-clean",
-                        "price_cents": 3600,
+                        "category_slug": "laundry",
+                        "price_cents": 2800,
                         "duration_minutes": 75,
+                    },
+                    {
+                        "name": "Executive Dry Cleaning",
+                        "slug": "mtjuliet-executive-dry-cleaning",
+                        "category_slug": "dry-cleaning",
+                        "price_cents": 4200,
+                        "duration_minutes": 90,
                     },
                 ],
             },
@@ -383,16 +424,25 @@ DEMO_MARKETS: dict[str, SeedMarket] = {
                 ],
                 "services": [
                     {
-                        "name": "Providence Everyday Clean",
+                        "name": "Providence Everyday Sneaker Care",
                         "slug": "providence-everyday-clean",
+                        "category_slug": "shoes",
                         "price_cents": 2400,
                         "duration_minutes": 45,
                     },
                     {
-                        "name": "Providence Premium Restore",
+                        "name": "Designer Handbag Refresh",
                         "slug": "providence-premium-restore",
-                        "price_cents": 4200,
+                        "category_slug": "handbags-leather",
+                        "price_cents": 5200,
                         "duration_minutes": 90,
+                    },
+                    {
+                        "name": "Hemming & Minor Alterations",
+                        "slug": "providence-hemming-minor-alterations",
+                        "category_slug": "alterations",
+                        "price_cents": 3000,
+                        "duration_minutes": 60,
                     },
                 ],
             },
@@ -412,16 +462,25 @@ DEMO_MARKETS: dict[str, SeedMarket] = {
                 ],
                 "services": [
                     {
-                        "name": "Fast Turnaround Refresh",
+                        "name": "Area Rug Refresh",
                         "slug": "goldenbear-fast-refresh",
-                        "price_cents": 2100,
-                        "duration_minutes": 40,
+                        "category_slug": "rugs-textiles",
+                        "price_cents": 6800,
+                        "duration_minutes": 120,
                     },
                     {
                         "name": "White Pair Recovery",
                         "slug": "goldenbear-white-recovery",
+                        "category_slug": "shoes",
                         "price_cents": 3800,
                         "duration_minutes": 70,
+                    },
+                    {
+                        "name": "Leather Conditioning & Care",
+                        "slug": "goldenbear-leather-conditioning-care",
+                        "category_slug": "handbags-leather",
+                        "price_cents": 5600,
+                        "duration_minutes": 95,
                     },
                 ],
             },
@@ -471,10 +530,13 @@ def seed(
         raise HTTPException(status_code=400, detail="Unsupported demo_market")
 
     market = DEMO_MARKETS[demo_market]
+    categories_by_slug = ensure_baseline_care_categories(db)
     main_demo_customer_home = market["customer_job_addresses"][0]
     created = {
         "companies": 0,
         "services": 0,
+        "company_categories": 0,
+        "provider_categories": 0,
         "slots": 0,
         "users": 0,
         "company_users": 0,
@@ -491,6 +553,9 @@ def seed(
         demo_company_ids = [company.id for company in demo_companies]
 
         if demo_company_ids:
+            db.query(CompanyCareCategory).filter(CompanyCareCategory.company_id.in_(demo_company_ids)).delete(
+                synchronize_session=False
+            )
             demo_appointment_ids = select(Appointment.id).where(Appointment.company_id.in_(demo_company_ids))
             db.query(NotificationEvent).filter(
                 NotificationEvent.notification_id.in_(
@@ -516,6 +581,9 @@ def seed(
             db.query(Company).filter(Company.id.in_(demo_company_ids)).delete(synchronize_session=False)
 
         if demo_user_ids:
+            db.query(ProviderCareCategory).filter(ProviderCareCategory.provider_id.in_(demo_user_ids)).delete(
+                synchronize_session=False
+            )
             db.query(PushToken).filter(PushToken.user_id.in_(demo_user_ids)).delete(synchronize_session=False)
             db.query(RefreshToken).filter(RefreshToken.user_id.in_(demo_user_ids)).delete(synchronize_session=False)
             db.query(User).filter(User.id.in_(demo_user_ids)).delete(synchronize_session=False)
@@ -550,10 +618,15 @@ def seed(
         for company_config in market["companies"]
     }
 
-    def get_or_create_service(company_id, name, slug, price_cents, duration_minutes) -> Service:
+    def get_or_create_service(company_id, name, slug, category_slug, price_cents, duration_minutes) -> Service:
+        category = categories_by_slug.get(category_slug)
+        if category is None:
+            raise HTTPException(status_code=500, detail=f"Unknown care category in seed data: {category_slug}")
+
         service = db.query(Service).filter(Service.slug == slug).first()
         if service:
             service.company_id = company_id
+            service.category_id = category.id
             service.name = name
             service.price_cents = price_cents
             service.duration_minutes = duration_minutes
@@ -561,6 +634,7 @@ def seed(
 
         service = Service(
             company_id=company_id,
+            category_id=category.id,
             name=name,
             slug=slug,
             price_cents=price_cents,
@@ -580,6 +654,7 @@ def seed(
                 company.id,
                 service_config["name"],
                 service_config["slug"],
+                service_config["category_slug"],
                 service_config["price_cents"],
                 service_config["duration_minutes"],
             )
@@ -615,9 +690,9 @@ def seed(
     primary_company = seeded_companies[primary_company_config["name"]]
     secondary_company = seeded_companies[secondary_company_config["name"]]
     tertiary_company = seeded_companies[tertiary_company_config["name"]]
-    primary_service_one, primary_service_two = primary_company_config["services"]
-    secondary_service_one, secondary_service_two = secondary_company_config["services"]
-    tertiary_service_one, tertiary_service_two = tertiary_company_config["services"]
+    primary_service_one, primary_service_two, primary_service_three = primary_company_config["services"]
+    secondary_service_one, secondary_service_two, secondary_service_three = secondary_company_config["services"]
+    tertiary_service_one, tertiary_service_two, tertiary_service_three = tertiary_company_config["services"]
 
     get_or_create_slot(
         primary_company.id,
@@ -633,6 +708,11 @@ def seed(
         secondary_company.id,
         seeded_services[secondary_company.name][secondary_service_one["slug"]].id,
         slot_anchor + timedelta(hours=2),
+    )
+    get_or_create_slot(
+        secondary_company.id,
+        seeded_services[secondary_company.name][secondary_service_three["slug"]].id,
+        slot_anchor + timedelta(hours=5),
     )
     get_or_create_slot(
         tertiary_company.id,
@@ -720,13 +800,61 @@ def seed(
         for provider in company_providers[company.name]:
             ensure_company_user(provider.id, company.id)
 
+    def ensure_company_category(company_id, category_id):
+        link = (
+            db.query(CompanyCareCategory)
+            .filter(CompanyCareCategory.company_id == company_id, CompanyCareCategory.category_id == category_id)
+            .first()
+        )
+        if link:
+            link.is_active = True
+            return
+        db.add(CompanyCareCategory(company_id=company_id, category_id=category_id, is_active=True))
+        created["company_categories"] += 1
+
+    def ensure_provider_category(provider_id, category_id):
+        link = (
+            db.query(ProviderCareCategory)
+            .filter(ProviderCareCategory.provider_id == provider_id, ProviderCareCategory.category_id == category_id)
+            .first()
+        )
+        if link:
+            link.is_active = True
+            return
+        db.add(ProviderCareCategory(provider_id=provider_id, category_id=category_id, is_active=True))
+        created["provider_categories"] += 1
+
+    for company_config in market["companies"]:
+        company = seeded_companies[company_config["name"]]
+        category_ids = {
+            categories_by_slug[service_config["category_slug"]].id
+            for service_config in company_config["services"]
+        }
+        for category_id in category_ids:
+            ensure_company_category(company.id, category_id)
+            ensure_provider_category(company_admins[company.name].id, category_id)
+            for provider in company_providers[company.name]:
+                ensure_provider_category(provider.id, category_id)
+
     primary_quick_demo_company = seeded_companies[market["companies"][0]["name"]]
     quick_demo_provider = quick_demo_users.get("provider")
     if quick_demo_provider is not None:
         ensure_company_user(quick_demo_provider.id, primary_quick_demo_company.id)
+        primary_category_ids = {
+            categories_by_slug[service_config["category_slug"]].id
+            for service_config in market["companies"][0]["services"]
+        }
+        for category_id in primary_category_ids:
+            ensure_provider_category(quick_demo_provider.id, category_id)
     quick_demo_admin = quick_demo_users.get("company_admin")
     if quick_demo_admin is not None:
         ensure_company_user(quick_demo_admin.id, primary_quick_demo_company.id)
+        primary_category_ids = {
+            categories_by_slug[service_config["category_slug"]].id
+            for service_config in market["companies"][0]["services"]
+        }
+        for category_id in primary_category_ids:
+            ensure_provider_category(quick_demo_admin.id, category_id)
 
     appointment_sequence = {"value": 0}
 
@@ -766,7 +894,7 @@ def seed(
     )
     primary_pickup = create_demo_appointment(
         primary_company,
-        seeded_services[primary_company.name][primary_service_one["slug"]],
+        seeded_services[primary_company.name][primary_service_two["slug"]],
         appointment_anchor + timedelta(minutes=20),
         AppointmentStatus.en_route_pickup,
     )
@@ -778,7 +906,7 @@ def seed(
     )
     primary_ready = create_demo_appointment(
         primary_company,
-        seeded_services[primary_company.name][primary_service_two["slug"]],
+        seeded_services[primary_company.name][primary_service_three["slug"]],
         appointment_anchor - timedelta(hours=1),
         AppointmentStatus.ready,
     )
@@ -792,7 +920,7 @@ def seed(
         secondary_company,
         seeded_services[secondary_company.name][secondary_service_two["slug"]],
         appointment_anchor + timedelta(hours=4),
-        AppointmentStatus.confirmed,
+        AppointmentStatus.delivered,
     )
     create_demo_appointment(
         tertiary_company,
@@ -802,9 +930,15 @@ def seed(
     )
     create_demo_appointment(
         tertiary_company,
-        seeded_services[tertiary_company.name][tertiary_service_two["slug"]],
+        seeded_services[tertiary_company.name][tertiary_service_one["slug"]],
         appointment_anchor - timedelta(days=1, hours=2),
         AppointmentStatus.completed,
+    )
+    create_demo_appointment(
+        secondary_company,
+        seeded_services[secondary_company.name][secondary_service_three["slug"]],
+        appointment_anchor + timedelta(hours=6),
+        AppointmentStatus.confirmed,
     )
 
     primary_providers = company_providers[primary_company.name]

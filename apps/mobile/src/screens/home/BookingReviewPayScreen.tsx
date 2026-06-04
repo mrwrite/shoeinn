@@ -1,14 +1,21 @@
 import React, { useMemo, useState } from "react";
-import { Alert, Linking, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, Linking, StyleSheet, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { confirmAppointment, createHold, getAppointmentQuote } from "../../api/http";
-import { ScreenContainer } from "../../components/ScreenContainer";
+import { AppScreen } from "../../components/ui/AppScreen";
+import { BookingStepper } from "../../components/ui/BookingStepper";
+import { LoadingState } from "../../components/ui/LoadingState";
+import { MediaPlaceholder } from "../../components/ui/MediaPlaceholder";
+import { SectionHeader } from "../../components/ui/SectionHeader";
+import { StatusBadge } from "../../components/ui/StatusBadge";
 import { Button } from "../../components/ui/Button";
-import { Card } from "../../components/ui/Card";
+import { Card, PressableCard } from "../../components/ui/Card";
 import { Text } from "../../components/ui/Text";
+import { getServiceCategoryLabel } from "../../discovery/categoryMetadata";
 import { buildQuoteDisplayRows, formatMoney, getImmediateCheckoutUrl } from "../../features/bookingCheckout";
 import type { HomeStackParamList } from "../../navigation/types";
 import { appointmentQueryKey, customerAppointmentsQueryKey } from "../../query/keys";
@@ -25,6 +32,7 @@ export default function BookingReviewPayScreen() {
   const { companyId } = useAuthStore();
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodOption>("saved_card");
   const queryClient = useQueryClient();
+  const categoryLabel = getServiceCategoryLabel(service);
 
   const quoteQuery = useQuery({
     queryKey: ["appointment-quote", service.id, time, customerDetails.type],
@@ -136,16 +144,19 @@ export default function BookingReviewPayScreen() {
           key: "saved_card" as const,
           title: "Visa ending in 4242",
           detail: "Saved/default card placeholder",
+          icon: "card-outline" as const,
         },
         {
           key: "stripe_checkout" as const,
           title: "Add new card in secure checkout",
           detail: "Continue into Stripe-hosted checkout",
+          icon: "lock-closed-outline" as const,
         },
         {
           key: "mock_demo" as const,
           title: "Demo payment method",
           detail: "Local mock payment for demos and development",
+          icon: "sparkles-outline" as const,
         },
       ].map((option) => ({
         ...option,
@@ -157,21 +168,30 @@ export default function BookingReviewPayScreen() {
   const quoteRows = quoteQuery.data ? buildQuoteDisplayRows(quoteQuery.data) : [];
   const totalLabel = quoteQuery.data ? formatMoney(quoteQuery.data.total, quoteQuery.data.currency) : "--";
   const placing = placeBookingMutation.isPending;
+  const bookingSteps = [
+    { key: "date", label: "Date" },
+    { key: "time", label: "Time" },
+    { key: "details", label: "Details" },
+    { key: "pay", label: "Pay" },
+  ];
 
   return (
-    <ScreenContainer
+    <AppScreen
+      scrollable
+      contentContainerStyle={styles.content}
       stickyFooter={
         <View style={styles.stickyFooter}>
           <View>
-            <Text variant="caption" color={theme.colors.mutedText}>
+            <Text variant="caption" color={theme.colors.textMuted}>
               Total due
             </Text>
-            <Text variant="title" weight="bold">
+            <Text variant="h2" weight="bold">
               {totalLabel}
             </Text>
           </View>
           <Button
-            label={placing ? "Placing booking..." : "Place Booking"}
+            label={placing ? "Placing booking..." : "Place booking"}
+            variant="gold"
             onPress={() => placeBookingMutation.mutate()}
             loading={placing}
             disabled={placing || quoteQuery.isLoading || quoteQuery.isError}
@@ -180,43 +200,48 @@ export default function BookingReviewPayScreen() {
         </View>
       }
     >
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text variant="title" weight="bold">
-          Review & Pay
-        </Text>
-        <Text color={theme.colors.mutedText}>
-          Review the order summary, choose how to pay, and place the booking when ready.
-        </Text>
+        <BookingStepper steps={bookingSteps} currentIndex={3} />
+        <SectionHeader
+          eyebrow="Review & Pay"
+          title="Confirm your order"
+          subtitle="Review your pickup details, choose payment, and place the booking."
+        />
 
-        <Card style={styles.heroCard}>
-          <Text variant="subtitle" weight="semibold">
-            Order summary
-          </Text>
-          <Text color={theme.colors.mutedText} style={{ marginTop: 6 }}>
-            {service.name}
-          </Text>
-          <Text style={styles.heroMeta}>
-            {new Date(date).toDateString()} at {new Date(time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-          </Text>
+        <Card variant="marketplace" style={styles.heroCard}>
+          <MediaPlaceholder
+            compact
+            categorySlug={service.category_slug}
+            label={service.name}
+            caption={categoryLabel ?? "Care appointment"}
+            style={styles.heroMedia}
+          />
+          <View style={styles.heroCopy}>
+            <View style={styles.heroHeader}>
+              <SectionHeader title={service.name} subtitle={`${new Date(date).toDateString()} at ${new Date(time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`} />
+              <StatusBadge label="Ready to book" tone="primary" />
+            </View>
+            <View style={styles.badgeRow}>
+              {categoryLabel ? <StatusBadge label={categoryLabel} tone="primary" /> : null}
+              <StatusBadge label={totalLabel} tone="warning" />
+            </View>
+          </View>
         </Card>
 
-        <Card>
-          <Text variant="subtitle" weight="semibold">
-            Payment summary
-          </Text>
+        <Card variant="marketplace">
+          <SectionHeader title="Payment summary" />
           {quoteQuery.isLoading ? (
-            <Text color={theme.colors.mutedText} style={{ marginTop: 10 }}>
-              Loading checkout total...
-            </Text>
+            <LoadingState label="Loading checkout total" />
           ) : quoteQuery.isError ? (
-            <Text color={theme.colors.danger} style={{ marginTop: 10 }}>
-              Unable to load the booking quote.
-            </Text>
+            <View style={styles.errorBlock}>
+              <Text color={theme.colors.danger} weight="bold">
+                Unable to load the booking quote.
+              </Text>
+            </View>
           ) : (
             <View style={styles.summaryRows}>
               {quoteRows.map((row) => (
                 <View key={row.key} style={styles.summaryRow}>
-                  <Text color={row.key === "total" ? theme.colors.textCharcoal : theme.colors.mutedText} weight={row.key === "total" ? "bold" : "regular"}>
+                  <Text color={row.key === "total" ? theme.colors.textPrimary : theme.colors.textMuted} weight={row.key === "total" ? "bold" : "regular"}>
                     {row.label}
                   </Text>
                   <Text weight={row.key === "total" ? "bold" : "semibold"}>{row.value}</Text>
@@ -226,53 +251,56 @@ export default function BookingReviewPayScreen() {
           )}
         </Card>
 
-        <Card>
-          <Text variant="subtitle" weight="semibold">
-            Payment method
-          </Text>
+        <Card variant="marketplace">
+          <SectionHeader title="Payment method" subtitle="Your final payment path depends on the active backend payment mode." />
           <View style={styles.paymentMethods}>
             {paymentOptions.map((option) => {
               const selected = paymentMethod === option.key;
               return (
-                <Pressable
+                <PressableCard
                   key={option.key}
+                  variant={selected ? "elevated" : "outline"}
                   style={[
                     styles.paymentMethodCard,
-                    { borderColor: selected ? theme.colors.peacockPrimary : theme.colors.border },
-                    selected && styles.paymentMethodCardSelected,
+                    {
+                      backgroundColor: selected ? theme.colors.surfaceTint : theme.colors.card,
+                      borderColor: selected ? theme.colors.primary : theme.colors.borderSoft,
+                    },
                   ]}
                   onPress={() => setPaymentMethod(option.key)}
                 >
-                  <Text weight="semibold">{option.title}</Text>
-                  <Text color={theme.colors.mutedText} style={{ marginTop: 4 }}>
-                    {option.detail}
-                  </Text>
-                </Pressable>
+                  <View style={[styles.paymentIcon, { backgroundColor: selected ? theme.colors.primary : theme.colors.surfaceMuted }]}>
+                    <Ionicons name={option.icon} size={18} color={selected ? theme.colors.surfaceElevated : theme.colors.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text weight="bold">{option.title}</Text>
+                    <Text color={theme.colors.textSecondary} style={{ marginTop: 4 }}>
+                      {option.detail}
+                    </Text>
+                  </View>
+                </PressableCard>
               );
             })}
           </View>
         </Card>
 
-        <Card>
-          <Text variant="subtitle" weight="semibold">
-            Delivery details
-          </Text>
-          <View style={{ marginTop: 10, gap: 6 }}>
-            <Text weight="semibold">{customerDetails.customer_name}</Text>
-            <Text color={theme.colors.mutedText}>{customerDetails.customer_phone}</Text>
+        <Card variant="marketplace">
+          <SectionHeader title="Pickup details" />
+          <View style={styles.detailRows}>
+            <Text weight="bold">{customerDetails.customer_name}</Text>
+            <Text color={theme.colors.textSecondary}>{customerDetails.customer_phone}</Text>
             {customerDetails.customer_email ? (
-              <Text color={theme.colors.mutedText}>{customerDetails.customer_email}</Text>
+              <Text color={theme.colors.textSecondary}>{customerDetails.customer_email}</Text>
             ) : null}
-            <Text color={theme.colors.mutedText}>
+            <Text color={theme.colors.textSecondary}>
               {[customerDetails.address_line1, customerDetails.address_line2].filter(Boolean).join(", ")}
             </Text>
-            <Text color={theme.colors.mutedText}>
+            <Text color={theme.colors.textSecondary}>
               {[customerDetails.city, customerDetails.state, customerDetails.postal_code].filter(Boolean).join(" ")}
             </Text>
           </View>
         </Card>
-      </ScrollView>
-    </ScreenContainer>
+    </AppScreen>
   );
 }
 
@@ -280,16 +308,30 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
     paddingBottom: 140,
-    gap: 12,
+    gap: 14,
   },
   heroCard: {
-    backgroundColor: "#fff7ed",
-    borderColor: "#fdba74",
-    borderWidth: 1,
+    padding: 0,
+    overflow: "hidden",
   },
-  heroMeta: {
-    marginTop: 6,
-    color: "#7c2d12",
+  heroMedia: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+  },
+  heroCopy: {
+    padding: 16,
+    gap: 12,
+  },
+  heroHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  badgeRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
   },
   summaryRows: {
     marginTop: 12,
@@ -301,18 +343,29 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 12,
   },
+  errorBlock: {
+    marginTop: 12,
+  },
   paymentMethods: {
     marginTop: 12,
     gap: 10,
   },
   paymentMethodCard: {
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 14,
-    backgroundColor: "#ffffff",
+    minHeight: 76,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
   },
-  paymentMethodCardSelected: {
-    backgroundColor: "#eff6ff",
+  paymentIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  detailRows: {
+    marginTop: 12,
+    gap: 6,
   },
   stickyFooter: {
     flexDirection: "row",
@@ -321,7 +374,6 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 8,
     borderRadius: 18,
-    backgroundColor: "#f8fafc",
   },
   footerButton: {
     flex: 1,

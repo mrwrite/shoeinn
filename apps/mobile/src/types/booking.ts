@@ -1,6 +1,10 @@
 export interface Service {
   id: string;
   company_id?: string | null;
+  category_id?: string | null;
+  category_slug?: string | null;
+  category_name?: string | null;
+  category_icon_key?: string | null;
   name: string;
   slug: string;
   description?: string | null;
@@ -46,6 +50,10 @@ export interface Appointment {
   id: string;
   company_id?: string | null;
   service_id: string;
+  category_id?: string | null;
+  category_slug?: string | null;
+  category_name?: string | null;
+  category_icon_key?: string | null;
   hold_id?: string | null;
   type?: string;
   customer_name: string;
@@ -86,7 +94,12 @@ export interface AppointmentSummary {
   postal_code?: string | null;
   id: string;
   company_id?: string | null;
+  service_id?: string | null;
   service_name?: string | null;
+  category_id?: string | null;
+  category_slug?: string | null;
+  category_name?: string | null;
+  category_icon_key?: string | null;
   start_time: string;
   status: AppointmentStatus;
   payment_status?: "pending" | "requires_action" | "succeeded" | "failed" | "refunded" | "disputed" | null;
@@ -107,6 +120,12 @@ export interface AppointmentAssignment {
   id: string;
   appointment_id: string;
   user_id: string;
+  service_id?: string | null;
+  service_name?: string | null;
+  category_id?: string | null;
+  category_slug?: string | null;
+  category_name?: string | null;
+  category_icon_key?: string | null;
   provider_name?: string | null;
   assigned_at: string;
   unassigned_at?: string | null;
@@ -203,6 +222,10 @@ export interface AppointmentQuoteLineItem {
 export interface AppointmentQuote {
   service_id: string;
   service_name: string;
+  category_id?: string | null;
+  category_slug?: string | null;
+  category_name?: string | null;
+  category_icon_key?: string | null;
   currency: string;
   line_items: AppointmentQuoteLineItem[];
   subtotal: number;

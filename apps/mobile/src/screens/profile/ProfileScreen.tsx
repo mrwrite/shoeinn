@@ -8,9 +8,12 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getMe, updateMyAddress } from "../../api/http";
-import { ScreenContainer } from "../../components/ScreenContainer";
+import { AppScreen } from "../../components/ui/AppScreen";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
+import { RewardsCard } from "../../components/ui/RewardsCard";
+import { SectionHeader } from "../../components/ui/SectionHeader";
+import { StatusBadge } from "../../components/ui/StatusBadge";
 import { Text } from "../../components/ui/Text";
 import {
   customerNotificationPreferencesQueryKey,
@@ -121,75 +124,82 @@ export default function ProfileScreen() {
   };
 
   return (
-    <ScreenContainer
+    <AppScreen
       scrollable
       contentContainerStyle={{
         padding: 16,
-        gap: 12,
+        gap: 14,
         paddingBottom: tabBarHeight + insets.bottom + 24,
       }}
     >
-      <Text variant="title" weight="bold">
-        Profile
-      </Text>
-      <Card style={styles.row}>
-        <View style={styles.avatar}>
-          <Ionicons name="person" size={22} color={theme.colors.surfaceLight} />
+      <SectionHeader
+        eyebrow="Account"
+        title="Profile"
+        subtitle="Manage account details, care notifications, and saved pickup address."
+      />
+
+      <RewardsCard
+        title="ShoeInn Care Club"
+        subtitle="Premium local care with pickup, delivery, and real-time updates."
+        value={role === "customer" ? "Member" : role === "company_admin" ? "Owner" : role === "provider" ? "Provider" : "Account"}
+      />
+
+      <Card variant="marketplace" style={styles.accountCard}>
+        <View style={[styles.avatar, { backgroundColor: theme.colors.primary }]}>
+          <Ionicons name="person" size={22} color={theme.colors.surfaceElevated} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text weight="semibold">{fullName ?? "Guest"}</Text>
-          <Text color={theme.colors.mutedText}>{email}</Text>
-          <Text variant="caption" color={theme.colors.mutedText} style={{ marginTop: 4 }}>
-            Role: {role ?? "unknown"}
-          </Text>
+          <Text variant="h3" weight="bold">{fullName ?? "Guest"}</Text>
+          <Text color={theme.colors.textSecondary}>{email}</Text>
+          <View style={styles.roleRow}>
+            <StatusBadge label={role ?? "unknown"} tone="primary" />
+          </View>
         </View>
       </Card>
-      <Card>
-        <Text variant="subtitle" weight="semibold">
-          Primary address
-        </Text>
+      <Card variant="marketplace">
+        <SectionHeader title="Primary address" subtitle="Used to prefill pickup details during booking." />
         <View style={{ marginTop: 12, gap: 12 }}>
           <TextInput
             placeholder="Address line 1"
             value={addressLine1}
             onChangeText={setAddressLine1}
-            style={[styles.input, { borderColor: theme.colors.border }]}
-            placeholderTextColor={theme.colors.mutedText}
+            style={[styles.input, { borderColor: theme.colors.borderSoft, backgroundColor: theme.colors.surface }]}
+            placeholderTextColor={theme.colors.textSubtle}
           />
           <TextInput
             placeholder="Address line 2 (optional)"
             value={addressLine2}
             onChangeText={setAddressLine2}
-            style={[styles.input, { borderColor: theme.colors.border }]}
-            placeholderTextColor={theme.colors.mutedText}
+            style={[styles.input, { borderColor: theme.colors.borderSoft, backgroundColor: theme.colors.surface }]}
+            placeholderTextColor={theme.colors.textSubtle}
           />
           <TextInput
             placeholder="City"
             value={city}
             onChangeText={setCity}
-            style={[styles.input, { borderColor: theme.colors.border }]}
-            placeholderTextColor={theme.colors.mutedText}
+            style={[styles.input, { borderColor: theme.colors.borderSoft, backgroundColor: theme.colors.surface }]}
+            placeholderTextColor={theme.colors.textSubtle}
           />
           <TextInput
             placeholder="State"
             value={state}
             onChangeText={setState}
-            style={[styles.input, { borderColor: theme.colors.border }]}
-            placeholderTextColor={theme.colors.mutedText}
+            style={[styles.input, { borderColor: theme.colors.borderSoft, backgroundColor: theme.colors.surface }]}
+            placeholderTextColor={theme.colors.textSubtle}
           />
           <TextInput
             placeholder="Postal code"
             value={postalCode}
             onChangeText={setPostalCode}
-            style={[styles.input, { borderColor: theme.colors.border }]}
-            placeholderTextColor={theme.colors.mutedText}
+            style={[styles.input, { borderColor: theme.colors.borderSoft, backgroundColor: theme.colors.surface }]}
+            placeholderTextColor={theme.colors.textSubtle}
           />
           <TextInput
             placeholder="Country"
             value={country}
             onChangeText={setCountry}
-            style={[styles.input, { borderColor: theme.colors.border }]}
-            placeholderTextColor={theme.colors.mutedText}
+            style={[styles.input, { borderColor: theme.colors.borderSoft, backgroundColor: theme.colors.surface }]}
+            placeholderTextColor={theme.colors.textSubtle}
             autoCapitalize="characters"
             maxLength={2}
           />
@@ -197,15 +207,13 @@ export default function ProfileScreen() {
         </View>
       </Card>
       {role === "customer" ? (
-        <Card>
+        <Card variant="marketplace">
           <View style={styles.notificationsHeader}>
             <View style={{ flex: 1 }}>
-              <Text variant="subtitle" weight="semibold">
-                Notifications
-              </Text>
-              <Text color={theme.colors.mutedText} style={{ marginTop: 6 }}>
-                Keep push alerts useful by choosing which customer updates can reach your device.
-              </Text>
+              <SectionHeader
+                title="Notifications"
+                subtitle="Choose which customer care updates can reach your device."
+              />
             </View>
             <Button
               label="Open inbox"
@@ -249,8 +257,19 @@ export default function ProfileScreen() {
           </View>
         </Card>
       ) : null}
+      <Card variant="compact" style={styles.supportCard}>
+        <View style={styles.supportIcon}>
+          <Ionicons name="help-circle-outline" size={20} color={theme.colors.primary} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text weight="bold">Need help?</Text>
+          <Text variant="caption" color={theme.colors.textSecondary}>
+            Support and account actions stay available from this profile surface.
+          </Text>
+        </View>
+      </Card>
       <Button label="Logout" variant="secondary" onPress={logout} />
-    </ScreenContainer>
+    </AppScreen>
   );
 }
 
@@ -272,7 +291,7 @@ function PreferenceRow({
     <View style={styles.preferenceRow}>
       <View style={{ flex: 1, gap: 4 }}>
         <Text weight="semibold">{label}</Text>
-        <Text variant="caption" color={theme.colors.mutedText}>
+        <Text variant="caption" color={theme.colors.textMuted}>
           {detail}
         </Text>
       </View>
@@ -282,7 +301,7 @@ function PreferenceRow({
 }
 
 const styles = StyleSheet.create({
-  row: {
+  accountCard: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
@@ -291,16 +310,20 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: "#0F4C5C",
     alignItems: "center",
     justifyContent: "center",
   },
+  roleRow: {
+    marginTop: 8,
+    flexDirection: "row",
+  },
   input: {
-    height: 48,
-    borderRadius: 14,
+    minHeight: 52,
+    borderRadius: 20,
     borderWidth: 1,
-    paddingHorizontal: 14,
-    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 16,
+    color: "#1B1E24",
+    fontSize: 16,
   },
   preferenceRow: {
     flexDirection: "row",
@@ -312,5 +335,18 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     justifyContent: "space-between",
     gap: 12,
+  },
+  supportCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  supportIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F8EBC4",
   },
 });

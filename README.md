@@ -123,6 +123,7 @@ Useful options:
 
 - `-ApiBaseUrl "http://10.0.2.2:8000"` for Android emulator
 - `-ApiBaseUrl "http://<YOUR-LAN-IP>:8000"` for a physical device
+- `-DemoMarket shelby` or `-DemoMarket mt_juliet` to choose which demo login buttons Expo displays
 - `-ExpectedPaymentMode service` to fail fast if the API is not actually running in service payment mode
 - `-Tunnel` to run `npm start -- --tunnel`
 - `-SkipApiCheck` to skip the preflight `GET /health` check

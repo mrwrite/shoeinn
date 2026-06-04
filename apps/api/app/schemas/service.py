@@ -13,6 +13,10 @@ class ServiceRead(BaseModel):
 
     id: UUID
     company_id: UUID | None = None
+    category_id: UUID | None = None
+    category_slug: str | None = None
+    category_name: str | None = None
+    category_icon_key: str | None = None
     name: str
     slug: str
     description: str | None = None
@@ -28,6 +32,10 @@ class ServiceRead(BaseModel):
 class ServiceOut(BaseModel):
     id: UUID
     company_id: UUID | None = None
+    category_id: UUID | None = None
+    category_slug: str | None = None
+    category_name: str | None = None
+    category_icon_key: str | None = None
     name: str
     description: str | None = None
     duration_minutes: int

@@ -5,6 +5,7 @@ from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from fastapi import APIRouter, Query
 from fastapi.responses import HTMLResponse
 
+from app.core.brand import APP_NAME
 from app.core.config import settings
 
 
@@ -34,7 +35,7 @@ def _build_app_return_url(
 
 def _payment_return_page(*, title: str, body: str, app_url: str | None) -> HTMLResponse:
     open_app_link = (
-        f'<p><a class="button" href="{app_url}">Open ShoeInn</a></p>'
+        f'<p><a class="button" href="{app_url}">Open {APP_NAME}</a></p>'
         if app_url
         else ""
     )
@@ -50,9 +51,9 @@ def _payment_return_page(*, title: str, body: str, app_url: str | None) -> HTMLR
         else ""
     )
     app_note = (
-        "We also tried to reopen ShoeInn automatically. If the app did not open, use the button below."
+        f"We also tried to reopen {APP_NAME} automatically. If the app did not open, use the button below."
         if app_url
-        else "Return to ShoeInn manually and use the payment status action to continue your booking."
+        else f"Return to {APP_NAME} manually and use the payment status action to continue your care appointment."
     )
     return HTMLResponse(
         f"""<!doctype html>
@@ -135,7 +136,7 @@ def payment_cancel_page(
 ) -> HTMLResponse:
     return _payment_return_page(
         title="Checkout canceled",
-        body="No payment was completed for this booking.",
+        body="No payment was completed for this care appointment.",
         app_url=_build_app_return_url(
             booking_id=booking_id,
             session_id=session_id,

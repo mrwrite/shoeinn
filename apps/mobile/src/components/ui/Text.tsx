@@ -3,7 +3,19 @@ import { Text as RNText, TextProps, StyleSheet, type TextStyle } from "react-nat
 
 import { useTheme } from "../../theme/theme";
 
-type Variant = "title" | "subtitle" | "body" | "caption" | "overline";
+type Variant =
+  | "display"
+  | "h1"
+  | "h2"
+  | "h3"
+  | "title"
+  | "subtitle"
+  | "body"
+  | "bodySmall"
+  | "caption"
+  | "meta"
+  | "button"
+  | "overline";
 type Weight = "regular" | "medium" | "semibold" | "bold";
 
 type Props = TextProps & {
@@ -26,8 +38,8 @@ export function Text({ variant = "body", weight = "regular", style, color, ...re
       {...rest}
       style={[
         styles.base,
-        styles[variant],
-        { color: color ?? theme.colors.textCharcoal, fontWeight: fontWeightMap[weight] },
+        theme.textStyles[variant],
+        { color: color ?? theme.colors.textPrimary, fontWeight: fontWeightMap[weight] },
         style,
       ]}
     />
@@ -37,23 +49,6 @@ export function Text({ variant = "body", weight = "regular", style, color, ...re
 const styles = StyleSheet.create({
   base: {
     includeFontPadding: false,
-  },
-  title: {
-    fontSize: 24,
-  },
-  subtitle: {
-    fontSize: 18,
-  },
-  body: {
-    fontSize: 15,
-  },
-  caption: {
-    fontSize: 13,
-  },
-  overline: {
-    fontSize: 11,
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
   },
 });
 

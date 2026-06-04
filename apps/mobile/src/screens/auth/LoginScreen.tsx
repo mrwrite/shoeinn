@@ -1,27 +1,26 @@
 import React, { useState } from "react";
-import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useMutation } from "@tanstack/react-query";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 import { login } from "../../api/http";
-import { MT_JULIET_DEMO_ACCOUNTS, shouldShowDemoLogins } from "../../auth/demoLogins";
+import { getDemoLoginAccounts, getDemoMarketLabel, shouldShowDemoLogins } from "../../auth/demoLogins";
+import { AppButton } from "../../components/AppButton";
+import { AppCard } from "../../components/AppCard";
+import { AppScreen } from "../../components/AppScreen";
+import { MediaPlaceholder } from "../../components/ui/MediaPlaceholder";
+import { SectionHeader } from "../../components/SectionHeader";
+import { Text } from "../../components/ui/Text";
+import { brandCopy } from "../../content/brandCopy";
 import { AuthStackParamList } from "../../navigation/AuthStack";
 import { useAuthStore } from "../../state/authStore";
+import { useTheme } from "../../theme/theme";
 
 type Props = NativeStackScreenProps<AuthStackParamList, "Login">;
 
 export default function LoginScreen({ navigation }: Props) {
+  const theme = useTheme();
   const setAuth = useAuthStore((s) => s.setAuth);
   const rememberMe = useAuthStore((s) => s.rememberMe);
   const setRememberMe = useAuthStore((s) => s.setRememberMe);
@@ -29,6 +28,8 @@ export default function LoginScreen({ navigation }: Props) {
   const [password, setPassword] = useState("Password1!");
   const [error, setError] = useState<string | null>(null);
   const showDemoLogins = shouldShowDemoLogins();
+  const demoMarketLabel = getDemoMarketLabel();
+  const demoAccounts = getDemoLoginAccounts();
 
   const mutation = useMutation({
     mutationFn: login,
@@ -46,150 +47,272 @@ export default function LoginScreen({ navigation }: Props) {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={styles.flex}
+    <AppScreen scrollable contentContainerStyle={styles.container}>
+      <View style={[styles.brandBlock, { backgroundColor: theme.colors.primary }, theme.shadows.floating]}>
+        <View style={styles.brandTopRow}>
+          <View style={[styles.logoMark, { backgroundColor: "rgba(255,255,255,0.15)", borderColor: "rgba(255,255,255,0.18)" }]}>
+            <Ionicons name="sparkles" size={24} color={theme.colors.surfaceElevated} />
+          </View>
+          <View style={[styles.brandPill, { backgroundColor: theme.colors.accent }]}>
+            <Text variant="meta" weight="bold" style={{ color: theme.colors.textPrimary }}>
+              Premium care
+            </Text>
+          </View>
+        </View>
+        <View style={styles.hero}>
+          <Text variant="display" weight="bold" style={{ color: theme.colors.surfaceElevated }}>
+            {brandCopy.appName}
+          </Text>
+          <Text color="rgba(255,255,255,0.8)" style={styles.heroCopy}>
+            {brandCopy.marketplacePositioning}
+          </Text>
+        </View>
+        <MediaPlaceholder
+          compact
+          categorySlug="shoes"
+          label="Care marketplace"
+          caption="Luxury pickup and delivery"
+          style={styles.brandMedia}
+        />
+      </View>
+
+      <AppCard variant="elevated" style={[styles.formCard, { borderColor: theme.colors.borderSoft }]}>
+        <SectionHeader
+          eyebrow="Welcome back"
+          title="Sign in to ShoeInn"
+          subtitle={`Use your account or jump into a ${demoMarketLabel} premium care demo role.`}
+        />
+
+        {error ? (
+          <View style={[styles.error, { backgroundColor: theme.colors.dangerSoft, borderColor: `${theme.colors.danger}33` }]}>
+            <Ionicons name="alert-circle-outline" size={18} color={theme.colors.danger} />
+            <Text color={theme.colors.danger} weight="semibold" style={styles.errorCopy}>
+              {error}
+            </Text>
+          </View>
+        ) : null}
+
+        <View style={styles.field}>
+          <Text variant="caption" weight="bold" color={theme.colors.textSecondary}>
+            Email
+          </Text>
+          <TextInput
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            style={[styles.input, { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderSoft, color: theme.colors.textPrimary }]}
+            placeholder="you@example.com"
+            placeholderTextColor={theme.colors.textSubtle}
+          />
+        </View>
+
+        <View style={styles.field}>
+          <Text variant="caption" weight="bold" color={theme.colors.textSecondary}>
+            Password
+          </Text>
+          <TextInput
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry={true}
+            style={[styles.input, { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderSoft, color: theme.colors.textPrimary }]}
+            placeholder="Password"
+            placeholderTextColor={theme.colors.textSubtle}
+          />
+        </View>
+
+        <Pressable
+          style={styles.checkboxRow}
+          onPress={() => setRememberMe(!rememberMe)}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: rememberMe }}
+        >
+          <View
+            style={[
+              styles.checkbox,
+              { borderColor: rememberMe ? theme.colors.primary : theme.colors.borderSoft },
+              rememberMe && { backgroundColor: theme.colors.primary },
+            ]}
+          >
+            {rememberMe ? <Ionicons name="checkmark" size={14} color={theme.colors.surfaceElevated} /> : null}
+          </View>
+          <Text color={theme.colors.textSecondary}>Remember me</Text>
+        </Pressable>
+
+        <AppButton label="Sign in" onPress={submit} loading={mutation.isPending} disabled={mutation.isPending} />
+      </AppCard>
+
+      {showDemoLogins ? (
+        <View style={styles.demoSection}>
+          <SectionHeader
+            eyebrow="Demo access"
+            title="Choose a role"
+            subtitle={`Sign in with ${demoMarketLabel} seed data for customer, provider, or company admin views.`}
+          />
+          <View style={styles.demoGrid}>
+            {demoAccounts.map((acct) => (
+              <Pressable
+                key={acct.email}
+                disabled={mutation.isPending}
+                accessibilityRole="button"
+                accessibilityLabel={`Sign in as ${acct.label}`}
+                accessibilityState={{ disabled: mutation.isPending, busy: mutation.isPending }}
+                style={({ pressed }) => [
+                  styles.demoButton,
+                  {
+                    backgroundColor: theme.colors.card,
+                    borderColor: theme.colors.borderSoft,
+                    opacity: mutation.isPending ? 0.58 : pressed ? 0.94 : 1,
+                  },
+                  theme.shadows.soft,
+                ]}
+                onPress={() => {
+                  setEmail(acct.email);
+                  setPassword(acct.password);
+                  setError(null);
+                  mutation.mutate({ email: acct.email, password: acct.password });
+                }}
+              >
+                <View style={[styles.demoIcon, { backgroundColor: theme.colors.accentSoft }]}>
+                  <Ionicons name="person-circle-outline" size={22} color={theme.colors.primary} />
+                </View>
+                <View style={styles.demoCopy}>
+                  <Text weight="bold">{acct.label}</Text>
+                  <Text variant="caption" color={theme.colors.textMuted} numberOfLines={1}>
+                    {acct.email}
+                  </Text>
+                </View>
+                <Ionicons name="arrow-forward" size={18} color={theme.colors.textMuted} />
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
+      <Pressable
+        onPress={() => navigation.navigate("Register")}
+        style={styles.registerLink}
+        accessibilityRole="button"
+        accessibilityLabel="Register a new account"
       >
-        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-          <Text style={styles.title}>Welcome back</Text>
-          <Text style={styles.subtitle}>Sign in to continue</Text>
-
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-
-          <View style={styles.field}>
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              style={styles.input}
-              placeholder="you@example.com"
-            />
-          </View>
-
-          <View style={styles.field}>
-            <Text style={styles.label}>Password</Text>
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={true}
-              style={styles.input}
-              placeholder="••••••••"
-            />
-          </View>
-
-          <Pressable style={styles.checkboxRow} onPress={() => setRememberMe(!rememberMe)} accessibilityRole="checkbox">
-            <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
-              {rememberMe ? <Text style={styles.checkboxMark}>✓</Text> : null}
-            </View>
-            <Text style={styles.checkboxLabel}>Remember me</Text>
-          </Pressable>
-
-          <Pressable style={[styles.button, mutation.isPending && styles.buttonDisabled]} onPress={submit} disabled={mutation.isPending}>
-            {mutation.isPending ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Sign in</Text>}
-          </Pressable>
-
-          {showDemoLogins ? (
-            <>
-              <Text style={styles.sectionTitle}>Demo Logins</Text>
-              <View style={styles.demoRow}>
-                {MT_JULIET_DEMO_ACCOUNTS.map((acct) => (
-                  <Pressable
-                    key={acct.email}
-                    style={styles.demoButton}
-                    onPress={() => {
-                      setEmail(acct.email);
-                      setPassword(acct.password);
-                      setError(null);
-                      mutation.mutate({ email: acct.email, password: acct.password });
-                    }}
-                  >
-                    <Text style={styles.demoText}>{acct.label}</Text>
-                    <Text style={styles.demoSubtext}>{acct.email}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            </>
-          ) : null}
-
-          <Pressable onPress={() => navigation.navigate("Register")}> 
-            <Text style={styles.link}>Need an account? Register</Text>
-          </Pressable>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+        <Text weight="bold" color={theme.colors.primary}>
+          Need an account? Register
+        </Text>
+      </Pressable>
+    </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 },
-  safeArea: { flex: 1, backgroundColor: "#f3f4f6" },
   container: {
-    padding: 24,
-    gap: 12,
+    gap: 20,
+    paddingBottom: 32,
   },
-  title: { fontSize: 28, fontWeight: "700", marginTop: 12 },
-  subtitle: { fontSize: 16, color: "#4b5563" },
-  field: { gap: 4 },
-  label: { fontSize: 14, color: "#374151" },
-  input: {
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+  brandBlock: {
+    borderRadius: 34,
+    padding: 18,
+    gap: 16,
+    overflow: "hidden",
   },
-  button: {
-    backgroundColor: "#111827",
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: "center",
-  },
-  buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
-  error: { color: "#b91c1c", backgroundColor: "#fee2e2", padding: 10, borderRadius: 8 },
-  checkboxRow: {
+  brandTopRow: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  hero: {
     gap: 8,
   },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
+  logoMark: {
+    width: 52,
+    height: 52,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: "#d1d5db",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#fff",
   },
-  checkboxChecked: {
-    backgroundColor: "#111827",
-    borderColor: "#111827",
-  },
-  checkboxMark: {
-    color: "#fff",
-    fontWeight: "800",
-    fontSize: 12,
-  },
-  checkboxLabel: {
-    fontSize: 14,
-    color: "#111827",
-  },
-  sectionTitle: { fontWeight: "700", marginTop: 6 },
-  demoRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  demoButton: {
-    minWidth: 150,
-    paddingVertical: 12,
+  brandPill: {
+    minHeight: 32,
+    borderRadius: 999,
     paddingHorizontal: 12,
-    backgroundColor: "#e5e7eb",
-    borderRadius: 12,
-    gap: 4,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  demoText: { fontWeight: "600" },
-  demoSubtext: { fontSize: 12, color: "#4b5563" },
-  link: { color: "#1d4ed8", marginTop: 8, fontWeight: "600" },
+  heroCopy: {
+    maxWidth: 320,
+  },
+  brandMedia: {
+    minHeight: 104,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+  },
+  formCard: {
+    gap: 16,
+  },
+  field: {
+    gap: 8,
+  },
+  input: {
+    minHeight: 52,
+    borderRadius: 20,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    fontSize: 16,
+  },
+  error: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 12,
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "flex-start",
+  },
+  errorCopy: {
+    flex: 1,
+  },
+  checkboxRow: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  demoSection: {
+    gap: 12,
+  },
+  demoGrid: {
+    gap: 10,
+  },
+  demoButton: {
+    minHeight: 70,
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  demoIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  demoCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  registerLink: {
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 });
