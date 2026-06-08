@@ -47,8 +47,8 @@ export function BookingStepper({ steps, currentIndex, style }: BookingStepperPro
             <Text
               variant="meta"
               weight={isCurrent ? "bold" : "semibold"}
-              numberOfLines={1}
-              style={{ color: isCurrent ? theme.colors.primary : theme.colors.textMuted }}
+              numberOfLines={2}
+              style={[styles.label, { color: isCurrent ? theme.colors.primary : theme.colors.textMuted }]}
             >
               {step.label}
             </Text>
@@ -64,7 +64,7 @@ export function BookingStepper({ steps, currentIndex, style }: BookingStepperPro
 
 const styles = StyleSheet.create({
   container: {
-    minHeight: 64,
+    minHeight: 74,
     borderRadius: 24,
     borderWidth: 1,
     paddingHorizontal: 12,
@@ -78,6 +78,9 @@ const styles = StyleSheet.create({
     minWidth: 0,
     alignItems: "center",
     gap: 6,
+  },
+  label: {
+    textAlign: "center",
   },
   dot: {
     width: 30,

@@ -32,7 +32,7 @@ export function AppScreen({
       {scrollable ? (
         <ScrollView
           style={styles.flex}
-          contentContainerStyle={[styles.contentContainer, contentContainerStyle]}
+          contentContainerStyle={[styles.contentContainer, stickyFooter ? styles.contentWithStickyFooter : null, contentContainerStyle]}
           keyboardShouldPersistTaps="handled"
           refreshControl={refreshControl}
         >
@@ -69,6 +69,9 @@ const styles = StyleSheet.create({
   contentContainer: {
     padding: 16,
     paddingBottom: 32,
+  },
+  contentWithStickyFooter: {
+    paddingBottom: 132,
   },
   staticContent: {
     padding: 16,

@@ -50,7 +50,7 @@ export function OwnerJobCard({ appointment, emphasis = "neutral", nextActionLabe
               <Text variant="caption" weight="bold" color={surface === "dark" ? "rgba(255,255,255,0.76)" : theme.colors.textMuted}>
                 {(appointment.category_name ?? "Care").toUpperCase()}
               </Text>
-              <Text variant="caption" color={surface === "dark" ? "rgba(255,255,255,0.64)" : theme.colors.textMuted} numberOfLines={1}>
+              <Text variant="caption" color={surface === "dark" ? "rgba(255,255,255,0.64)" : theme.colors.textMuted} numberOfLines={2}>
                 {appointment.service_name ?? "Premium care"}
               </Text>
             </View>
@@ -59,7 +59,7 @@ export function OwnerJobCard({ appointment, emphasis = "neutral", nextActionLabe
           <Text variant="h3" weight="bold" style={surface === "dark" ? styles.darkTitle : undefined} numberOfLines={2}>
             {appointment.service_name ?? "Appointment"}
           </Text>
-          <Text color={surface === "dark" ? "rgba(255,255,255,0.82)" : theme.colors.textSecondary} style={styles.customerName} numberOfLines={1}>
+          <Text color={surface === "dark" ? "rgba(255,255,255,0.82)" : theme.colors.textSecondary} style={styles.customerName} numberOfLines={2}>
             {appointment.customer_name ?? "Customer"}
           </Text>
 
@@ -70,13 +70,13 @@ export function OwnerJobCard({ appointment, emphasis = "neutral", nextActionLabe
             {!appointment.provider_name ? <StatusBadge label="Unassigned" tone="warning" /> : null}
           </View>
         </View>
-        <Ionicons name="chevron-forward" size={30} color={surface === "dark" ? "rgba(255,255,255,0.86)" : theme.colors.textMuted} />
+        <Ionicons name="chevron-forward" size={24} color={surface === "dark" ? "rgba(255,255,255,0.86)" : theme.colors.textMuted} />
       </View>
 
       <View style={[styles.infoGrid, { backgroundColor: surface === "dark" ? "rgba(255,255,255,0.06)" : theme.colors.surfaceMuted, borderColor: surface === "dark" ? "rgba(255,255,255,0.08)" : theme.colors.borderSoft }]}>
-        <InfoRow icon="calendar-outline" label="Scheduled" value={formatSchedule(appointment.start_time)} />
-        <InfoRow icon="person-outline" label="Provider" value={appointment.provider_name ?? "Needs assignment"} />
-        <InfoRow icon="location-outline" label="Area" value={location || "Address pending"} />
+        <InfoRow icon="calendar-outline" label="Scheduled" value={formatSchedule(appointment.start_time)} surface={surface} />
+        <InfoRow icon="person-outline" label="Provider" value={appointment.provider_name ?? "Needs assignment"} surface={surface} />
+        <InfoRow icon="location-outline" label="Area" value={location || "Address pending"} surface={surface} />
       </View>
     </PressableCard>
   );
@@ -147,16 +147,27 @@ function ImageFrame({
   );
 }
 
-function InfoRow({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMap; label: string; value: string }) {
+function InfoRow({
+  icon,
+  label,
+  value,
+  surface,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: string;
+  surface: "light" | "dark";
+}) {
   const theme = useTheme();
+  const isDark = surface === "dark";
   return (
     <View style={styles.infoRow}>
-      <Ionicons name={icon} size={16} color={theme.colors.accent} />
+      <Ionicons name={icon} size={16} color={isDark ? theme.colors.accent : theme.colors.primary} />
       <View style={{ flex: 1 }}>
-        <Text variant="caption" color="rgba(255,255,255,0.64)">
+        <Text variant="caption" color={isDark ? "rgba(255,255,255,0.64)" : theme.colors.textMuted}>
           {label}
         </Text>
-        <Text weight="bold" style={{ color: theme.colors.surfaceElevated }}>
+        <Text weight="bold" style={{ color: isDark ? theme.colors.surfaceElevated : theme.colors.textPrimary }}>
           {value}
         </Text>
       </View>
@@ -171,9 +182,9 @@ const styles = StyleSheet.create({
     borderRadius: 18,
   },
   media: {
-    width: 142,
-    height: 142,
-    minHeight: 142,
+    width: 116,
+    height: 132,
+    minHeight: 132,
     borderRadius: 10,
     overflow: "hidden",
   },
@@ -193,7 +204,7 @@ const styles = StyleSheet.create({
   mainRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 18,
+    gap: 12,
   },
   jobCopy: {
     flex: 1,
@@ -223,11 +234,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderWidth: 1,
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 12,
   },
   infoRow: {
     flex: 1,
-    minWidth: 0,
+    minWidth: 126,
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 10,

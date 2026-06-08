@@ -46,7 +46,7 @@ export function ServiceCard({ service, onPress, onBook }: Props) {
 
       <View style={styles.content}>
         <View style={styles.titleRow}>
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, minWidth: 0 }}>
             <Text variant="h3" weight="bold">
               {service.name}
             </Text>
@@ -67,13 +67,13 @@ export function ServiceCard({ service, onPress, onBook }: Props) {
         <View style={styles.metaRow}>
           <View style={[styles.metaItem, { backgroundColor: theme.colors.surfaceMuted }]}>
             <Ionicons name="shield-checkmark-outline" size={16} color={theme.colors.secondary} />
-            <Text weight="bold" color={theme.colors.textSecondary} style={{ marginLeft: 6 }}>
+            <Text weight="bold" color={theme.colors.textSecondary} style={styles.metaText}>
               Inspected care
             </Text>
           </View>
           <View style={[styles.metaItem, { backgroundColor: visual.softColor }]}>
             <Ionicons name="location" size={16} color={theme.colors.primary} />
-            <Text style={{ marginLeft: 6 }} color={theme.colors.textSecondary} weight="bold">
+            <Text style={styles.metaText} color={theme.colors.textSecondary} weight="bold">
               Pickup
             </Text>
           </View>
@@ -117,10 +117,12 @@ const styles = StyleSheet.create({
   titleRow: {
     flexDirection: "row",
     alignItems: "flex-start",
+    flexWrap: "wrap",
     gap: 10,
   },
   priceLockup: {
     minWidth: 78,
+    maxWidth: 118,
     borderRadius: 18,
     paddingHorizontal: 10,
     paddingVertical: 8,
@@ -133,11 +135,16 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   metaItem: {
+    maxWidth: "100%",
     minHeight: 36,
     borderRadius: 999,
     paddingHorizontal: 10,
     flexDirection: "row",
     alignItems: "center",
+  },
+  metaText: {
+    marginLeft: 6,
+    flexShrink: 1,
   },
 });
 

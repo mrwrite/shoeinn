@@ -1,5 +1,5 @@
 import React from "react";
-import { ImageBackground, Pressable, StyleSheet, View } from "react-native";
+import { ImageBackground, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -37,6 +37,7 @@ const includedItems = ["Deep cleaning", "Sole whitening", "Leather conditioning"
 
 export default function ServiceDetailScreen() {
   const theme = useTheme();
+  const { width } = useWindowDimensions();
   const navigation = useNavigation<NativeStackNavigationProp<HomeStackParamList>>();
   const route = useRoute<RouteProp<HomeStackParamList, "ServiceDetail">>();
   const { service } = route.params;
@@ -44,6 +45,7 @@ export default function ServiceDetailScreen() {
   const categoryLabel = getServiceCategoryLabel(service);
   const duration = formatDuration(service.duration_minutes);
   const providerName = "Sole Revival";
+  const isCompact = width < 390;
 
   return (
     <AppScreen
@@ -96,9 +98,9 @@ export default function ServiceDetailScreen() {
 
         <View style={styles.metaGrid}>
           <DetailMetric icon="pricetag-outline" label="Price" value={price} />
-          <View style={[styles.verticalDivider, { backgroundColor: theme.colors.divider }]} />
+          {!isCompact ? <View style={[styles.verticalDivider, { backgroundColor: theme.colors.divider }]} /> : null}
           <DetailMetric icon="time-outline" label="Duration" value={duration} />
-          <View style={[styles.verticalDivider, { backgroundColor: theme.colors.divider }]} />
+          {!isCompact ? <View style={[styles.verticalDivider, { backgroundColor: theme.colors.divider }]} /> : null}
           <DetailMetric icon="person-outline" label="Provider" value={providerName} />
         </View>
 
@@ -110,7 +112,7 @@ export default function ServiceDetailScreen() {
             {includedItems.map((item) => (
               <View key={item} style={styles.includedRow}>
                 <Ionicons name="checkmark-circle" size={22} color={theme.colors.accentPressed} />
-                <Text variant="bodySmall" weight="medium">
+                <Text variant="bodySmall" weight="medium" style={styles.includedText}>
                   {item}
                 </Text>
               </View>
@@ -212,7 +214,7 @@ function RoundIconButton({
 function DetailMetric({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMap; label: string; value: string }) {
   const theme = useTheme();
   return (
-    <View style={styles.detailMetric}>
+    <View style={[styles.detailMetric, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.borderSoft }]}>
       <Ionicons name={icon} size={34} color={theme.colors.accentPressed} />
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text variant="bodySmall" color={theme.colors.textMuted}>
@@ -372,8 +374,8 @@ const styles = StyleSheet.create({
   detailSheet: {
     marginHorizontal: 18,
     borderRadius: 34,
-    padding: 30,
-    gap: 28,
+    padding: 22,
+    gap: 26,
   },
   providerLine: {
     flexDirection: "row",
@@ -381,24 +383,28 @@ const styles = StyleSheet.create({
     gap: 9,
   },
   title: {
-    fontSize: 42,
-    lineHeight: 48,
+    fontSize: 36,
+    lineHeight: 42,
   },
   description: {
-    fontSize: 18,
-    lineHeight: 28,
+    fontSize: 16,
+    lineHeight: 25,
   },
   metaGrid: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 18,
+    alignItems: "stretch",
+    flexWrap: "wrap",
+    gap: 10,
   },
   detailMetric: {
     flex: 1,
-    minWidth: 0,
+    minWidth: 132,
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 12,
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
+    gap: 10,
   },
   verticalDivider: {
     width: 1,
@@ -406,13 +412,11 @@ const styles = StyleSheet.create({
   },
   includedCard: {
     borderRadius: 18,
-    padding: 24,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 20,
+    padding: 18,
+    gap: 18,
   },
   includedList: {
-    flex: 1,
+    width: "100%",
     gap: 13,
   },
   sectionTitle: {
@@ -421,14 +425,18 @@ const styles = StyleSheet.create({
   },
   includedRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 10,
   },
+  includedText: {
+    flex: 1,
+    minWidth: 0,
+  },
   guaranteeCard: {
-    width: 210,
+    width: "100%",
     minHeight: 160,
     borderRadius: 18,
-    padding: 22,
+    padding: 18,
     justifyContent: "center",
     gap: 12,
   },
@@ -439,10 +447,11 @@ const styles = StyleSheet.create({
   },
   reviewsRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 18,
   },
   ratingSummary: {
-    width: 160,
+    width: "100%",
     gap: 8,
     justifyContent: "center",
   },
@@ -455,7 +464,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   reviewCard: {
-    width: 300,
+    width: "100%",
     minHeight: 154,
     borderRadius: 18,
     flexDirection: "row",
@@ -478,11 +487,10 @@ const styles = StyleSheet.create({
     gap: 1,
   },
   beforeAfterRow: {
-    flexDirection: "row",
     gap: 18,
   },
   beforeAfterPair: {
-    flex: 1,
+    width: "100%",
     height: 184,
     borderRadius: 18,
     overflow: "hidden",

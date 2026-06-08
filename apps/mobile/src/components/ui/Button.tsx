@@ -1,5 +1,5 @@
 import React from "react";
-import { ActivityIndicator, Pressable, StyleSheet, View, ViewStyle } from "react-native";
+import { ActivityIndicator, Pressable, StyleProp, StyleSheet, View, ViewStyle } from "react-native";
 
 import { useTheme } from "../../theme/theme";
 import { Text } from "./Text";
@@ -17,7 +17,7 @@ type Props = {
   loading?: boolean;
   variant?: Variant;
   size?: Size;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
 };
 
 /**
@@ -104,7 +104,7 @@ export function Button({
       ) : (
         <View style={styles.content}>
           {leftIcon ? <View style={styles.icon}>{leftIcon}</View> : null}
-          <Text variant="button" weight="bold" style={{ color: variantStyle.textColor }}>
+          <Text variant="button" weight="bold" style={[styles.label, { color: variantStyle.textColor }]}>
             {label}
           </Text>
           {rightIcon ? <View style={styles.icon}>{rightIcon}</View> : null}
@@ -121,6 +121,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 18,
+    paddingVertical: 10,
     flexDirection: "row",
     gap: 8,
   },
@@ -137,6 +138,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
+    maxWidth: "100%",
+    minWidth: 0,
+  },
+  label: {
+    flexShrink: 1,
+    textAlign: "center",
   },
   icon: {
     alignItems: "center",

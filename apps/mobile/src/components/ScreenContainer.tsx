@@ -17,7 +17,11 @@ export function ScreenContainer({ children, scrollable = false, contentContainer
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.colors.background }]}>
       {scrollable ? (
-        <ScrollView style={styles.flex} contentContainerStyle={[styles.contentContainer, contentContainerStyle]}>
+        <ScrollView
+          style={styles.flex}
+          contentContainerStyle={[styles.contentContainer, stickyFooter ? styles.contentWithStickyFooter : null, contentContainerStyle]}
+          keyboardShouldPersistTaps="handled"
+        >
           {children}
         </ScrollView>
       ) : (
@@ -37,6 +41,9 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     paddingBottom: 24,
+  },
+  contentWithStickyFooter: {
+    paddingBottom: 132,
   },
   sticky: {
     position: "absolute",

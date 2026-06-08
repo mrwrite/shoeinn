@@ -38,7 +38,7 @@ export function ProviderCard({ company, onPress }: Props) {
       />
       <View style={styles.content}>
         <View style={styles.row}>
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, minWidth: 0 }}>
             <Text variant="h3" weight="bold">
               {company.name}
             </Text>
@@ -57,7 +57,7 @@ export function ProviderCard({ company, onPress }: Props) {
                   size={13}
                   color={theme.colors.primary}
                 />
-                <Text variant="caption" weight="bold" color={theme.colors.textSecondary} numberOfLines={1}>
+                <Text variant="caption" weight="bold" color={theme.colors.textSecondary} numberOfLines={1} style={styles.pillText}>
                   {category.name}
                 </Text>
               </View>
@@ -67,13 +67,13 @@ export function ProviderCard({ company, onPress }: Props) {
         <View style={styles.metaRow}>
           <View style={[styles.metaPill, { backgroundColor: theme.colors.surfaceMuted }]}>
             <Ionicons name="shield-checkmark-outline" size={15} color={theme.colors.secondary} />
-            <Text variant="caption" weight="bold" color={theme.colors.textSecondary}>
+            <Text variant="caption" weight="bold" color={theme.colors.textSecondary} style={styles.pillText}>
               {categoryLabel}
             </Text>
           </View>
           <View style={[styles.metaPill, { backgroundColor: theme.colors.surfaceMuted }]}>
             <Ionicons name="time-outline" size={15} color={theme.colors.primary} />
-            <Text variant="caption" weight="bold" color={theme.colors.textSecondary}>
+            <Text variant="caption" weight="bold" color={theme.colors.textSecondary} style={styles.pillText}>
               Pickup windows
             </Text>
           </View>
@@ -122,12 +122,16 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   metaPill: {
+    maxWidth: "100%",
     minHeight: 34,
     borderRadius: 999,
     paddingHorizontal: 10,
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+  },
+  pillText: {
+    flexShrink: 1,
   },
 });
 

@@ -70,7 +70,7 @@ export function StatusBadge({ label, tone = "neutral", style }: StatusBadgeProps
       accessibilityLabel={`Status: ${label}`}
       style={[styles.badge, { backgroundColor: palette.background, borderColor: palette.border }, style]}
     >
-      <Text variant="caption" weight="bold" style={{ color: palette.text }}>
+      <Text variant="caption" weight="bold" style={[styles.label, { color: palette.text }]}>
         {label}
       </Text>
     </View>
@@ -91,6 +91,11 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     alignItems: "center",
     justifyContent: "center",
+    maxWidth: "100%",
+  },
+  label: {
+    flexShrink: 1,
+    textAlign: "center",
   },
 });
 

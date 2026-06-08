@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { ImageBackground, Pressable, StyleSheet, View } from "react-native";
+import { ImageBackground, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -39,6 +39,7 @@ const SERVICE_IMAGES: Record<string, string> = {
 
 export default function ProviderMenuScreen() {
   const theme = useTheme();
+  const { width } = useWindowDimensions();
   const navigation = useNavigation<NativeStackNavigationProp<HomeStackParamList>>();
   const route = useRoute<RouteProp<HomeStackParamList, "ProviderMenu">>();
   const { company, categorySlug, categoryName } = route.params;
@@ -46,6 +47,7 @@ export default function ProviderMenuScreen() {
   const categoryLabel = getProviderCategoryLabel(company);
   const primaryCategorySlug = categorySlug ?? getPrimaryCategorySlug(company.offered_categories);
   const visual = getMarketplaceVisual(primaryCategorySlug);
+  const isCompact = width < 390;
 
   const servicesQuery = useQuery<Service[]>({
     queryKey: ["services", company.id, categorySlug ?? "all"],
@@ -98,7 +100,7 @@ export default function ProviderMenuScreen() {
       </View>
 
       <Card variant="marketplace" style={styles.profileCard}>
-        <View style={styles.profileHeader}>
+        <View style={[styles.profileHeader, isCompact && styles.profileHeaderCompact]}>
           <View style={[styles.logoBadge, { backgroundColor: visual.backgroundColor, borderColor: theme.colors.accent }]}>
             <Text variant="h2" weight="regular" style={styles.logoText}>
               {getProviderInitials(company.name)}
@@ -134,12 +136,12 @@ export default function ProviderMenuScreen() {
           </View>
         </View>
 
-        <Card variant="outline" style={styles.metricsCard}>
-          <Metric icon="calendar-outline" value="12,840" label="Appointments Completed" />
-          <View style={[styles.metricDivider, { backgroundColor: theme.colors.divider }]} />
-          <Metric icon="happy-outline" value="99%" label="Satisfaction Rate" />
-          <View style={[styles.metricDivider, { backgroundColor: theme.colors.divider }]} />
-          <Metric icon="time-outline" value="1.2 hrs" label="Avg. Response Time" />
+        <Card variant="outline" style={[styles.metricsCard, isCompact && styles.metricsCardCompact]}>
+          <Metric icon="calendar-outline" value="12,840" label={"Appointments\nCompleted"} />
+          {!isCompact ? <View style={[styles.metricDivider, { backgroundColor: theme.colors.divider }]} /> : null}
+          <Metric icon="happy-outline" value="99%" label={"Satisfaction\nRate"} />
+          {!isCompact ? <View style={[styles.metricDivider, { backgroundColor: theme.colors.divider }]} /> : null}
+          <Metric icon="time-outline" value="1.2 hrs" label={"Avg. Response\nTime"} />
         </Card>
 
         <View style={styles.servicesHeader}>
@@ -170,6 +172,7 @@ export default function ProviderMenuScreen() {
               <ProviderServiceRow
                 key={svc.id}
                 service={svc}
+                compact={isCompact}
                 onPress={(service) => navigation.navigate("ServiceDetail", { service })}
               />
             ))}
@@ -212,7 +215,15 @@ function Metric({ icon, value, label }: { icon: keyof typeof Ionicons.glyphMap; 
   );
 }
 
-function ProviderServiceRow({ service, onPress }: { service: Service; onPress: (service: Service) => void }) {
+function ProviderServiceRow({
+  service,
+  onPress,
+  compact,
+}: {
+  service: Service;
+  onPress: (service: Service) => void;
+  compact: boolean;
+}) {
   const theme = useTheme();
   const categoryLabel = getServiceCategoryLabel(service);
   const duration = formatDuration(service.duration_minutes);
@@ -223,10 +234,10 @@ function ProviderServiceRow({ service, onPress }: { service: Service; onPress: (
       variant="outline"
       onPress={() => onPress(service)}
       accessibilityLabel={`Open service ${service.name}, ${price}`}
-      style={styles.serviceRow}
+      style={[styles.serviceRow, compact && styles.serviceRowCompact]}
     >
-      <ServiceImage categorySlug={service.category_slug} label={service.name} />
-      <View style={styles.serviceCopy}>
+      <ServiceImage categorySlug={service.category_slug} label={service.name} compact={compact} />
+      <View style={[styles.serviceCopy, compact && styles.serviceCopyCompact]}>
         <Text variant="h3" weight="bold" numberOfLines={2}>
           {service.name}
         </Text>
@@ -238,34 +249,38 @@ function ProviderServiceRow({ service, onPress }: { service: Service; onPress: (
             {categoryLabel ?? "Care"}
           </Text>
         </View>
-      </View>
-      <View style={styles.priceColumn}>
-        <Text variant="h2" weight="regular" color={theme.colors.primary}>
-          {price}
-        </Text>
-        <View style={styles.durationRow}>
-          <Ionicons name="time-outline" size={17} color={theme.colors.textMuted} />
-          <Text variant="bodySmall" color={theme.colors.textMuted}>
-            {duration}
-          </Text>
+        <View style={styles.serviceMetaRow}>
+          <View style={[styles.pricePill, { backgroundColor: theme.colors.surfaceMuted }]}>
+            <Text variant="h3" weight="bold" color={theme.colors.primary} numberOfLines={1}>
+              {price}
+            </Text>
+          </View>
+          <View style={[styles.durationRow, { backgroundColor: theme.colors.surfaceTint }]}>
+            <Ionicons name="time-outline" size={15} color={theme.colors.textMuted} />
+            <Text variant="caption" weight="semibold" color={theme.colors.textMuted} numberOfLines={1}>
+              {duration}
+            </Text>
+          </View>
         </View>
       </View>
-      <Ionicons name="chevron-forward" size={25} color={theme.colors.textMuted} />
+      <View style={[styles.chevronWrap, compact && styles.chevronWrapCompact]}>
+        <Ionicons name="chevron-forward" size={22} color={theme.colors.textMuted} />
+      </View>
     </PressableCard>
   );
 }
 
-function ServiceImage({ categorySlug, label }: { categorySlug?: string | null; label: string }) {
+function ServiceImage({ categorySlug, label, compact }: { categorySlug?: string | null; label: string; compact: boolean }) {
   const [error, setError] = React.useState(false);
   if (error) {
-    return <MediaPlaceholder compact categorySlug={categorySlug} label={label} style={styles.serviceImage} />;
+    return <MediaPlaceholder compact categorySlug={categorySlug} label={label} style={[styles.serviceImage, compact && styles.serviceImageCompact]} />;
   }
 
   return (
     <ImageBackground
       source={{ uri: getServiceImage(categorySlug) }}
       resizeMode="cover"
-      style={styles.serviceImage}
+      style={[styles.serviceImage, compact && styles.serviceImageCompact]}
       imageStyle={styles.serviceImageRadius}
       onError={() => setError(true)}
     />
@@ -346,18 +361,21 @@ const styles = StyleSheet.create({
   profileCard: {
     marginHorizontal: 18,
     borderRadius: 34,
-    padding: 30,
-    gap: 26,
+    padding: 22,
+    gap: 24,
   },
   profileHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: 24,
   },
+  profileHeaderCompact: {
+    alignItems: "flex-start",
+  },
   logoBadge: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
+    width: 104,
+    height: 104,
+    borderRadius: 52,
     borderWidth: 3,
     alignItems: "center",
     justifyContent: "center",
@@ -373,8 +391,8 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   providerTitle: {
-    fontSize: 42,
-    lineHeight: 48,
+    fontSize: 34,
+    lineHeight: 40,
   },
   ratingRow: {
     flexDirection: "row",
@@ -403,25 +421,32 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   metricsCard: {
-    minHeight: 132,
+    minHeight: 120,
     borderRadius: 18,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 18,
+    paddingVertical: 14,
+    paddingHorizontal: 10,
+  },
+  metricsCardCompact: {
+    gap: 8,
   },
   metric: {
     flex: 1,
+    minWidth: 0,
     alignItems: "center",
-    gap: 8,
+    gap: 6,
   },
   metricValue: {
-    fontSize: 30,
-    lineHeight: 34,
+    fontSize: 24,
+    lineHeight: 29,
   },
   metricLabel: {
     textAlign: "center",
-    maxWidth: 112,
+    maxWidth: 82,
+    fontSize: 11,
+    lineHeight: 14,
   },
   metricDivider: {
     width: 1,
@@ -437,28 +462,39 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   serviceRow: {
-    minHeight: 146,
+    minHeight: 132,
     borderRadius: 18,
-    padding: 0,
     overflow: "hidden",
     flexDirection: "row",
-    alignItems: "center",
-    gap: 18,
-    paddingRight: 16,
+    alignItems: "stretch",
+    gap: 12,
+    padding: 12,
+  },
+  serviceRowCompact: {
+    gap: 10,
   },
   serviceImage: {
-    width: 156,
-    height: 146,
+    width: 104,
+    aspectRatio: 1,
+    minHeight: 104,
+    borderRadius: 14,
     overflow: "hidden",
   },
+  serviceImageCompact: {
+    width: 84,
+    minHeight: 84,
+  },
   serviceImageRadius: {
-    borderTopLeftRadius: 18,
-    borderBottomLeftRadius: 18,
+    borderRadius: 14,
   },
   serviceCopy: {
     flex: 1,
     minWidth: 0,
-    gap: 7,
+    gap: 8,
+    justifyContent: "center",
+  },
+  serviceCopyCompact: {
+    minWidth: 0,
   },
   categoryPill: {
     alignSelf: "flex-start",
@@ -467,14 +503,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
-  priceColumn: {
-    width: 88,
-    alignItems: "flex-end",
-    gap: 14,
+  serviceMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  pricePill: {
+    minHeight: 38,
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    alignItems: "center",
+    justifyContent: "center",
   },
   durationRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
+    minHeight: 32,
+    borderRadius: 14,
+    paddingHorizontal: 9,
+  },
+  chevronWrap: {
+    minHeight: 44,
+    width: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  chevronWrapCompact: {
+    width: 20,
   },
 });

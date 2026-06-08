@@ -48,12 +48,14 @@ export function SectionHeader({ title, eyebrow, subtitle, action, style, tone = 
 const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "flex-start",
     justifyContent: "space-between",
     gap: 12,
   },
   copy: {
     flex: 1,
+    minWidth: 0,
     gap: 5,
   },
   subtitle: {
