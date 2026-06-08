@@ -496,8 +496,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   monthButton: {
-    width: 42,
-    height: 42,
+    width: 44,
+    height: 44,
     alignItems: "center",
     justifyContent: "center",
   },

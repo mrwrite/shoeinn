@@ -384,15 +384,18 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: "row",
+    flexWrap: "wrap",
     justifyContent: "space-between",
     alignItems: "flex-start",
     gap: 12,
   },
   headerCopy: {
     flex: 1,
+    minWidth: 0,
   },
   pills: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
     marginTop: 12,
   },

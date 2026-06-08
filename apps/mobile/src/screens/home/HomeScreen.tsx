@@ -815,9 +815,9 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   heartButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(255,255,255,0.18)",

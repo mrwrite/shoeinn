@@ -16,20 +16,21 @@ export function SearchBar({ value, onChangeText, onSubmitEditing, editable = tru
     <View style={[styles.container, { backgroundColor: theme.colors.surfaceElevated, borderColor: theme.colors.borderSoft }, theme.shadows.soft]}>
       <Ionicons name="search" size={18} color={theme.colors.primary} style={styles.icon} />
       <TextInput
-        style={styles.input}
+        style={[styles.input, { color: theme.colors.textPrimary }]}
         placeholder={placeholder ?? brandCopy.serviceSearchPlaceholder}
         placeholderTextColor={theme.colors.textSubtle}
         value={value}
         onChangeText={onChangeText}
         onSubmitEditing={onSubmitEditing}
         editable={editable && !onPress}
+        accessibilityLabel="Search services"
       />
     </View>
   );
 
   if (onPress) {
     return (
-      <Pressable onPress={onPress} style={styles.pressable}>
+      <Pressable onPress={onPress} style={styles.pressable} accessibilityRole="button" accessibilityLabel="Search services">
         {content}
       </Pressable>
     );
@@ -53,8 +54,8 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
+    minWidth: 0,
     fontSize: 16,
-    color: "#1B1E24",
   },
   icon: {
     marginRight: 8,
