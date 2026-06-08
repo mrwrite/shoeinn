@@ -8,6 +8,19 @@ This repository is a small monorepo. Run each app from its own folder:
 - `apps/mobile` - Expo React Native app
 - `apps/payment` - optional Stripe-backed payment service
 
+## Documentation Map
+
+- [New developer onboarding](docs/getting-started.md)
+- [Central environment variable reference](docs/environment.md)
+- [Architecture overview](docs/architecture/overview.md)
+- [Mobile architecture](docs/architecture/mobile.md)
+- [API architecture](docs/architecture/api.md)
+- [Payment architecture](docs/architecture/payment.md)
+- [Deployment architecture](docs/architecture/deployment.md)
+- [Staging runbook](docs/staging.md)
+- [Troubleshooting](docs/troubleshooting.md)
+- [OpenSpec workflow](docs/openspec.md)
+
 The local workflow below is Windows PowerShell first because that is the current development environment. macOS/Linux equivalents are mostly the same, except virtual environment activation paths and shell environment-variable syntax.
 
 ## Prerequisites
