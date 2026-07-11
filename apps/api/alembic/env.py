@@ -7,17 +7,17 @@ from sqlalchemy import engine_from_config, pool
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from app.core.config import settings
-from app.core.db import Base
+from app.core.db import Base, _normalize_db_url
 from app import models  # noqa: F401 - ensure models are imported for metadata
 
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.database_url)
+config.set_main_option("sqlalchemy.url", _normalize_db_url(settings.database_url))
 
 target_metadata = Base.metadata
 
 
 def run_migrations_offline():
-    context.configure(url=settings.database_url, target_metadata=target_metadata, literal_binds=True)
+    context.configure(url=_normalize_db_url(settings.database_url), target_metadata=target_metadata, literal_binds=True)
     with context.begin_transaction():
         context.run_migrations()
 
