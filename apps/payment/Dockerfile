@@ -6,11 +6,10 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 COPY apps/payment/pyproject.toml /app/pyproject.toml
+COPY apps/payment/app /app/app
 
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir .
-
-COPY apps/payment/app /app/app
 
 EXPOSE 8001
 
