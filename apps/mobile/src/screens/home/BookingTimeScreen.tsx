@@ -6,6 +6,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useQuery } from "@tanstack/react-query";
 
 import { getAvailability } from "../../api/http";
+import { Logo } from "../../components/branding/Logo";
 import { AppScreen } from "../../components/ui/AppScreen";
 import { Button } from "../../components/ui/Button";
 import { Card, PressableCard } from "../../components/ui/Card";
@@ -184,12 +185,7 @@ function BookingTopBar({ onBack }: { onBack: () => void }) {
     <View style={styles.topBar}>
       <RoundIconButton icon="chevron-back" label="Go back" onPress={onBack} />
       <View style={styles.brandLockup}>
-        <View style={styles.brandRow}>
-          <Text variant="display" weight="regular" color={theme.colors.primary} style={styles.brand}>
-            ShoeInn
-          </Text>
-          <Ionicons name="sparkles" size={18} color={theme.colors.accent} />
-        </View>
+        <Logo size={34} />
         <Text variant="overline" color={theme.colors.accent} style={styles.brandSubhead}>
           Premium Care Marketplace
         </Text>
@@ -319,7 +315,7 @@ function ServiceDetailsCard({
           })}
         />
         <AppointmentMeta icon="location-outline" label="Location" value="Pickup address added later" />
-        <AppointmentMeta icon="person-outline" label="Provider" value={categoryLabel ?? "ShoeInn Care"} />
+        <AppointmentMeta icon="person-outline" label="Provider" value={categoryLabel ?? "Skruhb Care"} />
       </View>
     </Card>
   );

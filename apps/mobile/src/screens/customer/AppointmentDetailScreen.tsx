@@ -246,7 +246,7 @@ export default function AppointmentDetailScreen({ route }: Props) {
 
       Alert.alert(
         "Payment submitted",
-        latest.payment_message ?? "We returned to ShoeInn, but Stripe has not marked this payment complete yet. You can refresh again if needed.",
+        latest.payment_message ?? "We returned to Skruhb, but Stripe has not marked this payment complete yet. You can refresh again if needed.",
       );
     } catch (error: any) {
       Alert.alert("Unable to refresh payment", error?.message ?? "Please try again.");

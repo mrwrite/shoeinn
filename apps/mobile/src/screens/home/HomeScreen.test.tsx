@@ -167,7 +167,7 @@ describe("HomeScreen", () => {
     const tree = renderComponent(<HomeScreen />);
     const output = JSON.stringify(tree.toJSON());
 
-    expect(output).toContain("ShoeInn");
+    expect(output).toContain("Skruhb");
     expect(output).toContain("Good Morning, ");
     expect(output).toContain("Anthony");
     expect(output).toContain("What needs care today?");

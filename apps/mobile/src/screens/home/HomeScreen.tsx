@@ -9,6 +9,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { getAppointmentAssignment, getMyAppointments, listCareCategories, listCompanies } from "../../api/http";
 import { getDemoMarketDiscoveryLocation, shouldShowDemoLogins } from "../../auth/demoLogins";
 import { ProviderCard } from "../../components/ProviderCard";
+import { Logo } from "../../components/branding/Logo";
 import { AppScreen } from "../../components/ui/AppScreen";
 import { Button } from "../../components/ui/Button";
 import { CategoryTile } from "../../components/ui/CategoryTile";
@@ -20,7 +21,6 @@ import { SectionHeader } from "../../components/ui/SectionHeader";
 import { SearchBar } from "../../components/ui/SearchBar";
 import { StatusBadge, AppointmentStatusBadge } from "../../components/ui/StatusBadge";
 import { Text } from "../../components/ui/Text";
-import { brandCopy } from "../../content/brandCopy";
 import {
   filterCompaniesByCategory,
   getCategoryEmptyMessage,
@@ -230,12 +230,7 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <View style={styles.brandLockup}>
           <View style={styles.brandWordmarkWrap}>
-            <View style={styles.brandWordmarkRow}>
-              <Text variant="display" weight="bold" style={[styles.brandWordmark, { color: theme.colors.primary }]}>
-                {brandCopy.appName}
-              </Text>
-              <Ionicons name="star" size={11} color={theme.colors.accent} />
-            </View>
+            <Logo size={48} />
             <Text variant="caption" weight="bold" color={theme.colors.accentPressed} style={styles.brandTagline}>
               PREMIUM CARE MARKETPLACE
             </Text>

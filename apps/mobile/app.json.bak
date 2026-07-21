@@ -1,9 +1,24 @@
 {
   "expo": {
-    "name": "shoeinn",
-    "slug": "shoeinn",
+    "name": "Skruhb",
+    "slug": "skruhb",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F7F3EA"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#062E37"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
     "platforms": [
       "ios",
       "android",

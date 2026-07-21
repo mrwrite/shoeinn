@@ -19,12 +19,12 @@ describe("RewardsCard", () => {
 
     act(() => {
       tree = renderer.create(
-        <RewardsCard title="ShoeInn Care Club" subtitle="Premium care, pickup, and delivery" value="Member" />,
+        <RewardsCard title="Skruhb Care Club" subtitle="Premium care, pickup, and delivery" value="Member" />,
       );
     });
 
     const output = JSON.stringify(tree?.toJSON());
-    expect(output).toContain("ShoeInn Care Club");
+    expect(output).toContain("Skruhb Care Club");
     expect(output).toContain("Premium care, pickup, and delivery");
     expect(output).toContain("Member");
   });

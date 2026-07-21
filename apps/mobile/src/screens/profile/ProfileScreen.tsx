@@ -139,7 +139,7 @@ export default function ProfileScreen() {
       />
 
       <RewardsCard
-        title="ShoeInn Care Club"
+        title="Skruhb Care Club"
         subtitle="Premium local care with pickup, delivery, and real-time updates."
         value={role === "customer" ? "Member" : role === "company_admin" ? "Owner" : role === "provider" ? "Provider" : "Account"}
       />

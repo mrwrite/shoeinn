@@ -1,6 +1,10 @@
-# ShoeInn Mobile
+<img src="assets/brand/skruhb-logo-deep.svg" alt="Skruhb" width="246" />
+
+# Skruhb Mobile
 
 Expo React Native app for customer booking, provider job handling, company admin operations, live appointment updates, notifications, maps, and payment return flows.
+
+The reusable `Logo` component in `src/components/branding/Logo.tsx` renders the approved compact SK ligature and horizontal wordmark. Editable SVG masters and required Expo raster assets are stored in `assets/brand` and `assets` respectively.
 
 ## Requirements
 
@@ -88,15 +92,15 @@ EXPO_PUBLIC_DEMO_MARKET=mt_juliet
 
 Shelby County demo accounts use `Password1!`:
 
-- Customer: `customer@shoeinn.com`
-- Provider: `pelham.driver1@shoeinn.com`
-- Company admin: `pelham.admin@shoeinn.com`
+- Customer: `customer@skruhb.com`
+- Provider: `pelham.driver1@skruhb.com`
+- Company admin: `pelham.admin@skruhb.com`
 
 Mt. Juliet demo accounts use `Password123!`:
 
-- Customer: `customer.mtjuliet@shoeinn.demo`
-- Provider: `provider.mtjuliet@shoeinn.demo`
-- Company admin: `admin.mtjuliet@shoeinn.demo`
+- Customer: `customer.mtjuliet@skruhb.demo`
+- Provider: `provider.mtjuliet@skruhb.demo`
+- Company admin: `admin.mtjuliet@skruhb.demo`
 
 Seed data from the API before logging in:
 
@@ -125,7 +129,7 @@ For mock payment mode, no Stripe redirect setup is required.
 For service payment mode with Stripe Checkout, configure the app return base:
 
 ```bash
-EXPO_PUBLIC_MOBILE_REDIRECT_BASE=shoeinn://app
+EXPO_PUBLIC_MOBILE_REDIRECT_BASE=skruhb://app
 ```
 
 For Expo Go return-flow testing:

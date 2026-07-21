@@ -103,7 +103,7 @@ def seed_services(session: Session) -> int:
 
     company = session.execute(select(Company).limit(1)).scalar_one_or_none()
     if company is None:
-        company = Company(name="ShoeInn", city="Anywhere", state="CA")
+        company = Company(name="Skruhb", city="Anywhere", state="CA")
         session.add(company)
         session.flush()
 

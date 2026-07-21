@@ -141,7 +141,7 @@ DEMO_MARKETS: dict[str, SeedMarket] = {
             },
         ],
         "customer": {
-            "email": "customer@shoeinn.com",
+            "email": "customer@skruhb.com",
             "role": "customer",
             "full_name": "Jordan Demo Customer",
         },
@@ -150,18 +150,18 @@ DEMO_MARKETS: dict[str, SeedMarket] = {
             {
                 "name": "Pelham Pickup & Press",
                 "admin": {
-                    "email": "pelham.admin@shoeinn.com",
+                    "email": "pelham.admin@skruhb.com",
                     "role": "company_admin",
                     "full_name": "Pelham Owner Demo",
                 },
                 "providers": [
                     {
-                        "email": "pelham.driver1@shoeinn.com",
+                        "email": "pelham.driver1@skruhb.com",
                         "role": "provider",
                         "full_name": "Mason Route Lead",
                     },
                     {
-                        "email": "pelham.driver2@shoeinn.com",
+                        "email": "pelham.driver2@skruhb.com",
                         "role": "provider",
                         "full_name": "Ava Delivery Lead",
                     },
@@ -193,13 +193,13 @@ DEMO_MARKETS: dict[str, SeedMarket] = {
             {
                 "name": "Helena Shoe & Dry Care",
                 "admin": {
-                    "email": "helena.admin@shoeinn.com",
+                    "email": "helena.admin@skruhb.com",
                     "role": "company_admin",
                     "full_name": "Helena Owner Demo",
                 },
                 "providers": [
                     {
-                        "email": "helena.driver@shoeinn.com",
+                        "email": "helena.driver@skruhb.com",
                         "role": "provider",
                         "full_name": "Noah Helena Driver",
                     },
@@ -231,13 +231,13 @@ DEMO_MARKETS: dict[str, SeedMarket] = {
             {
                 "name": "Alabaster Clean Run",
                 "admin": {
-                    "email": "alabaster.admin@shoeinn.com",
+                    "email": "alabaster.admin@skruhb.com",
                     "role": "company_admin",
                     "full_name": "Alabaster Owner Demo",
                 },
                 "providers": [
                     {
-                        "email": "alabaster.driver@shoeinn.com",
+                        "email": "alabaster.driver@skruhb.com",
                         "role": "provider",
                         "full_name": "Liam Alabaster Driver",
                     },
@@ -343,23 +343,23 @@ DEMO_MARKETS: dict[str, SeedMarket] = {
             },
         ],
         "customer": {
-            "email": "mtjuliet.customer@shoeinn.com",
+            "email": "mtjuliet.customer@skruhb.com",
             "role": "customer",
             "full_name": "Jordan Demo Customer",
         },
         "quick_demo_users": {
             "customer": {
-                "email": "customer.mtjuliet@shoeinn.demo",
+                "email": "customer.mtjuliet@skruhb.demo",
                 "role": "customer",
                 "full_name": "Avery Mt. Juliet Customer",
             },
             "provider": {
-                "email": "provider.mtjuliet@shoeinn.demo",
+                "email": "provider.mtjuliet@skruhb.demo",
                 "role": "provider",
                 "full_name": "Cameron Mt. Juliet Provider",
             },
             "company_admin": {
-                "email": "admin.mtjuliet@shoeinn.demo",
+                "email": "admin.mtjuliet@skruhb.demo",
                 "role": "company_admin",
                 "full_name": "Reese Mt. Juliet Company Admin",
             },
@@ -368,18 +368,18 @@ DEMO_MARKETS: dict[str, SeedMarket] = {
             {
                 "name": "Mt. Juliet Pickup & Press",
                 "admin": {
-                    "email": "mtjuliet.admin@shoeinn.com",
+                    "email": "mtjuliet.admin@skruhb.com",
                     "role": "company_admin",
                     "full_name": "Mt. Juliet Owner Demo",
                 },
                 "providers": [
                     {
-                        "email": "mtjuliet.driver1@shoeinn.com",
+                        "email": "mtjuliet.driver1@skruhb.com",
                         "role": "provider",
                         "full_name": "Harper Route Lead",
                     },
                     {
-                        "email": "mtjuliet.driver2@shoeinn.com",
+                        "email": "mtjuliet.driver2@skruhb.com",
                         "role": "provider",
                         "full_name": "Ethan Delivery Lead",
                     },
@@ -411,13 +411,13 @@ DEMO_MARKETS: dict[str, SeedMarket] = {
             {
                 "name": "Providence Shoe & Dry Care",
                 "admin": {
-                    "email": "providence.admin@shoeinn.com",
+                    "email": "providence.admin@skruhb.com",
                     "role": "company_admin",
                     "full_name": "Providence Owner Demo",
                 },
                 "providers": [
                     {
-                        "email": "providence.driver@shoeinn.com",
+                        "email": "providence.driver@skruhb.com",
                         "role": "provider",
                         "full_name": "Lucas Providence Driver",
                     },
@@ -449,13 +449,13 @@ DEMO_MARKETS: dict[str, SeedMarket] = {
             {
                 "name": "Golden Bear Clean Run",
                 "admin": {
-                    "email": "goldenbear.admin@shoeinn.com",
+                    "email": "goldenbear.admin@skruhb.com",
                     "role": "company_admin",
                     "full_name": "Golden Bear Owner Demo",
                 },
                 "providers": [
                     {
-                        "email": "goldenbear.driver@shoeinn.com",
+                        "email": "goldenbear.driver@skruhb.com",
                         "role": "provider",
                         "full_name": "Mia Golden Bear Driver",
                     },
@@ -505,7 +505,7 @@ def _all_demo_company_names() -> set[str]:
 
 
 def _all_demo_emails() -> set[str]:
-    emails = {"admin@shoeinn.com"}
+    emails = {"admin@skruhb.com"}
     for demo_market in DEMO_MARKETS.values():
         emails.add(demo_market["customer"]["email"])
         emails.update(user["email"] for user in demo_market["quick_demo_users"].values())
@@ -739,7 +739,7 @@ def seed(
         created["users"] += 1
         return user
 
-    global_admin = get_or_create_user("admin@shoeinn.com", "admin", "ShoeInn Global Admin")
+    global_admin = get_or_create_user("admin@skruhb.com", "admin", "Skruhb Global Admin")
     customer = get_or_create_user(
         market["customer"]["email"],
         market["customer"]["role"],

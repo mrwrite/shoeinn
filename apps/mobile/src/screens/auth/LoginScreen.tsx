@@ -11,6 +11,7 @@ import { AppCard } from "../../components/AppCard";
 import { AppScreen } from "../../components/AppScreen";
 import { MediaPlaceholder } from "../../components/ui/MediaPlaceholder";
 import { SectionHeader } from "../../components/SectionHeader";
+import { Logo } from "../../components/branding/Logo";
 import { Text } from "../../components/ui/Text";
 import { brandCopy } from "../../content/brandCopy";
 import { AuthStackParamList } from "../../navigation/AuthStack";
@@ -24,7 +25,7 @@ export default function LoginScreen({ navigation }: Props) {
   const setAuth = useAuthStore((s) => s.setAuth);
   const rememberMe = useAuthStore((s) => s.rememberMe);
   const setRememberMe = useAuthStore((s) => s.setRememberMe);
-  const [email, setEmail] = useState("customer@shoeinn.com");
+  const [email, setEmail] = useState("customer@skruhb.com");
   const [password, setPassword] = useState("Password1!");
   const [error, setError] = useState<string | null>(null);
   const showDemoLogins = shouldShowDemoLogins();
@@ -50,9 +51,7 @@ export default function LoginScreen({ navigation }: Props) {
     <AppScreen scrollable contentContainerStyle={styles.container}>
       <View style={[styles.brandBlock, { backgroundColor: theme.colors.primary }, theme.shadows.floating]}>
         <View style={styles.brandTopRow}>
-          <View style={[styles.logoMark, { backgroundColor: "rgba(255,255,255,0.15)", borderColor: "rgba(255,255,255,0.18)" }]}>
-            <Ionicons name="sparkles" size={24} color={theme.colors.surfaceElevated} />
-          </View>
+          <Logo layout="symbol" tone="light" size={52} decorative />
           <View style={[styles.brandPill, { backgroundColor: theme.colors.accent }]}>
             <Text variant="meta" weight="bold" style={{ color: theme.colors.textPrimary }}>
               Premium care
@@ -60,9 +59,7 @@ export default function LoginScreen({ navigation }: Props) {
           </View>
         </View>
         <View style={styles.hero}>
-          <Text variant="display" weight="bold" style={{ color: theme.colors.surfaceElevated }}>
-            {brandCopy.appName}
-          </Text>
+          <Logo tone="light" size={64} />
           <Text color="rgba(255,255,255,0.8)" style={styles.heroCopy}>
             {brandCopy.marketplacePositioning}
           </Text>
@@ -79,7 +76,7 @@ export default function LoginScreen({ navigation }: Props) {
       <AppCard variant="elevated" style={[styles.formCard, { borderColor: theme.colors.borderSoft }]}>
         <SectionHeader
           eyebrow="Welcome back"
-          title="Sign in to ShoeInn"
+          title="Sign in to Skruhb"
           subtitle={`Use your account or jump into a ${demoMarketLabel} premium care demo role.`}
         />
 
@@ -222,14 +219,6 @@ const styles = StyleSheet.create({
   },
   hero: {
     gap: 8,
-  },
-  logoMark: {
-    width: 52,
-    height: 52,
-    borderRadius: 20,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
   },
   brandPill: {
     minHeight: 32,

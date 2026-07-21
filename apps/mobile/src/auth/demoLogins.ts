@@ -15,17 +15,17 @@ export type DemoMarketDiscoveryLocation = {
 export const SHELBY_DEMO_ACCOUNTS: DemoLoginAccount[] = [
   {
     label: "Shelby Customer",
-    email: "customer@shoeinn.com",
+    email: "customer@skruhb.com",
     password: "Password1!",
   },
   {
     label: "Shelby Provider",
-    email: "pelham.driver1@shoeinn.com",
+    email: "pelham.driver1@skruhb.com",
     password: "Password1!",
   },
   {
     label: "Shelby Company Admin",
-    email: "pelham.admin@shoeinn.com",
+    email: "pelham.admin@skruhb.com",
     password: "Password1!",
   },
 ];
@@ -33,17 +33,17 @@ export const SHELBY_DEMO_ACCOUNTS: DemoLoginAccount[] = [
 export const MT_JULIET_DEMO_ACCOUNTS: DemoLoginAccount[] = [
   {
     label: "Mt. Juliet Customer",
-    email: "customer.mtjuliet@shoeinn.demo",
+    email: "customer.mtjuliet@skruhb.demo",
     password: "Password123!",
   },
   {
     label: "Mt. Juliet Provider",
-    email: "provider.mtjuliet@shoeinn.demo",
+    email: "provider.mtjuliet@skruhb.demo",
     password: "Password123!",
   },
   {
     label: "Mt. Juliet Company Admin",
-    email: "admin.mtjuliet@shoeinn.demo",
+    email: "admin.mtjuliet@skruhb.demo",
     password: "Password123!",
   },
 ];

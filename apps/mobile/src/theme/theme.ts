@@ -1,11 +1,11 @@
 import { StyleSheet, type TextStyle, type ViewStyle } from "react-native";
 
 const palette = {
-  ink900: "#1B1E24",
+  ink900: "#172126",
   ink700: "#3B424C",
   ink500: "#6F7782",
   ink300: "#9BA3AD",
-  porcelain: "#FAF8F4",
+  porcelain: "#F7F3EA",
   cream: "#F8F5EF",
   white: "#FFFFFF",
   linen: "#F3EDE3",
@@ -14,8 +14,8 @@ const palette = {
   border: "#E5DACE",
   borderSoft: "#EFE7DC",
   divider: "#EEE4D8",
-  peacock: "#0B5563",
-  peacockPressed: "#083F4A",
+  peacock: "#062E37",
+  peacockPressed: "#041F25",
   teal: "#117B7C",
   mint: "#CFE9E5",
   gold: "#D6A73D",
@@ -202,28 +202,28 @@ export const textStyles = StyleSheet.create({
 
 export const shadows = {
   card: {
-    shadowColor: "#1B1E24",
+    shadowColor: "#172126",
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.07,
     shadowRadius: 22,
     elevation: 3,
   } satisfies ViewStyle,
   floating: {
-    shadowColor: "#1B1E24",
+    shadowColor: "#172126",
     shadowOffset: { width: 0, height: 16 },
     shadowOpacity: 0.12,
     shadowRadius: 32,
     elevation: 7,
   } satisfies ViewStyle,
   modal: {
-    shadowColor: "#1B1E24",
+    shadowColor: "#172126",
     shadowOffset: { width: 0, height: 18 },
     shadowOpacity: 0.16,
     shadowRadius: 40,
     elevation: 10,
   } satisfies ViewStyle,
   soft: {
-    shadowColor: "#1B1E24",
+    shadowColor: "#172126",
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.05,
     shadowRadius: 16,

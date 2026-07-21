@@ -51,7 +51,7 @@ describe("category discovery helpers", () => {
     const companies: Company[] = [
       {
         id: "company-shoes",
-        name: "ShoeInn",
+        name: "Skruhb",
         offered_categories: [{ id: "1", slug: "shoes", name: "Shoes", icon_key: "footprints" }],
       },
       {

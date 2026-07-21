@@ -131,7 +131,7 @@ try {
                 $effectivePaymentServiceBaseUrl = "http://localhost:8001"
             }
             if (-not $effectiveMobileRedirectBase) {
-                throw "PAYMENT_MODE=service requires -MobileRedirectBase, for example exp://<YOUR-LAN-IP>:8081/-- for Expo Go or shoeinn://app for a dev build."
+                throw "PAYMENT_MODE=service requires -MobileRedirectBase, for example exp://<YOUR-LAN-IP>:8081/-- for Expo Go or skruhb://app for a dev build."
             }
             try {
                 Invoke-RestMethod "$($effectivePaymentServiceBaseUrl.TrimEnd('/'))/health" | Out-Null

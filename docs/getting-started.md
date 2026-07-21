@@ -92,16 +92,16 @@ The helper script can do the same setup:
 
 Shelby County demo, password `Password1!`:
 
-- Customer: `customer@shoeinn.com`
-- Provider: `pelham.driver1@shoeinn.com`
-- Company admin: `pelham.admin@shoeinn.com`
-- Global admin: `admin@shoeinn.com`
+- Customer: `customer@skruhb.com`
+- Provider: `pelham.driver1@skruhb.com`
+- Company admin: `pelham.admin@skruhb.com`
+- Global admin: `admin@skruhb.com`
 
 Mt. Juliet demo, password `Password123!`:
 
-- Customer: `customer.mtjuliet@shoeinn.demo`
-- Provider: `provider.mtjuliet@shoeinn.demo`
-- Company admin: `admin.mtjuliet@shoeinn.demo`
+- Customer: `customer.mtjuliet@skruhb.demo`
+- Provider: `provider.mtjuliet@skruhb.demo`
+- Company admin: `admin.mtjuliet@skruhb.demo`
 
 To show demo login buttons:
 
@@ -148,10 +148,10 @@ Company admin:
 3. Start API in service mode:
 
 ```powershell
-.\scripts\start-api.ps1 -PaymentMode service -MobileRedirectBase "shoeinn://app"
+.\scripts\start-api.ps1 -PaymentMode service -MobileRedirectBase "skruhb://app"
 ```
 
-4. Start mobile with `EXPO_PUBLIC_MOBILE_REDIRECT_BASE=shoeinn://app` for a dev build, or an `exp://.../--` URL for Expo Go.
+4. Start mobile with `EXPO_PUBLIC_MOBILE_REDIRECT_BASE=skruhb://app` for a dev build, or an `exp://.../--` URL for Expo Go.
 
 ## 8. Validate Before Making Changes
 
@@ -178,4 +178,3 @@ cd .\apps\payment
 .\.venv\Scripts\Activate.ps1
 python -m pytest tests -q
 ```
-

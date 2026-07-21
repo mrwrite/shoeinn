@@ -17,7 +17,7 @@ type RewardsCardProps = {
  * content. It does not imply new backend rewards behavior.
  */
 export function RewardsCard({
-  title = "ShoeInn Care Club",
+  title = "Skruhb Care Club",
   subtitle = "Premium care, pickup, and delivery",
   value = "Member",
   style,

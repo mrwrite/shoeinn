@@ -3,7 +3,7 @@
   "configurations": [
     
     {
-      "name": "ShoeInn API (uvicorn)",
+      "name": "Skruhb API (uvicorn)",
       "type": "python",
       "request": "launch",
       "module": "uvicorn",

@@ -15,6 +15,7 @@ import { useMutation } from "@tanstack/react-query";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { login, register } from "../../api/http";
+import { Logo } from "../../components/branding/Logo";
 import { AuthStackParamList } from "../../navigation/AuthStack";
 import { useAuthStore } from "../../state/authStore";
 
@@ -50,8 +51,9 @@ export default function RegisterScreen({ navigation }: Props) {
         style={styles.flex}
       >
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+          <Logo size={48} style={styles.logo} />
           <Text style={styles.title}>Create an account</Text>
-          <Text style={styles.subtitle}>Start booking clean kicks</Text>
+          <Text style={styles.subtitle}>Run your care from one connected place</Text>
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -107,8 +109,9 @@ export default function RegisterScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  safeArea: { flex: 1, backgroundColor: "#f3f4f6" },
+  safeArea: { flex: 1, backgroundColor: "#F7F3EA" },
   container: { padding: 24, gap: 12 },
+  logo: { marginBottom: 12 },
   title: { fontSize: 28, fontWeight: "700", marginTop: 12 },
   subtitle: { fontSize: 16, color: "#4b5563" },
   field: { gap: 4 },

@@ -26,7 +26,7 @@ Read by `apps/api/app/core/config.py`.
 | `PAYMENT_SERVICE_BASE_URL` | Required for service mode | blank | `http://localhost:8001` | Payment service base URL. |
 | `PAYMENT_CHECKOUT_SUCCESS_URL` / `PAYMENT_SUCCESS_URL` | Optional | blank | `https://api.example.com/payments/return/success` | Browser success return URL alias. |
 | `PAYMENT_CHECKOUT_CANCEL_URL` / `PAYMENT_CANCEL_URL` | Optional | blank | `https://api.example.com/payments/return/cancel` | Browser cancel return URL alias. |
-| `PAYMENT_MOBILE_REDIRECT_BASE` | Required for service mobile return path | blank | `shoeinn://app` | Mobile/frontend redirect base. Aliases: `PAYMENT_SUCCESS_URL_BASE`, `PAYMENT_RETURN_APP_URL`. |
+| `PAYMENT_MOBILE_REDIRECT_BASE` | Required for service mobile return path | blank | `skruhb://app` | Mobile/frontend redirect base. Aliases: `PAYMENT_SUCCESS_URL_BASE`, `PAYMENT_RETURN_APP_URL`. |
 | `PAYMENT_SERVICE_TIMEOUT_SECONDS` | No | `10.0` | `10` | Timeout for payment-service calls. |
 | `PAYMENT_CURRENCY` | No | `usd` | `usd` | Default payment currency. |
 | `ENABLE_PAYMENT_SYNC_WORKER` | No | `true` | `true` | Starts payment sync worker when service mode is configured. |
@@ -45,8 +45,8 @@ Read by `apps/mobile/app.config.ts`, `src/api/http.ts`, `src/api/services.ts`, d
 | `SHOW_DEMO_LOGINS` | No | `false` | `true` | Non-public fallback read by app config. |
 | `EXPO_PUBLIC_DEMO_MARKET` | No | `shelby` | `mt_juliet` | Demo login/market selector. |
 | `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` | Optional | none | `AIza...` | Enables Google Directions API route line, ETA, distance, and native map API keys. |
-| `EXPO_PUBLIC_MOBILE_REDIRECT_BASE` | Required for service payment return | none | `shoeinn://app` | Mobile return base for Stripe Checkout. |
-| `EXPO_PUBLIC_APP_URL` | Optional alias | none | `shoeinn://app` | Alias for mobile redirect base. |
+| `EXPO_PUBLIC_MOBILE_REDIRECT_BASE` | Required for service payment return | none | `skruhb://app` | Mobile return base for Stripe Checkout. |
+| `EXPO_PUBLIC_APP_URL` | Optional alias | none | `skruhb://app` | Alias for mobile redirect base. |
 
 ## Payment Service
 
@@ -64,4 +64,3 @@ Read by `apps/payment/app/config.py`.
 | `BOOKING_API_WEBHOOK_SECRET` | No | none | `replace-me` | Optional callback header secret. |
 | `DEFAULT_CURRENCY` | No | `usd` | `usd` | Payment default currency. |
 | `PAYMENT_ALLOW_TEST_CLOCK` | No | `true` | `true` | Allows Stripe test clock behavior in non-production testing. |
-

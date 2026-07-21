@@ -67,7 +67,7 @@ def test_service_mode_requires_real_return_urls(
 def test_service_mode_succeeds_with_valid_return_urls(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "payment_mode", "service")
     monkeypatch.setattr(settings, "payment_service_base_url", "http://payments.test")
-    monkeypatch.setattr(settings, "payment_mobile_redirect_base", "shoeinn://app")
+    monkeypatch.setattr(settings, "payment_mobile_redirect_base", "skruhb://app")
 
     captured_payload: dict[str, object] = {}
 
@@ -103,7 +103,7 @@ def test_service_mode_succeeds_with_valid_return_urls(monkeypatch: pytest.Monkey
     cancel_url = str(captured_payload["cancel_url"])
     success_parts = urlparse(success_url)
     cancel_parts = urlparse(cancel_url)
-    assert success_parts.scheme == "shoeinn"
+    assert success_parts.scheme == "skruhb"
     assert success_parts.netloc == "app"
     assert success_parts.path == "/payment/success"
     assert cancel_parts.path == "/payment/cancel"

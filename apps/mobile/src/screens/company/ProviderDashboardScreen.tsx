@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { fetchOpenAppointments } from "../../api/http";
+import { Logo } from "../../components/branding/Logo";
 import { CompanyStackParamList } from "../../navigation/CompanyStack";
 import { useAuthStore } from "../../state/authStore";
 import type { ProviderAppointment } from "../../types/company";
@@ -41,7 +42,10 @@ export default function ProviderDashboardScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Provider dashboard</Text>
+        <View style={styles.headerBrand}>
+          <Logo size={30} />
+          <Text style={styles.headerSubtitle}>Provider dashboard</Text>
+        </View>
         <View style={styles.headerActions}>
           <Pressable onPress={() => navigation.navigate("Notifications")} style={styles.linkButton}>
             <Text style={styles.linkText}>🔔</Text>
@@ -81,7 +85,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  headerTitle: { fontSize: 20, fontWeight: "700" },
+  headerBrand: { gap: 2 },
+  headerSubtitle: { color: "#596568", fontSize: 12, fontWeight: "600" },
   headerActions: { flexDirection: "row", alignItems: "center", columnGap: 12 },
   linkButton: { paddingHorizontal: 6, paddingVertical: 4 },
   linkText: { color: "#1d4ed8", fontWeight: "600", fontSize: 16 },

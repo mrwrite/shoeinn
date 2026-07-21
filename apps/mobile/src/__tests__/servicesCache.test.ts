@@ -16,7 +16,7 @@ describe('services cache hydration', () => {
       duration_min: 30,
       company: {
         id: 'company-1',
-        name: 'Shoe Inn',
+        name: 'Skruhb',
         city: 'Seattle',
         state: 'WA',
       },

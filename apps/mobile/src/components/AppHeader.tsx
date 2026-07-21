@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useTheme } from "../theme/theme";
+import { Logo } from "./branding/Logo";
 
 interface AppHeaderProps {
   title?: string;
@@ -19,7 +20,7 @@ export function AppHeader({ title, locationLabel, onPressLocation, onPressNotifi
   return (
     <View style={[styles.container, { paddingTop: insets.top + 8, backgroundColor: theme.colors.surfaceLight }]}>
       <View style={styles.left}>
-        <Text style={styles.title}>{title ?? "Explore"}</Text>
+        {title === "Skruhb" ? <Logo size={30} /> : <Text style={styles.title}>{title ?? "Explore"}</Text>}
         <Text style={styles.location} onPress={onPressLocation}>
           <Ionicons name="location-outline" size={16} color={theme.colors.mutedText} /> {locationLabel}
         </Text>

@@ -49,7 +49,7 @@ try {
                 $apiPort = ([uri]$ApiBaseUrl).Port
             } catch {
             }
-            throw "Could not reach the ShoeInn API at $healthUrl. Check the API window for startup errors, confirm the API is running on port $apiPort, verify the LAN IP in -ApiBaseUrl, and confirm Windows Firewall allows inbound connections."
+            throw "Could not reach the Skruhb API at $healthUrl. Check the API window for startup errors, confirm the API is running on port $apiPort, verify the LAN IP in -ApiBaseUrl, and confirm Windows Firewall allows inbound connections."
         }
 
         if ($ExpectedPaymentMode) {

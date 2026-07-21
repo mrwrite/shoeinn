@@ -1,6 +1,6 @@
-# ShoeInn Architecture Overview
+# Skruhb Architecture Overview
 
-ShoeInn is a premium care marketplace demo composed of:
+Skruhb is a premium care marketplace demo composed of:
 
 - React Native Mobile App
 - FastAPI Backend API
@@ -102,4 +102,3 @@ flowchart LR
 - [Environment reference](../environment.md)
 - [Getting started](../getting-started.md)
 - [Troubleshooting](../troubleshooting.md)
-

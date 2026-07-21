@@ -1,6 +1,12 @@
-# ShoeInn
+<img src="brand/svg/skruhb-logo-deep.svg" alt="Skruhb" width="246" />
 
-Sneaker care scheduling, provider dispatch, notifications, and payment workflow demo.
+# Skruhb
+
+Operations software for cleaning and care businesses, including booking, provider dispatch, notifications, and payment workflows.
+
+## Brand assets
+
+The approved concept 45 compact SK ligature is the product identity. Exact Figma source exports are preserved in `brand/source`; cleaned, editable production masters for the deep blue-green, white, black, symbol-only, and horizontal lockups live in `brand/svg`. Platform raster derivatives live with the applications that consume them.
 
 This repository is a small monorepo. Run each app from its own folder:
 
@@ -121,7 +127,7 @@ Useful options:
 - `-SkipInstall` to skip `pip install`
 - `-PaymentMode mock` or `-PaymentMode service`
 - `-PaymentServiceBaseUrl "http://localhost:8001"` for service payment mode
-- `-MobileRedirectBase "exp://<YOUR-LAN-IP>:8081/--"` for Expo Go returns, or `shoeinn://app` for a dev build
+- `-MobileRedirectBase "exp://<YOUR-LAN-IP>:8081/--"` for Expo Go returns, or `skruhb://app` for a dev build
 - `-Port 8000` to override the API port
 
 If `apps/api/.env` already exists, the scripts preserve existing payment settings unless you explicitly pass `-PaymentMode`, `-PaymentServiceBaseUrl`, or `-MobileRedirectBase`.
@@ -244,20 +250,20 @@ Invoke-RestMethod -Method Post "http://localhost:8000/dev/seed?reset=true&demo_m
 
 Default demo logins all use `Password1!`:
 
-- Global admin: `admin@shoeinn.com`
-- Customer: `customer@shoeinn.com`
-- Pelham owner: `pelham.admin@shoeinn.com`
-- Pelham providers: `pelham.driver1@shoeinn.com`, `pelham.driver2@shoeinn.com`
-- Helena owner: `helena.admin@shoeinn.com`
-- Helena provider: `helena.driver@shoeinn.com`
-- Alabaster owner: `alabaster.admin@shoeinn.com`
-- Alabaster provider: `alabaster.driver@shoeinn.com`
+- Global admin: `admin@skruhb.com`
+- Customer: `customer@skruhb.com`
+- Pelham owner: `pelham.admin@skruhb.com`
+- Pelham providers: `pelham.driver1@skruhb.com`, `pelham.driver2@skruhb.com`
+- Helena owner: `helena.admin@skruhb.com`
+- Helena provider: `helena.driver@skruhb.com`
+- Alabaster owner: `alabaster.admin@skruhb.com`
+- Alabaster provider: `alabaster.driver@skruhb.com`
 
 Mt. Juliet quick-demo logins use `Password123!`:
 
-- Customer: `customer.mtjuliet@shoeinn.demo`
-- Provider: `provider.mtjuliet@shoeinn.demo`
-- Company admin: `admin.mtjuliet@shoeinn.demo`
+- Customer: `customer.mtjuliet@skruhb.demo`
+- Provider: `provider.mtjuliet@skruhb.demo`
+- Company admin: `admin.mtjuliet@skruhb.demo`
 
 The seed response also returns the current login list and generated company IDs.
 
@@ -313,7 +319,7 @@ $env:EXPO_PUBLIC_GOOGLE_MAPS_API_KEY="your-google-directions-api-key"
 $env:EXPO_PUBLIC_MOBILE_REDIRECT_BASE="exp://<YOUR-LAN-IP>:8081/--"
 ```
 
-Use `EXPO_PUBLIC_MOBILE_REDIRECT_BASE="shoeinn://app"` for a dev build or standalone app that supports the custom scheme.
+Use `EXPO_PUBLIC_MOBILE_REDIRECT_BASE="skruhb://app"` for a dev build or standalone app that supports the custom scheme.
 
 ## Optional Payment Service
 
@@ -346,7 +352,7 @@ Then set these API values in `apps/api/.env`:
 ```env
 PAYMENT_MODE=service
 PAYMENT_SERVICE_BASE_URL=http://localhost:8001
-PAYMENT_MOBILE_REDIRECT_BASE=shoeinn://app
+PAYMENT_MOBILE_REDIRECT_BASE=skruhb://app
 ```
 
 For Expo Go return-flow testing, use an explicit Expo URL instead:
@@ -496,5 +502,5 @@ Example login:
 ```powershell
 Invoke-RestMethod -Method Post "http://localhost:8000/auth/login" `
   -ContentType "application/json" `
-  -Body '{"email":"customer@shoeinn.com","password":"Password1!"}'
+  -Body '{"email":"customer@skruhb.com","password":"Password1!"}'
 ```
