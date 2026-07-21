@@ -1,5 +1,5 @@
 export const brandCopy = {
-  appName: "ShoeInn",
+  appName: "Skruhb",
   marketplacePositioning: "Premium care, pickup, and delivery from trusted local teams.",
   homeTitle: "Book premium care services",
   homeSubtitle: "Browse trusted local care providers and schedule pickup in minutes.",

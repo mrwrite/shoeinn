@@ -1,6 +1,6 @@
 # Staging Runbook
 
-This runbook describes the current Docker Compose staging slice for ShoeInn.
+This runbook describes the current Docker Compose staging slice for Skruhb.
 
 ## Scope
 
@@ -96,7 +96,7 @@ Critical values:
 EXPO_PUBLIC_API_URL=https://api-staging.example.com
 EXPO_PUBLIC_API_BASE_URL=https://api-staging.example.com
 EXPO_PUBLIC_ENABLE_DEMO_LOGINS=true
-EXPO_PUBLIC_MOBILE_REDIRECT_BASE=shoeinn://payment-return
+EXPO_PUBLIC_MOBILE_REDIRECT_BASE=skruhb://payment-return
 ```
 
 Do not point staging mobile builds at localhost.

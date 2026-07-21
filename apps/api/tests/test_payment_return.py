@@ -10,14 +10,16 @@ def test_payment_return_success_page_includes_app_link(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(settings, "payment_mobile_redirect_base", "shoeinn://app")
+    monkeypatch.setattr(settings, "payment_mobile_redirect_base", "skruhb://app")
 
     response = client.get("/payment/return/success?booking_id=booking-123&session_id=cs_123")
     assert response.status_code == 200
     body = response.text
     assert "Payment received" in body
-    assert "shoeinn://app/payment/success?booking_id=booking-123&session_id=cs_123" in body
-    assert "Open ShoeInn" in body
+    assert "skruhb://app/payment/success?booking_id=booking-123&session_id=cs_123" in body
+    assert "Open Skruhb" in body
+    assert 'src="/static/skruhb-logo-deep.svg"' in body
+    assert 'alt="Skruhb"' in body
 
 
 def test_payment_return_cancel_page_without_app_link_shows_manual_fallback(
@@ -30,5 +32,5 @@ def test_payment_return_cancel_page_without_app_link_shows_manual_fallback(
     assert response.status_code == 200
     body = response.text
     assert "Checkout canceled" in body
-    assert "Return to ShoeInn manually" in body
-    assert "Open ShoeInn" not in body
+    assert "Return to Skruhb manually" in body
+    assert "Open Skruhb" not in body

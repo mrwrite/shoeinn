@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { claimAppointment, fetchMyAppointments, fetchOpenAppointments } from "../../api/http";
 import { AppointmentCard } from "../../components/AppointmentCard";
+import { Logo } from "../../components/branding/Logo";
 import { AppCard } from "../../components/AppCard";
 import { AppScreen } from "../../components/ui/AppScreen";
 import { Button } from "../../components/ui/Button";
@@ -110,12 +111,7 @@ export default function ProviderDashboardScreen() {
       <View style={styles.header}>
         <View style={styles.brandLockup}>
           <View style={styles.brandWordmarkWrap}>
-            <View style={styles.brandWordmarkRow}>
-              <Text variant="display" weight="bold" style={[styles.brandWordmark, { color: theme.colors.primary }]}>
-                ShoeInn
-              </Text>
-              <Ionicons name="star" size={11} color={theme.colors.accent} />
-            </View>
+            <Logo size={48} />
             <Text variant="caption" weight="bold" color={theme.colors.accentPressed} style={styles.brandTagline}>
               PROVIDER DISPATCH
             </Text>

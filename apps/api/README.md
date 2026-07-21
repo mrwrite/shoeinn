@@ -1,4 +1,4 @@
-# ShoeInn API
+# Skruhb API
 
 FastAPI backend for authentication, companies, premium care services, booking holds, appointments, provider/company operations, live updates, notifications, payment reconciliation, and demo seeding.
 
@@ -111,7 +111,7 @@ Example login:
 ```powershell
 Invoke-RestMethod -Method Post "http://localhost:8000/auth/login" `
   -ContentType "application/json" `
-  -Body '{"email":"customer@shoeinn.com","password":"Password1!"}'
+  -Body '{"email":"customer@skruhb.com","password":"Password1!"}'
 ```
 
 ## Payment Modes
@@ -129,7 +129,7 @@ Use service mode only when `apps/payment` is running:
 ```env
 PAYMENT_MODE=service
 PAYMENT_SERVICE_BASE_URL=http://localhost:8001
-PAYMENT_MOBILE_REDIRECT_BASE=shoeinn://app
+PAYMENT_MOBILE_REDIRECT_BASE=skruhb://app
 ```
 
 For Expo Go return-flow testing:

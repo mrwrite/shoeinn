@@ -182,7 +182,7 @@ def test_company_services_can_filter_by_category(client: TestClient, db_session:
 
 
 def test_seed_services_backfills_existing_uncategorized_services(db_session: Session) -> None:
-    company = Company(name="Legacy ShoeInn", city="Mt. Juliet", state="TN")
+    company = Company(name="Legacy Skruhb", city="Mt. Juliet", state="TN")
     db_session.add(company)
     db_session.flush()
     service = Service(

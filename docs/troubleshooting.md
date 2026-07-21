@@ -54,7 +54,7 @@ If native config changed, rebuild the dev client instead of relying on Expo Go.
 
 - Run `npx eas credentials`.
 - Regenerate credentials only if the existing profile/certificate is invalid.
-- Make sure the bundle identifier remains `com.mrwrite.shoeinn`.
+- Make sure the bundle identifier remains `com.mrwrite.skruhb`.
 
 ## Maps
 

@@ -139,7 +139,7 @@ def test_dev_seed_populates_realistic_city_aligned_addresses(
     assert response.status_code == 200, response.text
     assert response.json()["demo_market"] == "shelby"
 
-    customer = db_session.query(User).filter(User.email == "customer@shoeinn.com").one()
+    customer = db_session.query(User).filter(User.email == "customer@skruhb.com").one()
     assert customer.address_line1 == "230 Tucker Road"
     assert customer.address_line2 is None
     assert customer.city == "Helena"
@@ -249,7 +249,7 @@ def test_dev_seed_mt_juliet_selector_resets_other_demo_markets_and_rotates_selec
     ).all()
     assert default_companies == []
 
-    customer = db_session.query(User).filter(User.email == "mtjuliet.customer@shoeinn.com").one()
+    customer = db_session.query(User).filter(User.email == "mtjuliet.customer@skruhb.com").one()
     assert customer.address_line1 == "3005 Willow Bend Dr"
     assert customer.address_line2 is None
     assert customer.city == "Mt. Juliet"
@@ -325,14 +325,14 @@ def test_dev_seed_mt_juliet_quick_demo_users_have_expected_roles(
         for user in db_session.query(User).filter(
             User.email.in_(
                 [
-                    "customer.mtjuliet@shoeinn.demo",
-                    "provider.mtjuliet@shoeinn.demo",
-                    "admin.mtjuliet@shoeinn.demo",
+                    "customer.mtjuliet@skruhb.demo",
+                    "provider.mtjuliet@skruhb.demo",
+                    "admin.mtjuliet@skruhb.demo",
                 ]
             )
         )
     }
 
-    assert users["customer.mtjuliet@shoeinn.demo"].role == "customer"
-    assert users["provider.mtjuliet@shoeinn.demo"].role == "provider"
-    assert users["admin.mtjuliet@shoeinn.demo"].role == "company_admin"
+    assert users["customer.mtjuliet@skruhb.demo"].role == "customer"
+    assert users["provider.mtjuliet@skruhb.demo"].role == "provider"
+    assert users["admin.mtjuliet@skruhb.demo"].role == "company_admin"

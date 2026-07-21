@@ -1,4 +1,4 @@
-# ShoeInn Payment Service
+# Skruhb Payment Service
 
 Optional FastAPI service that owns Stripe Checkout/PaymentIntent integration, payment records, Stripe webhook reconciliation, and payment-domain outbox rows.
 
@@ -67,7 +67,7 @@ Set in `apps/api/.env`:
 ```env
 PAYMENT_MODE=service
 PAYMENT_SERVICE_BASE_URL=http://localhost:8001
-PAYMENT_MOBILE_REDIRECT_BASE=shoeinn://app
+PAYMENT_MOBILE_REDIRECT_BASE=skruhb://app
 ```
 
 For Expo Go:
@@ -79,7 +79,7 @@ PAYMENT_MOBILE_REDIRECT_BASE=exp://<YOUR-LAN-IP>:8081/--
 Then start the API:
 
 ```powershell
-.\scripts\start-api.ps1 -PaymentMode service -MobileRedirectBase "shoeinn://app"
+.\scripts\start-api.ps1 -PaymentMode service -MobileRedirectBase "skruhb://app"
 ```
 
 ## Stripe Webhooks
@@ -112,7 +112,7 @@ Payment tests set in-memory SQLite and test Stripe env defaults in `tests/confte
 
 - The payment service creates tables at startup with SQLAlchemy metadata; there is no Alembic migration track in `apps/payment`.
 - Outbox rows are persisted, but no local broker publisher is implemented in this repository.
-- Checkout can reuse Stripe Customers and eligible saved cards, but ShoeInn does not provide a separate card-management UI.
+- Checkout can reuse Stripe Customers and eligible saved cards, but Skruhb does not provide a separate card-management UI.
 - Refund/dispute side effects are represented through payment state and compensating-action events; production support workflows remain future work.
 
 ## More Documentation

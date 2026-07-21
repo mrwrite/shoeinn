@@ -37,7 +37,7 @@ export default function CustomerHomeScreen() {
 
   return (
     <ScreenContainer scrollable contentContainerStyle={{ paddingBottom: 120 }} stickyFooter={stickyCTA}>
-      <AppHeader locationLabel="McDonough, GA" title="ShoeInn" />
+      <AppHeader locationLabel="McDonough, GA" title="Skruhb" />
       <View style={styles.searchWrapper}>
         <SearchBar value={search} onChangeText={setSearch} />
       </View>

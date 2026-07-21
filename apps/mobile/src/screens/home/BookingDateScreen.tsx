@@ -5,6 +5,7 @@ import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import { AppScreen } from "../../components/ui/AppScreen";
+import { Logo } from "../../components/branding/Logo";
 import { Button } from "../../components/ui/Button";
 import { Card, PressableCard } from "../../components/ui/Card";
 import { MediaPlaceholder } from "../../components/ui/MediaPlaceholder";
@@ -245,12 +246,7 @@ function BookingTopBar({ onBack, onClose }: { onBack: () => void; onClose: () =>
     <View style={styles.topBar}>
       <RoundIconButton icon="chevron-back" label="Go back" onPress={onBack} />
       <View style={styles.brandLockup}>
-        <View style={styles.brandRow}>
-          <Text variant="display" weight="regular" color={theme.colors.primary} style={styles.brand}>
-            ShoeInn
-          </Text>
-          <Ionicons name="sparkles" size={18} color={theme.colors.accent} />
-        </View>
+        <Logo size={34} />
         <Text variant="overline" color={theme.colors.accent} style={styles.brandSubhead}>
           Premium Care Marketplace
         </Text>

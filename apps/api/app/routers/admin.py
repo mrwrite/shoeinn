@@ -62,8 +62,8 @@ def _create_demo_user(db: Session, *, email: str, role: str, full_name: str, pas
 
 def _seed_demo_data(db: Session) -> dict[str, object]:
     now = datetime.now(timezone.utc)
-    company_one = Company(name="Downtown ShoeInn", city="San Francisco", state="CA")
-    company_two = Company(name="Uptown ShoeInn", city="New York", state="NY")
+    company_one = Company(name="Downtown Skruhb", city="San Francisco", state="CA")
+    company_two = Company(name="Uptown Skruhb", city="New York", state="NY")
     db.add_all([company_one, company_two])
     db.flush()
 

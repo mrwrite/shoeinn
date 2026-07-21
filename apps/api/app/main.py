@@ -36,7 +36,7 @@ logging.basicConfig(
     force=True,  # <- IMPORTANT: overrides existing handlers/config
 )
 
-app = FastAPI(title="ShoeInn API")
+app = FastAPI(title="Skruhb API")
 
 static_dir = Path(__file__).resolve().parent / "static"
 static_dir.mkdir(parents=True, exist_ok=True)

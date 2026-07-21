@@ -15,17 +15,27 @@ const demoMarket = process.env.EXPO_PUBLIC_DEMO_MARKET ?? "shelby";
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: "Shoeinn",
-  slug: "shoeinn",
-  scheme: "shoeinn",
+  name: "Skruhb",
+  slug: "skruhb",
+  scheme: "skruhb",
   version: "1.0.1",
+  icon: "./assets/icon.png",
   userInterfaceStyle: "light",
   orientation: "portrait",
   platforms: ["ios", "android", "web"],
+  splash: {
+    image: "./assets/splash-icon.png",
+    resizeMode: "contain",
+    backgroundColor: "#F7F3EA",
+  },
   android: {
     ...config.android,
-    package: "com.mrwrite.shoeinn",
+    package: "com.mrwrite.skruhb",
     versionCode: 2,
+    adaptiveIcon: {
+      foregroundImage: "./assets/adaptive-icon.png",
+      backgroundColor: "#062E37",
+    },
     config: {
       ...config.android?.config,
       googleMaps: {
@@ -35,7 +45,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   ios: {
     ...config.ios,
-    bundleIdentifier: "com.mrwrite.shoeinn",
+    bundleIdentifier: "com.mrwrite.skruhb",
     config: {
       ...config.ios?.config,
       googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
@@ -43,6 +53,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
     },
+  },
+  web: {
+    ...config.web,
+    favicon: "./assets/favicon.png",
   },
   updates: {
     ...config.updates,

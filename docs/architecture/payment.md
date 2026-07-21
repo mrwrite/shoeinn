@@ -37,7 +37,7 @@ API service mode:
 ```env
 PAYMENT_MODE=service
 PAYMENT_SERVICE_BASE_URL=http://localhost:8001
-PAYMENT_MOBILE_REDIRECT_BASE=shoeinn://app
+PAYMENT_MOBILE_REDIRECT_BASE=skruhb://app
 ```
 
 ## Webhooks
@@ -60,4 +60,3 @@ stripe listen --forward-to http://localhost:8001/payments/webhooks/stripe
 - No local broker publisher for payment outbox rows.
 - No separate card-management UI.
 - Refund/dispute support exists at state/event level but production support workflows are future work.
-

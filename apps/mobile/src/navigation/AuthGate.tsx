@@ -1,11 +1,12 @@
 import React, { useEffect } from "react";
-import { ActivityIndicator, Linking, View } from "react-native";
+import { ActivityIndicator, Linking, StyleSheet, View } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 
 import AuthStack from "./AuthStack";
 import AppStack from "./AppStack";
 import { navigateWhenReady, navigationRef } from "./rootNavigation";
 import { useAuthStore } from "../state/authStore";
+import { Logo } from "../components/branding/Logo";
 
 function normalizeIncomingPath(pathname: string, host: string): string {
   const trimmed = pathname.replace(/^\/+/, "");
@@ -77,9 +78,10 @@ export default function AuthGate() {
   if (loading) {
     return (
       <View
-        style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#f3f4f6" }}
+        style={styles.loading}
       >
-        <ActivityIndicator />
+        <Logo layout="symbol" size={84} />
+        <ActivityIndicator color="#062E37" accessibilityLabel="Loading Skruhb" />
       </View>
     );
   }
@@ -90,3 +92,13 @@ export default function AuthGate() {
     </NavigationContainer>
   );
 }
+
+const styles = StyleSheet.create({
+  loading: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 20,
+    backgroundColor: "#F7F3EA",
+  },
+});

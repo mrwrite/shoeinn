@@ -77,6 +77,13 @@ def _payment_return_page(*, title: str, body: str, app_url: str | None) -> HTMLR
         padding: 32px 24px;
         box-shadow: 0 20px 40px rgba(17, 24, 39, 0.08);
       }}
+      .brand {{
+        display: block;
+        width: 190px;
+        max-width: 60%;
+        height: auto;
+        margin: 0 0 28px;
+      }}
       h1 {{
         margin: 0 0 12px;
         font-size: 28px;
@@ -102,6 +109,7 @@ def _payment_return_page(*, title: str, body: str, app_url: str | None) -> HTMLR
   </head>
   <body>
     <main>
+      <img class="brand" src="/static/skruhb-logo-deep.svg" alt="{APP_NAME}" />
       <h1>{title}</h1>
       <p>{body}</p>
       {open_app_link}
