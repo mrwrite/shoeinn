@@ -43,3 +43,8 @@ dev.db
 **/.pytest_cache/
 **/__pycache__/
 *.db
+# Local environment files (templates remain tracked)
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.*.example
